@@ -1,5 +1,5 @@
 CC       = m68k-amigaos-gcc
-ARCH     = -noixemul -m68030 -fsingle-precision-constant -O2 -fomit-frame-pointer
+ARCH     = -noixemul -m68020 -fsingle-precision-constant -O2 -fomit-frame-pointer
 # the upstream simulation core is old K&R-ish C: no warnings from it
 COREFLAGS = $(ARCH) -std=gnu89 -w -Isrc/core -Isrc/amiga
 AMIFLAGS  = $(ARCH) -std=gnu99 -Wall -Wno-unused-parameter -Isrc/core -Isrc/amiga

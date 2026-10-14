@@ -1,0 +1,75 @@
+Short:        Micropolis (open-source SimCity) with RTG graphics
+Author:       Electronic Arts / Will Wright / Don Hopkins (original), Amiga port: joergsf4
+Uploader:     joergsf4
+Type:         game/strategy
+Version:      0.1
+Requires:     AmigaOS 3.x, 68020+, RTG card (Picasso96 or CyberGraphX), 2 MB Chip + 2 MB Fast
+Architecture: m68k-amigaos >= 3.0.0
+
+MICROPOLIS FOR AMIGAOS 3 - EARLY ALPHA
+======================================
+
+Micropolis is the open-source version of the original SimCity. This is a port of its
+simulation core to the Amiga with a native Intuition front end and RTG graphics
+(640x480, 8 bit). Developed and tested with AmigaOS 3.2 only.
+
+
+REQUIREMENTS
+------------
+- AmigaOS 3.x, Kickstart 3.2 recommended, 68020 or better (68030/50 MHz is the speed target)
+- 2 MB Chip RAM and 2 MB Fast RAM or more
+- RTG graphics card with Picasso96 or CyberGraphX (cybergraphics.library 40+),
+  with a 640x480 8 bit screen mode (in FS-UAE: graphics_card = uaegfx-z3)
+- LIBS: mathieeedoubbas.library, mathieeedoubtrans.library, gadtools.library, asl.library
+  (all are part of a normal Workbench)
+- The CPU library for your processor (68030.library, 68040.library, ...) as AmigaOS 3.2 asks for
+
+
+INSTALLATION
+------------
+Copy the Micropolis drawer where you like (e.g. Work:) and double-click the Micropolis icon.
+From a shell:
+
+    CD Work:Micropolis
+    Micropolis                      ; opens cities/haight.cty
+    Micropolis cities/bruce.cty
+
+The game looks for res/ and cities/ in the CURRENT DIRECTORY, so start it from its drawer.
+The Tools drawer has RTGTest (shows a colour gradient in a RTG screen - to check your setup)
+and ListModes (lists all screen modes the system knows).
+
+
+CONTROLS
+--------
+Tools          click a button on the left (Query, Doze, Road, Rail, Wire, Park, zones,
+               Fire, Police, Stadium, power plants, Sea port, Airport)
+Build          click or drag on the map; the white frame shows the area
+Scroll         W A S D, mouse wheel, mouse at the screen edge; in the overview map click or drag
+Menus          right mouse button
+Speed          0 pause, 1 slow, 2 medium, 3 fast, P toggles pause
+Budget         B, or menu Windows/Budget (Continue or Cancel)
+Overview map   M on/off, C next overlay (14 overlays in the Map menu)
+Quit           Esc, or Project/Quit
+
+The R C I bars at the top right show the demand for residential, commercial and industrial zones.
+Warnings and events open a message window (Continue, Return or Space closes it).
+
+
+STATUS
+------
+Works: simulation, building tools, animated map, overview map with overlays, budget,
+load/save/new random city, menus, disasters, event messages.
+Missing: evaluation window and graphs, sound, scenario selection, earthquake shake, tooltypes.
+Known problem: a crash when quitting was seen on some setups - please report the error number.
+
+The file micropolis.log in the drawer is a debug log; you may delete it.
+Source code and bug reports: https://github.com/joergsf4/micropolis-amiga
+
+
+LICENSE
+-------
+GNU GPL v3 (file COPYING) with the additional terms of the original Micropolis release: the name
+"SimCity" is a trademark of Electronic Arts and is neither used nor licensed here. Graphics, sounds and
+texts come from the original Micropolis distribution and are (c) Electronic Arts. Original game design:
+Will Wright. Unix/X11 version and open-sourcing: Don Hopkins.
+No Kickstart or Workbench files are included in this archive.

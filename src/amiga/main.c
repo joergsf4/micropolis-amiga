@@ -26,6 +26,8 @@
 #include <proto/asl.h>
 #include <proto/cybergraphics.h>
 
+static const char verstag[] __attribute__((used)) = "$VER: Micropolis 0.1 (14.10.2026)";
+
 struct Library *CyberGfxBase;
 struct IntuitionBase *IntuitionBase;
 struct GfxBase *GfxBase;
