@@ -60,6 +60,7 @@
  * NOT APPLY TO YOU.
  */
 #include "sim.h"
+void SetDemand(float r, float c, float i);   /* AMIGA: single precision (the ieee double library was unreliable) */
 
 
 short MustUpdateFunds;
