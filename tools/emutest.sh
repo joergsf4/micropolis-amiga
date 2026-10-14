@@ -4,7 +4,8 @@
 # usage: tools/emutest.sh "<command line, run from the program dir>" [timeout-seconds]
 set -euo pipefail
 cd "$(dirname "$0")/.."
-ROM="$HOME/dev/AmigaProjekt/Amiga OS3/ROM/kicka4000.rom"
+# MODEL=A1200/1230 ROMFILE=kicka1200.rom tools/emutest.sh ...  tests on a 68030
+ROM="$HOME/dev/AmigaProjekt/Amiga OS3/ROM/${ROMFILE:-kicka4000.rom}"
 CMD="${1:?command}"; TMO="${2:-120}"
 rm -rf out/testhd; mkdir -p out/testhd/S out/testhd/Libs
 cp -R "$HOME/dev/AmigaProjekt/workbench/share/Micropolis/." out/testhd/
@@ -14,7 +15,7 @@ cp "$ROM" out/kick.rom
 docker run --rm -i -v "$PWD":/project -w /project -e HOME=/tmp -e TMO="$TMO" -e EXTRA="${EXTRA:-}" dnd-amiga-emutest bash -s <<'EOS'
 Xvfb :99 -screen 0 1024x800x24 >/dev/null 2>&1 &
 export DISPLAY=:99; sleep 1
-fs-uae --amiga_model=A4000/040 --kickstart_file=/project/out/kick.rom --hard_drive_0=/project/out/testhd \
+fs-uae --amiga_model=${MODEL:-A4000/040} --kickstart_file=/project/out/kick.rom --hard_drive_0=/project/out/testhd \
   --fullscreen=0 --window_width=640 --window_height=480 --floppy_drive_speed=0 \
   --fast_memory=8192 $EXTRA > /project/out/fs-uae.log 2>&1 &
 for _ in $(seq 1 $TMO); do

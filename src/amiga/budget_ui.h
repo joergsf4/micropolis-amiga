@@ -3,6 +3,10 @@
 #include <exec/types.h>
 #include <graphics/rastport.h>
 extern int budget_visible;
+#define BUDGET_X 118                          /* panel rectangle incl. border */
+#define BUDGET_Y 78
+#define BUDGET_W 404
+#define BUDGET_H 324
 void budget_show(void);                       /* core asked for the budget ("UIShowBudgetAndWait") */
 void budget_set_totals(const char *cmd);      /* "UISetBudget {flow} {previous} {current} {collected} {tax}" */
 void budget_set_values(const char *cmd);      /* "UISetBudgetValues ..." */

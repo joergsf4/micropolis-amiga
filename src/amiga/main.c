@@ -57,6 +57,7 @@ static char status_date[32] = "", status_funds[48] = "", status_msg[96] = "";
 extern int sim_loops;
 static int dirty = 1;
 static int map_dirty = 1;
+static int budget_dirty = 1;
 #define MAP_X (SCR_W - MV_W - 6)
 #define MAP_Y (SCR_H - MV_H - 6)
 
@@ -101,9 +102,9 @@ int ui_eval(const char *cmd)
         sprintf(status_msg, "%s, %s, %s, %s", a, b, c, d);
         dirty = 1;
     }
-    else if (!strncmp(cmd, "UISetBudget ", 12))       { budget_set_totals(cmd); dirty = 1; }
+    else if (!strncmp(cmd, "UISetBudget ", 12))       { budget_set_totals(cmd); budget_dirty = 1; dirty = 1; }
     else if (!strncmp(cmd, "UISetBudgetValues ", 18)) { budget_set_values(cmd); dirty = 1; }
-    else if (!strncmp(cmd, "UIShowBudgetAndWait", 19)) { budget_show(); dirty = 1; }
+    else if (!strncmp(cmd, "UIShowBudgetAndWait", 19)) { budget_show(); budget_dirty = 1; dirty = 1; }
     else if (!strncmp(cmd, "UISetMessage ", 13)) { copy_braced(status_msg, sizeof status_msg, cmd); dirty = 1; }
     return 0;
 }
@@ -145,36 +146,72 @@ static int load_assets(void)
     return 1;
 }
 
-/* ---------- drawing ---------- */
+/* ---------- drawing ----------
+ * The frame buffer fb always holds the whole picture. Each frame only the tiles whose picture changed
+ * (animation, growth, blinking bolt), the areas touched by moving sprites and the cursor, and panels
+ * that changed are redrawn in fb and then sent to the RTG screen as small rectangles. On a 68030 with
+ * a Zorro II graphics card the bus is the bottleneck, so a full 640x480 blit per frame is far too much. */
+struct rect { short x0, y0, x1, y1; };          /* inclusive, frame buffer pixels */
+
+static short shown[VIEW_ROWS][VIEW_COLS];       /* tile id last drawn in each cell, -1 = unknown */
+static UBYTE redraw[VIEW_ROWS][VIEW_COLS];
+static int full_redraw = 1;                     /* start, scroll, panel closed: redraw all cells */
+static int toolbar_dirty = 1, first_present = 1;
+static int last_map_visible, last_budget_visible;
+static int last_view_x = -1, last_view_y = -1;
+#define MAX_SPR 48
+static struct rect prev_spr[MAX_SPR];
+static int n_prev_spr;
+static struct rect prev_cursor;
+static int have_prev_cursor;
+static char last_line1[200], last_line2[200];
+
+static struct { long frames, tiles, bytes, render_us, sim_us, sim_steps; } stats;   /* no doubles: the ieee double library is unreliable */
+
 static void draw_tile(int col, int row, int tile)
 {
-    UBYTE *src = tiles + tile * 256;
+    const UBYTE *src = tiles + tile * 256;
     UBYTE *dst = fb + (BAR_H + row * 16) * SCR_W + TB_W + col * 16;
     for (int y = 0; y < 16; y++, src += 16, dst += SCR_W)
         memcpy(dst, src, 16);
 }
 
-static void draw_sprite(SimSprite *s)
+/* picture of a sprite frame: size and pixels (0 = transparent), NULL if unknown */
+static const UBYTE *sprite_frame(const SimSprite *s, int *w, int *h)
 {
-    if (s->frame == 0) return;
     UWORD n = *(UWORD *)objects;
-    UBYTE *tab = objects + 2;
+    const UBYTE *tab = objects + 2;
+    if (s->frame == 0) return NULL;
     for (UWORD i = 0; i < n; i++, tab += 8) {
         if (tab[0] != s->type || tab[1] != s->frame - 1) continue;
-        int w = tab[2], h = tab[3];
-        UBYTE *px = objects + *(ULONG *)(tab + 4);
-        int x0 = s->x - (view_x << 4) + s->x_offset + TB_W;
-        int y0 = s->y - (view_y << 4) + s->y_offset + BAR_H;
-        for (int y = 0; y < h; y++) {
-            int dy = y0 + y;
-            if (dy < BAR_H || dy >= SCR_H) continue;
-            for (int x = 0; x < w; x++) {
-                int dx = x0 + x;
-                UBYTE c = px[y * w + x];
-                if (c && dx >= TB_W && dx < SCR_W) fb[dy * SCR_W + dx] = c;
-            }
+        *w = tab[2]; *h = tab[3];
+        return objects + *(const ULONG *)(tab + 4);
+    }
+    return NULL;
+}
+
+static int sprite_rect(const SimSprite *s, struct rect *r, const UBYTE **px, int *w, int *h)
+{
+    const UBYTE *p = sprite_frame(s, w, h);
+    if (!p) return 0;
+    r->x0 = s->x - (view_x << 4) + s->x_offset + TB_W;
+    r->y0 = s->y - (view_y << 4) + s->y_offset + BAR_H;
+    r->x1 = r->x0 + *w - 1;
+    r->y1 = r->y0 + *h - 1;
+    if (px) *px = p;
+    return 1;
+}
+
+static void draw_sprite(const struct rect *r, const UBYTE *px, int w, int h)
+{
+    for (int y = 0; y < h; y++) {
+        int dy = r->y0 + y;
+        if (dy < BAR_H || dy >= SCR_H) continue;
+        for (int x = 0; x < w; x++) {
+            int dx = r->x0 + x;
+            UBYTE c = px[y * w + x];
+            if (c && dx >= TB_W && dx < SCR_W) fb[dy * SCR_W + dx] = c;
         }
-        return;
     }
 }
 
@@ -190,16 +227,22 @@ static void vline(int x, int y0, int y1, UBYTE c)
     for (int y = y0; y <= y1; y++) if (y >= BAR_H && y < SCR_H) fb[y * SCR_W + x] = c;
 }
 
-/* outline of the area the current tool would build on, at the mouse position */
-static void draw_cursor(void)
+/* area the current tool would build on, at the mouse position */
+static int cursor_rect(struct rect *r)
 {
     int st = editor.tool_state, size = toolSize[st];
-    if (hover_x < 0 || size <= 0) return;
-    int tx = hover_x - toolOffset[st], ty = hover_y - toolOffset[st];
-    int x0 = TB_W + (tx - view_x) * 16, y0 = BAR_H + (ty - view_y) * 16;
-    int x1 = x0 + size * 16 - 1, y1 = y0 + size * 16 - 1;
-    hline(x0, x1, y0, PEN_TEXT); hline(x0, x1, y1, PEN_TEXT);
-    vline(x0, y0, y1, PEN_TEXT); vline(x1, y0, y1, PEN_TEXT);
+    if (hover_x < 0 || size <= 0) return 0;
+    r->x0 = TB_W + (hover_x - toolOffset[st] - view_x) * 16;
+    r->y0 = BAR_H + (hover_y - toolOffset[st] - view_y) * 16;
+    r->x1 = r->x0 + size * 16 - 1;
+    r->y1 = r->y0 + size * 16 - 1;
+    return 1;
+}
+
+static void draw_cursor(const struct rect *r)
+{
+    hline(r->x0, r->x1, r->y0, PEN_TEXT); hline(r->x0, r->x1, r->y1, PEN_TEXT);
+    vline(r->x0, r->y0, r->y1, PEN_TEXT); vline(r->x1, r->y0, r->y1, PEN_TEXT);
 }
 
 static void draw_toolbar(void)
@@ -211,52 +254,180 @@ static void draw_toolbar(void)
     }
 }
 
-static void render_map(void)
+/* mark every cell touched by a pixel rectangle */
+static void mark_rect(const struct rect *r)
 {
+    int c0 = (r->x0 - TB_W) >> 4, c1 = (r->x1 - TB_W) >> 4;
+    int r0 = (r->y0 - BAR_H) >> 4, r1 = (r->y1 - BAR_H) >> 4;
+    if (r->x0 < TB_W) c0 = 0;
+    if (r->y0 < BAR_H) r0 = 0;
+    if (c0 < 0) c0 = 0;
+    if (r0 < 0) r0 = 0;
+    if (c1 >= VIEW_COLS) c1 = VIEW_COLS - 1;
+    if (r1 >= VIEW_ROWS) r1 = VIEW_ROWS - 1;
+    for (int y = r0; y <= r1; y++)
+        for (int x = c0; x <= c1; x++) redraw[y][x] = 1;
+}
+
+static int overlaps(const struct rect *a, int x0, int y0, int x1, int y1)
+{
+    return !(a->x1 < x0 || a->x0 > x1 || a->y1 < y0 || a->y0 > y1);
+}
+
+static void blit(struct RastPort *rp, int x, int y, int w, int h)
+{
+    WritePixelArray(fb, x, y, SCR_W, rp, x, y, w, h, RECTFMT_LUT8);
+    stats.bytes += (long)w * h;
+}
+
+static void put_text(struct RastPort *rp, int x, int y, const char *s)
+{
+    Move(rp, x, y);
+    Text(rp, (CONST_STRPTR)s, strlen(s));
+}
+
+static struct timeval t_a;
+static long elapsed_us(void)
+{
+    struct timeval t_b;
+    gettimeofday(&t_b, NULL);
+    return (long)(t_b.tv_sec - t_a.tv_sec) * 1000000L + (long)(t_b.tv_usec - t_a.tv_usec);
+}
+
+static void render_frame(struct Window *win)
+{
+    struct RastPort *rp = win->RPort;
     int blink = flagBlink > 0;
+    struct rect cur_spr[MAX_SPR], cur;
+    const UBYTE *spr_px[MAX_SPR];
+    int spr_w[MAX_SPR], spr_h[MAX_SPR], n_spr = 0;
+    int have_cursor, map_need = 0, budget_redraw = budget_dirty;
+    struct rect maprect = { MAP_X - 1, MAP_Y - 1, MAP_X + MV_W, MAP_Y + MV_H };
+    struct rect budrect = { BUDGET_X, BUDGET_Y, BUDGET_X + BUDGET_W - 1, BUDGET_Y + BUDGET_H - 1 };
+
+    gettimeofday(&t_a, NULL);
+    if (!map_visible && last_map_visible) full_redraw = 1;           /* cells under the panel are stale */
+    if (!budget_visible && last_budget_visible) full_redraw = 1;
+    if (budget_visible && !last_budget_visible) budget_dirty = 1;
+    last_map_visible = map_visible; last_budget_visible = budget_visible;
+    if (view_x != last_view_x || view_y != last_view_y) { full_redraw = 1; last_view_x = view_x; last_view_y = view_y; }
+    if (full_redraw) {
+        memset(redraw, 1, sizeof redraw);
+        memset(shown, 0xff, sizeof shown);
+        have_prev_cursor = 0; n_prev_spr = 0;
+        full_redraw = 0;
+        if (map_visible) map_need = 1;
+    } else {
+        memset(redraw, 0, sizeof redraw);
+    }
+
+    /* which cells changed? */
     for (int row = 0; row < VIEW_ROWS; row++) {
         for (int col = 0; col < VIEW_COLS; col++) {
-            int mx = view_x + col, my = view_y + row;
-            int tile = 0;
+            int mx = view_x + col, my = view_y + row, tile = 0;
             if (mx < WORLD_X && my < WORLD_Y) {
                 tile = (unsigned short)Map[mx][my];
                 if ((tile & LOMASK) >= TILE_COUNT) tile -= TILE_COUNT;
                 if (blink && (tile & ZONEBIT) && !(tile & PWRBIT)) tile = LIGHTNINGBOLT;
                 else tile &= LOMASK;
             }
-            draw_tile(col, row, tile);
+            if (tile != shown[row][col]) { redraw[row][col] = 1; shown[row][col] = tile; }
         }
     }
-    for (SimSprite *s = sim->sprite; s; s = s->next) draw_sprite(s);
-    draw_cursor();
-    draw_toolbar();
+
+    /* moving things: redraw the cells under their old and new positions */
+    for (SimSprite *sp = sim->sprite; sp && n_spr < MAX_SPR; sp = sp->next) {
+        if (sprite_rect(sp, &cur_spr[n_spr], &spr_px[n_spr], &spr_w[n_spr], &spr_h[n_spr])) {
+            mark_rect(&cur_spr[n_spr]);
+            n_spr++;
+        }
+    }
+    for (int i = 0; i < n_prev_spr; i++) mark_rect(&prev_spr[i]);
+    have_cursor = cursor_rect(&cur);
+    if (have_cursor) mark_rect(&cur);
+    if (have_prev_cursor) mark_rect(&prev_cursor);
+
+    /* draw the tiles; cells that lie completely under a panel are not drawn at all */
+    for (int row = 0; row < VIEW_ROWS; row++) {
+        for (int col = 0; col < VIEW_COLS; col++) {
+            struct rect cell;
+            if (!redraw[row][col]) continue;
+            cell.x0 = TB_W + col * 16; cell.y0 = BAR_H + row * 16; cell.x1 = cell.x0 + 15; cell.y1 = cell.y0 + 15;
+            if (map_visible && cell.x0 >= maprect.x0 && cell.x1 <= maprect.x1 && cell.y0 >= maprect.y0 && cell.y1 <= maprect.y1) {
+                redraw[row][col] = 0; shown[row][col] = -1; continue;
+            }
+            if (budget_visible && cell.x0 >= budrect.x0 && cell.x1 <= budrect.x1 && cell.y0 >= budrect.y0 && cell.y1 <= budrect.y1) {
+                redraw[row][col] = 0; shown[row][col] = -1; continue;
+            }
+            draw_tile(col, row, shown[row][col]);
+            stats.tiles++;
+            if (map_visible && overlaps(&cell, maprect.x0, maprect.y0, maprect.x1, maprect.y1)) map_need = 1;
+            if (budget_visible && overlaps(&cell, budrect.x0, budrect.y0, budrect.x1, budrect.y1)) budget_redraw = 1;
+        }
+    }
+    for (int i = 0; i < n_spr; i++) draw_sprite(&cur_spr[i], spr_px[i], spr_w[i], spr_h[i]);
+    if (have_cursor) draw_cursor(&cur);
+    for (int i = 0; i < n_spr; i++) prev_spr[i] = cur_spr[i];
+    n_prev_spr = n_spr;
+    prev_cursor = cur; have_prev_cursor = have_cursor;
+
+    if (toolbar_dirty) draw_toolbar();
     if (map_visible) {
         static int last_loops = -1000;
-        if (map_dirty || sim_loops - last_loops >= 16) { map_refresh(); map_dirty = 0; last_loops = sim_loops; }
-        map_blit(fb, SCR_W, MAP_X, MAP_Y, view_x, view_y, VIEW_COLS, VIEW_ROWS);
+        if (map_dirty || sim_loops - last_loops >= 16) { map_refresh(); map_dirty = 0; last_loops = sim_loops; map_need = 1; }
+        if (map_need) map_blit(fb, SCR_W, MAP_X, MAP_Y, view_x, view_y, VIEW_COLS, VIEW_ROWS);
     }
-    budget_draw(fb, SCR_W);
-}
+    if (budget_visible && budget_redraw) budget_draw(fb, SCR_W);
+    stats.render_us += elapsed_us();
 
-static void present(struct Window *win)
-{
-    struct RastPort *rp = win->RPort;
-    WritePixelArray(fb, 0, 0, SCR_W, rp, 0, 0, SCR_W, SCR_H, RECTFMT_LUT8);
-    char line[200];
-    SetAPen(rp, PEN_TEXT);
-    SetBPen(rp, PEN_BAR);
-    sprintf(line, " %-9s  %-22s  Pop %-8ld  Speed %d%s ", status_date, status_funds, (long)CityPop, (int)SimSpeed,
-            SimSpeed ? "" : " (Pause)");
-    Move(rp, 4, 12);  Text(rp, (CONST_STRPTR)line, strlen(line));
-    sprintf(line, " %-70s", status_msg);
-    Move(rp, 4, 27);  Text(rp, (CONST_STRPTR)line, strlen(line));
-    SetAPen(rp, PEN_TEXT);
-    for (int i = 0; i < 16; i++) {
-        SetBPen(rp, toolbtn[i].state == editor.tool_state ? PEN_SEL : PEN_BTN);
-        Move(rp, 4, BAR_H + i * TB_BTN_H + 17);
-        Text(rp, (CONST_STRPTR)toolbtn[i].name, strlen(toolbtn[i].name));
+    /* send the changes to the screen */
+    if (first_present) {
+        blit(rp, 0, 0, SCR_W, SCR_H);
+        first_present = 0;
+    } else {
+        for (int row = 0; row < VIEW_ROWS; row++) {
+            int col = 0;
+            while (col < VIEW_COLS) {
+                int c0;
+                if (!redraw[row][col]) { col++; continue; }
+                c0 = col;
+                while (col < VIEW_COLS && redraw[row][col]) col++;
+                blit(rp, TB_W + c0 * 16, BAR_H + row * 16, (col - c0) * 16, 16);
+            }
+        }
+        if (toolbar_dirty) blit(rp, 0, BAR_H, TB_W, SCR_H - BAR_H);
+        if (map_visible && map_need) blit(rp, maprect.x0, maprect.y0, maprect.x1 - maprect.x0 + 1, maprect.y1 - maprect.y0 + 1);
+        if (budget_visible && budget_redraw) blit(rp, budrect.x0, budrect.y0, BUDGET_W, BUDGET_H);
     }
-    budget_text(rp);
+
+    /* text goes straight to the screen after the pixels under it were refreshed */
+    {
+        char line[200];
+        SetAPen(rp, PEN_TEXT);
+        SetBPen(rp, PEN_BAR);
+        sprintf(line, " %-9s  %-22s  Pop %-8ld  Speed %d%s ", status_date, status_funds, (long)CityPop, (int)SimSpeed,
+                SimSpeed ? "" : " (Pause)");
+        if (strcmp(line, last_line1)) { put_text(rp, 4, 12, line); strcpy(last_line1, line); }
+        sprintf(line, " %-70s", status_msg);
+        if (strcmp(line, last_line2)) { put_text(rp, 4, 27, line); strcpy(last_line2, line); }
+    }
+    if (toolbar_dirty) {
+        for (int i = 0; i < 16; i++) {
+            SetBPen(rp, toolbtn[i].state == editor.tool_state ? PEN_SEL : PEN_BTN);
+            put_text(rp, 4, BAR_H + i * TB_BTN_H + 17, toolbtn[i].name);
+        }
+        toolbar_dirty = 0;
+    }
+    if (budget_visible && budget_redraw) { budget_text(rp); budget_dirty = 0; }
+
+    if (++stats.frames >= 200) {                     /* performance log for tuning on slow machines */
+        char b[160];
+        sprintf(b, "perf: %ld frames, render %ld us/frame, %ld tiles/frame, %ld KB blit/frame; %ld sim steps, %ld us/step",
+                stats.frames, stats.render_us / stats.frames, stats.tiles / stats.frames,
+                stats.bytes / stats.frames / 1024, stats.sim_steps, stats.sim_steps ? stats.sim_us / stats.sim_steps : 0L);
+        logmsg(b);
+        memset(&stats, 0, sizeof stats);
+    }
 }
 
 /* ---------- menus and commands ---------- */
@@ -516,6 +687,7 @@ static int real_main(int argc, char **argv)
                 if (budget_visible) {
                     hover_x = -1;
                     if (cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) budget_click(mx, my);
+                    if (cls == IDCMP_MOUSEBUTTONS) budget_dirty = 1;
                     dirty = 1;
                     continue;
                 }
@@ -532,7 +704,7 @@ static int real_main(int argc, char **argv)
                 if (cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) {
                     if (mx < TB_W && my >= BAR_H) {
                         int i = (my - BAR_H) / TB_BTN_H;
-                        if (i < 16) editor.tool_state = toolbtn[i].state;
+                        if (i < 16) { editor.tool_state = toolbtn[i].state; toolbar_dirty = 1; }
                     } else if (inview) {
                         ToolDown(&editor, wx, wy);
                         dragging = 1;
@@ -556,15 +728,19 @@ static int real_main(int argc, char **argv)
             if (ox != view_x || oy != view_y) dirty = 1;
         }
         if (SimSpeed && ++tick >= delay[SimSpeed]) {
+            struct timeval t0, t1;
             tick = 0;
+            gettimeofday(&t0, NULL);
             sim_loop(1);
+            gettimeofday(&t1, NULL);
+            stats.sim_us += (long)(t1.tv_sec - t0.tv_sec) * 1000000L + (long)(t1.tv_usec - t0.tv_usec);
+            stats.sim_steps++;
             dirty = 1;
         }
         if (dirty) {
             static int first = 1; if (first) { logmsg("first frame"); first = 0; }
             if (!TilesAnimated) { animateTiles(); TilesAnimated = 1; }
-            render_map();
-            present(win);
+            render_frame(win);
             dirty = 0;
         }
         WaitTOF();
