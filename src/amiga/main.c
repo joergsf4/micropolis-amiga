@@ -17,11 +17,17 @@
 #include <proto/dos.h>
 #include <proto/intuition.h>
 #include <proto/graphics.h>
+#include <libraries/gadtools.h>
+#include <libraries/asl.h>
+#include <proto/gadtools.h>
+#include <proto/asl.h>
 #include <proto/cybergraphics.h>
 
 struct Library *CyberGfxBase;
 struct IntuitionBase *IntuitionBase;
 struct GfxBase *GfxBase;
+struct Library *GadToolsBase;
+struct Library *AslBase;
 
 #define SCR_W 640
 #define SCR_H 480
@@ -55,7 +61,7 @@ static int dirty = 1;
 static SimView editor;                 /* the core's tools take a SimView; only tool_state/last_x/y are used */
 static int hover_x = -1, hover_y = -1; /* tile under the mouse, -1 = none */
 static int dragging;
-static int panning, pan_mx, pan_my;      /* right mouse button drag scrolls the map */
+static const int panning = 0;            /* (right button is the menu button now) */
 static int mouse_x = -1, mouse_y = -1;   /* last window position, for edge scrolling */
 
 static const struct { const char *name; short state; } toolbtn[16] = {
@@ -235,6 +241,125 @@ static void present(struct Window *win)
     }
 }
 
+/* ---------- menus and commands ---------- */
+enum { CMD_NEW = 1, CMD_LOAD, CMD_SAVE, CMD_SAVEAS, CMD_QUIT,
+       CMD_PAUSE = 10, CMD_SLOW, CMD_MEDIUM, CMD_FAST,
+       CMD_AUTOBULLDOZE = 20, CMD_AUTOBUDGET, CMD_DISASTERS, CMD_SOUND,
+       CMD_FIRE = 30, CMD_FLOOD, CMD_TORNADO, CMD_QUAKE, CMD_MONSTER, CMD_MELTDOWN };
+
+static struct NewMenu newmenu[40];
+static int nmenu;
+static void mi(UBYTE type, const char *label, const char *key, UWORD flags, int id)
+{
+    struct NewMenu *n = &newmenu[nmenu++];
+    n->nm_Type = type; n->nm_Label = (STRPTR)label; n->nm_CommKey = (STRPTR)key;
+    n->nm_Flags = flags; n->nm_MutualExclude = 0; n->nm_UserData = (APTR)(long)id;
+}
+
+static struct Menu *make_menus(struct Screen *scr, APTR *vi_out)
+{
+    APTR vi = GetVisualInfoA(scr, NULL);
+    struct Menu *menu;
+    nmenu = 0;
+    mi(NM_TITLE, "Project", NULL, 0, 0);
+    mi(NM_ITEM, "New City", "N", 0, CMD_NEW);
+    mi(NM_ITEM, "Load City...", "L", 0, CMD_LOAD);
+    mi(NM_ITEM, "Save City", "S", 0, CMD_SAVE);
+    mi(NM_ITEM, "Save City As...", NULL, 0, CMD_SAVEAS);
+    mi(NM_ITEM, (const char *)NM_BARLABEL, NULL, 0, 0);
+    mi(NM_ITEM, "Quit", "Q", 0, CMD_QUIT);
+    mi(NM_TITLE, "Speed", NULL, 0, 0);
+    mi(NM_ITEM, "Pause", "0", 0, CMD_PAUSE);
+    mi(NM_ITEM, "Slow", "1", 0, CMD_SLOW);
+    mi(NM_ITEM, "Medium", "2", 0, CMD_MEDIUM);
+    mi(NM_ITEM, "Fast", "3", 0, CMD_FAST);
+    mi(NM_TITLE, "Options", NULL, 0, 0);
+    mi(NM_ITEM, "Auto Bulldoze", NULL, CHECKIT | MENUTOGGLE | (autoBulldoze ? CHECKED : 0), CMD_AUTOBULLDOZE);
+    mi(NM_ITEM, "Auto Budget", NULL, CHECKIT | MENUTOGGLE | (autoBudget ? CHECKED : 0), CMD_AUTOBUDGET);
+    mi(NM_ITEM, "Disasters", NULL, CHECKIT | MENUTOGGLE | (NoDisasters ? 0 : CHECKED), CMD_DISASTERS);
+    mi(NM_ITEM, "Sound", NULL, CHECKIT | MENUTOGGLE | (UserSoundOn ? CHECKED : 0), CMD_SOUND);
+    mi(NM_TITLE, "Disasters", NULL, 0, 0);
+    mi(NM_ITEM, "Fire", NULL, 0, CMD_FIRE);
+    mi(NM_ITEM, "Flood", NULL, 0, CMD_FLOOD);
+    mi(NM_ITEM, "Tornado", NULL, 0, CMD_TORNADO);
+    mi(NM_ITEM, "Earthquake", NULL, 0, CMD_QUAKE);
+    mi(NM_ITEM, "Monster", NULL, 0, CMD_MONSTER);
+    mi(NM_ITEM, "Meltdown", NULL, 0, CMD_MELTDOWN);
+    mi(NM_END, NULL, NULL, 0, 0);
+    *vi_out = vi;
+    if (!vi) return NULL;
+    menu = CreateMenusA(newmenu, NULL);
+    if (menu && !LayoutMenusA(menu, vi, NULL)) { FreeMenus(menu); menu = NULL; }
+    return menu;
+}
+
+/* file requester (asl.library); returns 1 and a full path in out, 0 if cancelled */
+static int ask_file(struct Window *win, int save, char *out, size_t n)
+{
+    int ok = 0;
+    if (!AslBase) return 0;
+    struct FileRequester *fr = AllocAslRequestTags(ASL_FileRequest,
+        ASLFR_Window, (ULONG)win, ASLFR_TitleText, (ULONG)(save ? "Save City" : "Load City"),
+        ASLFR_InitialDrawer, (ULONG)"cities", ASLFR_InitialPattern, (ULONG)"#?.cty",
+        ASLFR_DoPatterns, TRUE, ASLFR_DoSaveMode, save, ASLFR_RejectIcons, TRUE, TAG_DONE);
+    if (fr) {
+        if (AslRequest(fr, NULL)) {
+            strncpy(out, (char *)fr->fr_Drawer, n - 1); out[n - 1] = 0;
+            if (AddPart((STRPTR)out, fr->fr_File, n)) ok = 1;
+        }
+        FreeAslRequest(fr);
+    }
+    return ok;
+}
+
+static void recenter(void)
+{
+    view_x = WORLD_X / 2 - VIEW_COLS / 2;
+    view_y = WORLD_Y / 2 - VIEW_ROWS / 2;
+}
+
+/* returns 0 to quit */
+static int do_command(int id, struct Window *win, struct MenuItem *item)
+{
+    char path[256];
+    int checked = item && (item->Flags & CHECKED);
+    switch (id) {
+    case CMD_NEW:
+        GenerateNewCity(); SimSpeed = 3; recenter();
+        sprintf(status_msg, "New city generated."); break;
+    case CMD_LOAD:
+        if (ask_file(win, 0, path, sizeof path)) {
+            if (LoadCity(path)) { recenter(); sprintf(status_msg, "Loaded %s", path); }
+            else sprintf(status_msg, "Could not load %s", path);
+        }
+        break;
+    case CMD_SAVE:
+        if (CityFileName) { SaveCityAs(CityFileName); sprintf(status_msg, "Saved %s", CityFileName); break; }
+        /* no name yet: fall through to "Save As" */
+    case CMD_SAVEAS:
+        if (ask_file(win, 1, path, sizeof path)) {
+            SaveCityAs(path); sprintf(status_msg, "Saved %s", path);
+        }
+        break;
+    case CMD_QUIT: return 0;
+    case CMD_PAUSE: SimSpeed = 0; break;
+    case CMD_SLOW: SimSpeed = 1; break;
+    case CMD_MEDIUM: SimSpeed = 2; break;
+    case CMD_FAST: SimSpeed = 3; break;
+    case CMD_AUTOBULLDOZE: autoBulldoze = checked; break;
+    case CMD_AUTOBUDGET: autoBudget = checked; break;
+    case CMD_DISASTERS: NoDisasters = !checked; break;
+    case CMD_SOUND: UserSoundOn = checked; break;
+    case CMD_FIRE: MakeFire(); break;
+    case CMD_FLOOD: MakeFlood(); break;
+    case CMD_TORNADO: MakeTornado(); break;
+    case CMD_QUAKE: MakeEarthquake(); break;
+    case CMD_MONSTER: MakeMonster(); break;
+    case CMD_MELTDOWN: MakeMeltdown(); break;
+    }
+    return 1;
+}
+
 static void clamp_view(void)
 {
     if (view_x > WORLD_X - VIEW_COLS) view_x = WORLD_X - VIEW_COLS;
@@ -250,10 +375,14 @@ static int real_main(int argc, char **argv)
     int rc = 10;
     struct Screen *scr = NULL;
     struct Window *win = NULL;
+    struct Menu *menu = NULL;
+    APTR vi = NULL;
 
     IntuitionBase = (struct IntuitionBase *)OpenLibrary((CONST_STRPTR)"intuition.library", 39);
     GfxBase = (struct GfxBase *)OpenLibrary((CONST_STRPTR)"graphics.library", 39);
     CyberGfxBase = OpenLibrary((CONST_STRPTR)"cybergraphics.library", 40);
+    GadToolsBase = OpenLibrary((CONST_STRPTR)"gadtools.library", 37);
+    AslBase = OpenLibrary((CONST_STRPTR)"asl.library", 37);
     { char b[80]; struct Task *t = FindTask(NULL);
       sprintf(b, "stack: %ld bytes", (long)((char *)t->tc_SPUpper - (char *)t->tc_SPLower)); logmsg(b); }
     logmsg("start");
@@ -291,11 +420,15 @@ static int real_main(int argc, char **argv)
     LoadRGB32(&scr->ViewPort, pal);
     win = OpenWindowTags(NULL, WA_CustomScreen, (ULONG)scr, WA_Left, 0, WA_Top, 0, WA_Width, SCR_W,
                          WA_Height, SCR_H, WA_Borderless, TRUE, WA_Backdrop, TRUE, WA_Activate, TRUE,
-                         WA_RMBTrap, TRUE, WA_ReportMouse, TRUE,
-                         WA_IDCMP, IDCMP_RAWKEY | IDCMP_MOUSEBUTTONS | IDCMP_MOUSEMOVE, TAG_DONE);
+                         WA_ReportMouse, TRUE,
+                         WA_IDCMP, IDCMP_RAWKEY | IDCMP_MOUSEBUTTONS | IDCMP_MOUSEMOVE | IDCMP_MENUPICK, TAG_DONE);
     if (!win) { printf("OpenWindow fehlgeschlagen\n"); goto out; }
 
     logmsg("window open");
+    if (GadToolsBase) {
+        menu = make_menus(scr, &vi);
+        if (menu) SetMenuStrip(win, menu);
+    }
     editor.tool_state = queryState;
     SimSpeed = 3;
     int running = 1, tick = 0, frame = 0;
@@ -307,6 +440,16 @@ static int real_main(int argc, char **argv)
             UWORD code = m->Code;
             int mx = m->MouseX, my = m->MouseY;
             ReplyMsg((struct Message *)m);
+            if (cls == IDCMP_MENUPICK) {
+                while (code != MENUNULL && menu) {
+                    struct MenuItem *it = ItemAddress(menu, code);
+                    if (!it) break;
+                    if (!do_command((int)(long)GTMENUITEM_USERDATA(it), win, it)) running = 0;
+                    code = it->NextSelect;
+                }
+                dirty = 1;
+                continue;
+            }
             if (cls == IDCMP_RAWKEY) {
                 if (code & IECODE_UP_PREFIX) continue;
                 { static int n; if (n < 25) { char b[40]; sprintf(b, "rawkey 0x%02x", (unsigned)code); logmsg(b); n++; } }
@@ -330,18 +473,8 @@ static int real_main(int argc, char **argv)
             } else {
                 /* mouse: window coordinates -> tile / world pixel */
                 int inview = mx >= TB_W && my >= BAR_H;
-                mouse_x = mx; mouse_y = my;
-                if (cls == IDCMP_MOUSEBUTTONS && code == MENUDOWN) { panning = 1; pan_mx = mx; pan_my = my; }
-                else if (cls == IDCMP_MOUSEBUTTONS && code == MENUUP) panning = 0;
-                else if (cls == IDCMP_MOUSEMOVE && panning) {
-                    /* drag the map: 16 pixels of mouse movement = one tile */
-                    while (mx - pan_mx >= 16) { view_x--; pan_mx += 16; }
-                    while (pan_mx - mx >= 16) { view_x++; pan_mx -= 16; }
-                    while (my - pan_my >= 16) { view_y--; pan_my += 16; }
-                    while (pan_my - my >= 16) { view_y++; pan_my -= 16; }
-                    clamp_view();
-                }
                 int wx = (view_x << 4) + (mx - TB_W), wy = (view_y << 4) + (my - BAR_H);
+                mouse_x = mx; mouse_y = my;
                 if (inview) { hover_x = wx >> 4; hover_y = wy >> 4; } else hover_x = -1;
                 if (cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) {
                     if (mx < TB_W && my >= BAR_H) {
@@ -388,12 +521,17 @@ static int real_main(int argc, char **argv)
     rc = 0;
 out:
     logmsg("cleanup");
+    if (win && menu) ClearMenuStrip(win);
+    if (menu) FreeMenus(menu);
+    if (vi) FreeVisualInfo(vi);
     if (win) CloseWindow(win);
     logmsg("window closed");
     if (scr) CloseScreen(scr);
     logmsg("screen closed");
     if (fb) FreeVec(fb);
     if (CyberGfxBase) CloseLibrary(CyberGfxBase);
+    if (GadToolsBase) CloseLibrary(GadToolsBase);
+    if (AslBase) CloseLibrary(AslBase);
     logmsg("cleanup done");
     return rc;
 }
