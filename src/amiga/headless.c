@@ -28,6 +28,27 @@ static int real_main(int argc, char **argv)
     printf("loaded %s: year %d, funds %ld, pop %ld, class %d\n", argv[1], (int)CurrentYear(),
            (long)TotalFunds, (long)CityPop, (int)CityClass);
     SimSpeed = 3;
+    if (argc > 3 && !strcmp(argv[3], "budget")) {      /* budget panel experiment */
+        extern float roadPercent, policePercent, firePercent;
+        extern void UpdateBudget(void), UpdateBudgetWindow(void), drawBudgetWindow(void), Kick(void);
+        verbose = 1;
+        printf("start: road %d fire %d police %d tax %d\n", (int)(roadPercent * 100.0 + 0.5),
+               (int)(firePercent * 100.0 + 0.5), (int)(policePercent * 100.0 + 0.5), (int)CityTax);
+        for (i = 0; i < 3; i++) {
+            CityTax++; drawBudgetWindow(); Kick(); UpdateBudget(); UpdateBudgetWindow();
+            printf("after click %d: road %d fire %d police %d tax %d (raw %ld)\n", i, (int)(roadPercent * 100.0 + 0.5),
+                   (int)(firePercent * 100.0 + 0.5), (int)(policePercent * 100.0 + 0.5), (int)CityTax,
+                   (long)(roadPercent * 1000.0));
+        }
+        for (i = 0; i < 4; i++) {
+            int p = 100 - 5 * i;
+            roadPercent = (float)p / 100.0f; firePercent = (float)p / 100.0f; policePercent = (float)p / 100.0f;
+            UpdateBudget(); UpdateBudgetWindow();
+            printf("set %d: road %d fire %d police %d (raw %ld)\n", p, (int)(roadPercent * 100.0 + 0.5),
+                   (int)(firePercent * 100.0 + 0.5), (int)(policePercent * 100.0 + 0.5), (long)(roadPercent * 1000.0));
+        }
+        return 0;
+    }
     for (i = 0; i < months * 16; i++) {      /* about 16 sim frames per month */
         sim_loop(1);
         if ((i + 1) % (16 * 6) == 0)

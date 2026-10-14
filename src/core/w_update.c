@@ -202,7 +202,7 @@ showValves(void)
 
 drawValve(void)
 {
-  double r, c, i;
+  float r, c, i;
 
   r = RValve;
   if (r < -1500) r = -1500;
@@ -227,7 +227,7 @@ drawValve(void)
 }
 
 
-SetDemand(double r, double c, double i)
+SetDemand(float r, float c, float i)
 {
   char buf[256];
 

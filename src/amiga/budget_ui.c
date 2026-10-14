@@ -158,7 +158,7 @@ static void set_road(int p)
 {
     if (p < 0) p = 0;
     if (p > 100) p = 100;
-    roadPercent = p / 100.0;
+    roadPercent = (float)p / 100.0f;
     RoadSpend = (roadMaxValue * p) / 100;
     UpdateFundEffects(); Kick();
 }
@@ -167,7 +167,7 @@ static void set_fire(int p)
 {
     if (p < 0) p = 0;
     if (p > 100) p = 100;
-    firePercent = p / 100.0;
+    firePercent = (float)p / 100.0f;
     FireSpend = (fireMaxValue * p) / 100;
     UpdateFundEffects(); Kick();
 }
@@ -176,7 +176,7 @@ static void set_police(int p)
 {
     if (p < 0) p = 0;
     if (p > 100) p = 100;
-    policePercent = p / 100.0;
+    policePercent = (float)p / 100.0f;
     PoliceSpend = (policeMaxValue * p) / 100;
     UpdateFundEffects(); Kick();
 }
