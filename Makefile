@@ -9,9 +9,9 @@ UP       = upstream
 CORE_SRC = $(wildcard src/core/*.c)
 CORE_OBJ = $(patsubst src/%.c,out/obj/%.o,$(CORE_SRC))
 
-all: out/micropolis out/headless out/rtgtest data
+all: out/micropolis out/headless out/rtgtest out/listmodes data
 	mkdir -p $(DEST)
-	cp out/micropolis out/headless out/rtgtest $(DEST)/
+	cp out/micropolis out/headless out/rtgtest out/listmodes $(DEST)/
 
 out/obj/core/%.o: src/core/%.c $(wildcard src/core/*.h)
 	@mkdir -p $(dir $@)
@@ -24,8 +24,12 @@ out/obj/amiga/%.o: src/amiga/%.c $(wildcard src/core/*.h src/amiga/*.h)
 out/headless: $(CORE_OBJ) out/obj/amiga/ui_core.o out/obj/amiga/stack.o out/obj/amiga/mapview.o out/obj/amiga/headless.o
 	$(CC) $(ARCH) -o $@ $^ -lm
 
-out/micropolis: $(CORE_OBJ) out/obj/amiga/ui_core.o out/obj/amiga/stack.o out/obj/amiga/budget_ui.o out/obj/amiga/mapview.o out/obj/amiga/main.o
+out/micropolis: $(CORE_OBJ) out/obj/amiga/ui_core.o out/obj/amiga/stack.o out/obj/amiga/budget_ui.o out/obj/amiga/notice_ui.o out/obj/amiga/mapview.o out/obj/amiga/main.o
 	$(CC) $(ARCH) -o $@ $^ -lm
+
+out/listmodes: src/amiga/listmodes.c
+	@mkdir -p out
+	$(CC) $(AMIFLAGS) -o $@ $<
 
 out/rtgtest: src/amiga/rtgtest.c
 	@mkdir -p out
@@ -36,7 +40,7 @@ data:
 	mkdir -p $(DEST)/res $(DEST)/cities
 	cp $(UP)/res/stri.* $(UP)/res/hexa.* $(UP)/res/snro.* $(DEST)/res/
 	cp $(UP)/cities/*.cty $(DEST)/cities/
-	cp out/data/*.bin $(DEST)/res/
+	cp out/data/*.bin out/data/notices.txt $(DEST)/res/
 
 clean:
 	rm -rf out

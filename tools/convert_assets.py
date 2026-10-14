@@ -41,6 +41,51 @@ class Palette:
             self.colors.append(rgb)
         return self.colors.index(rgb, 1)
 
+def tcl_words(text):
+    """Minimal Tcl word splitter for the `Message id color title body props` commands."""
+    i, n, words = 0, len(text), []
+    while i < n:
+        c = text[i]
+        if c == '\\' and text[i + 1:i + 2] == '\n':
+            i += 2; continue
+        if c in ' \t':
+            i += 1; continue
+        if c == '\n':
+            words.append(None); i += 1; continue          # end of command
+        if c == '{':
+            depth, j = 1, i + 1
+            while depth:
+                depth += (text[j] == '{') - (text[j] == '}'); j += 1
+            words.append(text[i + 1:j - 1]); i = j; continue
+        if c == '"':
+            j = i + 1
+            while text[j] != '"':
+                j += 2 if text[j] == '\\' else 1
+            words.append(text[i + 1:j]); i = j + 1; continue
+        j = i
+        while j < n and text[j] not in ' \t\n':
+            j += 1
+        words.append(text[i:j]); i = j
+    return words
+
+def convert_notices(tcl, out):
+    """res/notices.txt: id|TITLE|body (newlines as \\n). Only the city-event messages (no %s formats)."""
+    text = open(tcl, encoding='latin-1').read()
+    a = text.index('\nMessage 1 ')
+    b = text.index('\nMessage 300 ')
+    words = tcl_words(text[a:b])
+    lines, cmd = [], []
+    for w in words + [None]:
+        if w is None:
+            if len(cmd) >= 5 and cmd[0] == 'Message' and '%s' not in cmd[4]:
+                body = cmd[4].strip().replace('\n', '\\n').replace('|', '/')
+                lines.append('%s|%s|%s' % (cmd[1], cmd[3].replace('|', '/'), body))
+            cmd = []
+        else:
+            cmd.append(w)
+    open(os.path.join(out, 'notices.txt'), 'w', encoding='latin-1').write('\n'.join(lines) + '\n')
+    print('notices:', len(lines))
+
 def main():
     src, out = sys.argv[1], sys.argv[2]
     os.makedirs(out, exist_ok=True)
@@ -74,6 +119,7 @@ def main():
     assert len(pal.colors) <= 64, len(pal.colors)
     p = b''.join(bytes(c) for c in pal.colors) + bytes(3 * (256 - len(pal.colors)))
     open(os.path.join(out, 'palette.bin'), 'wb').write(p)
+    convert_notices(os.path.join(src, '..', 'res', 'micropolis.tcl'), out)
     print('palette: %d colors, tiles: %d bytes, %d sprite frames' % (len(pal.colors), len(tiles), len(frames)))
 
     if '--preview' in sys.argv:

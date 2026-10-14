@@ -7,6 +7,7 @@
 #include "stack.h"
 #include "budget_ui.h"
 #include "mapview.h"
+#include "notice_ui.h"
 #undef GetSprite
 #include <stdio.h>
 #include <string.h>
@@ -58,6 +59,9 @@ extern int sim_loops;
 static int dirty = 1;
 static int map_dirty = 1;
 static int budget_dirty = 1;
+static int notice_dirty = 1;
+static int demand_r, demand_c, demand_i, demand_dirty = 1;   /* -15..15, from "UISetDemand" */
+static void clamp_view(void);
 #define MAP_X (SCR_W - MV_W - 6)
 #define MAP_Y (SCR_H - MV_H - 6)
 
@@ -105,6 +109,17 @@ int ui_eval(const char *cmd)
     else if (!strncmp(cmd, "UISetBudget ", 12))       { budget_set_totals(cmd); budget_dirty = 1; dirty = 1; }
     else if (!strncmp(cmd, "UISetBudgetValues ", 18)) { budget_set_values(cmd); dirty = 1; }
     else if (!strncmp(cmd, "UIShowBudgetAndWait", 19)) { budget_show(); budget_dirty = 1; dirty = 1; }
+    else if (!strncmp(cmd, "UISetDemand ", 12)) {
+        int r, c, i;
+        if (sscanf(cmd + 12, "%d %d %d", &r, &c, &i) == 3) { demand_r = r; demand_c = c; demand_i = i; demand_dirty = 1; dirty = 1; }
+    }
+    else if (!strncmp(cmd, "UIShowPicture ", 14))   { notice_show(atoi(cmd + 14)); notice_dirty = 1; dirty = 1; }
+    else if (!strncmp(cmd, "UIAutoGoto ", 11)) {
+        int x, y;
+        if (autoGo && sscanf(cmd + 11, "%d %d", &x, &y) == 2) { view_x = x - VIEW_COLS / 2; view_y = y - VIEW_ROWS / 2; clamp_view(); dirty = 1; }
+    }
+    else if (!strncmp(cmd, "UILoseGame", 10))      { notice_show(200); notice_dirty = 1; dirty = 1; }
+    else if (!strncmp(cmd, "UIWinGame", 9))        { notice_show(100); notice_dirty = 1; dirty = 1; }
     else if (!strncmp(cmd, "UISetMessage ", 13)) { copy_braced(status_msg, sizeof status_msg, cmd); dirty = 1; }
     return 0;
 }
@@ -131,8 +146,15 @@ static int load_assets(void)
     UBYTE *pal = load_file("res/palette.bin", NULL);
     tiles = load_file("res/tiles.bin", NULL);
     objects = load_file("res/objects.bin", NULL);
-    if (!pal || !tiles || !objects) { printf("Assets fehlen (res/*.bin)\n"); return 0; }
+    if (!pal || !tiles || !objects) {
+        char b[100];
+        sprintf(b, "Assets missing: palette %s tiles %s objects %s (IoErr %ld)", pal ? "ok" : "NO", tiles ? "ok" : "NO", objects ? "ok" : "NO", (long)IoErr());
+        logmsg(b);
+        printf("Assets fehlen (res/*.bin)\n");
+        return 0;
+    }
     map_load();
+    notice_load();
     memcpy(palette, pal, 256 * 3);
     FreeVec(pal);
     palette[PEN_BAR * 3 + 0] = 0x20; palette[PEN_BAR * 3 + 1] = 0x28; palette[PEN_BAR * 3 + 2] = 0x50;
@@ -157,7 +179,7 @@ static short shown[VIEW_ROWS][VIEW_COLS];       /* tile id last drawn in each ce
 static UBYTE redraw[VIEW_ROWS][VIEW_COLS];
 static int full_redraw = 1;                     /* start, scroll, panel closed: redraw all cells */
 static int toolbar_dirty = 1, first_present = 1;
-static int last_map_visible, last_budget_visible;
+static int last_map_visible, last_budget_visible, last_notice_visible;
 static int last_view_x = -1, last_view_y = -1;
 #define MAX_SPR 48
 static struct rect prev_spr[MAX_SPR];
@@ -294,6 +316,25 @@ static long elapsed_us(void)
     return (long)(t_b.tv_sec - t_a.tv_sec) * 1000000L + (long)(t_b.tv_usec - t_a.tv_usec);
 }
 
+/* residential / commercial / industrial demand bars in the status bar (what the city needs) */
+#define DEM_X 520
+#define DEM_Y 0
+#define DEM_W 100
+#define DEM_H 32
+static void draw_demand(void)
+{
+    static const UBYTE pen[3] = { PEN_V_LGREEN, PEN_V_LBLUE, PEN_V_YELLOW };
+    int v[3] = { demand_r, demand_c, demand_i };
+    for (int y = 0; y < DEM_H; y++) memset(fb + (DEM_Y + y) * SCR_W + DEM_X, PEN_BAR, DEM_W);
+    for (int k = 0; k < 3; k++) {
+        int h = (v[k] > 15 ? 15 : v[k] < -15 ? -15 : v[k]) * 9 / 15;     /* +-9 pixels */
+        int x0 = DEM_X + 4 + k * 36, y0 = DEM_Y + 12;          /* zero line at y0 */
+        for (int x = 0; x < 20; x++) fb[(y0) * SCR_W + x0 + x] = PEN_TEXT;
+        if (h > 0) for (int y = 1; y <= h; y++) memset(fb + (y0 - y) * SCR_W + x0, pen[k], 20);
+        else for (int y = 1; y <= -h; y++) memset(fb + (y0 + y) * SCR_W + x0, pen[k], 20);
+    }
+}
+
 static void render_frame(struct Window *win)
 {
     struct RastPort *rp = win->RPort;
@@ -301,15 +342,18 @@ static void render_frame(struct Window *win)
     struct rect cur_spr[MAX_SPR], cur;
     const UBYTE *spr_px[MAX_SPR];
     int spr_w[MAX_SPR], spr_h[MAX_SPR], n_spr = 0;
-    int have_cursor, map_need = 0, budget_redraw = budget_dirty;
+    int have_cursor, map_need = 0, budget_redraw = budget_dirty, notice_redraw = notice_dirty;
     struct rect maprect = { MAP_X - 1, MAP_Y - 1, MAP_X + MV_W, MAP_Y + MV_H };
+    struct rect notrect = { NOTICE_X, NOTICE_Y, NOTICE_X + NOTICE_W - 1, NOTICE_Y + NOTICE_H - 1 };
     struct rect budrect = { BUDGET_X, BUDGET_Y, BUDGET_X + BUDGET_W - 1, BUDGET_Y + BUDGET_H - 1 };
 
     gettimeofday(&t_a, NULL);
     if (!map_visible && last_map_visible) full_redraw = 1;           /* cells under the panel are stale */
     if (!budget_visible && last_budget_visible) full_redraw = 1;
+    if (!notice_visible && last_notice_visible) full_redraw = 1;
     if (budget_visible && !last_budget_visible) budget_dirty = 1;
-    last_map_visible = map_visible; last_budget_visible = budget_visible;
+    if (notice_visible && !last_notice_visible) { notice_dirty = 1; notice_redraw = 1; }
+    last_map_visible = map_visible; last_budget_visible = budget_visible; last_notice_visible = notice_visible;
     if (view_x != last_view_x || view_y != last_view_y) { full_redraw = 1; last_view_x = view_x; last_view_y = view_y; }
     if (full_redraw) {
         memset(redraw, 1, sizeof redraw);
@@ -359,8 +403,12 @@ static void render_frame(struct Window *win)
             if (budget_visible && cell.x0 >= budrect.x0 && cell.x1 <= budrect.x1 && cell.y0 >= budrect.y0 && cell.y1 <= budrect.y1) {
                 redraw[row][col] = 0; shown[row][col] = -1; continue;
             }
+            if (notice_visible && cell.x0 >= notrect.x0 && cell.x1 <= notrect.x1 && cell.y0 >= notrect.y0 && cell.y1 <= notrect.y1) {
+                redraw[row][col] = 0; shown[row][col] = -1; continue;
+            }
             draw_tile(col, row, shown[row][col]);
             stats.tiles++;
+            if (notice_visible && overlaps(&cell, notrect.x0, notrect.y0, notrect.x1, notrect.y1)) notice_redraw = 1;
             if (map_visible && overlaps(&cell, maprect.x0, maprect.y0, maprect.x1, maprect.y1)) map_need = 1;
             if (budget_visible && overlaps(&cell, budrect.x0, budrect.y0, budrect.x1, budrect.y1)) budget_redraw = 1;
         }
@@ -378,6 +426,8 @@ static void render_frame(struct Window *win)
         if (map_need) map_blit(fb, SCR_W, MAP_X, MAP_Y, view_x, view_y, VIEW_COLS, VIEW_ROWS);
     }
     if (budget_visible && budget_redraw) budget_draw(fb, SCR_W);
+    if (notice_visible && notice_redraw) notice_draw(fb, SCR_W);
+    if (demand_dirty) draw_demand();
     stats.render_us += elapsed_us();
 
     /* send the changes to the screen */
@@ -398,6 +448,8 @@ static void render_frame(struct Window *win)
         if (toolbar_dirty) blit(rp, 0, BAR_H, TB_W, SCR_H - BAR_H);
         if (map_visible && map_need) blit(rp, maprect.x0, maprect.y0, maprect.x1 - maprect.x0 + 1, maprect.y1 - maprect.y0 + 1);
         if (budget_visible && budget_redraw) blit(rp, budrect.x0, budrect.y0, BUDGET_W, BUDGET_H);
+        if (notice_visible && notice_redraw) blit(rp, notrect.x0, notrect.y0, NOTICE_W, NOTICE_H);
+        if (demand_dirty) blit(rp, DEM_X, DEM_Y, DEM_W, DEM_H);
     }
 
     /* text goes straight to the screen after the pixels under it were refreshed */
@@ -408,7 +460,7 @@ static void render_frame(struct Window *win)
         sprintf(line, " %-9s  %-22s  Pop %-8ld  Speed %d%s ", status_date, status_funds, (long)CityPop, (int)SimSpeed,
                 SimSpeed ? "" : " (Pause)");
         if (strcmp(line, last_line1)) { put_text(rp, 4, 12, line); strcpy(last_line1, line); }
-        sprintf(line, " %-70s", status_msg);
+        sprintf(line, " %-58.58s", status_msg);
         if (strcmp(line, last_line2)) { put_text(rp, 4, 27, line); strcpy(last_line2, line); }
     }
     if (toolbar_dirty) {
@@ -419,6 +471,12 @@ static void render_frame(struct Window *win)
         toolbar_dirty = 0;
     }
     if (budget_visible && budget_redraw) { budget_text(rp); budget_dirty = 0; }
+    if (notice_visible && notice_redraw) { notice_text(rp); notice_dirty = 0; }
+    if (demand_dirty) {
+        SetAPen(rp, PEN_TEXT); SetBPen(rp, PEN_BAR);
+        put_text(rp, DEM_X + 10, DEM_Y + 30, "R");  put_text(rp, DEM_X + 46, DEM_Y + 30, "C");  put_text(rp, DEM_X + 82, DEM_Y + 30, "I");
+        demand_dirty = 0;
+    }
 
     if (++stats.frames >= 200) {                     /* performance log for tuning on slow machines */
         char b[160];
@@ -634,6 +692,7 @@ static int real_main(int argc, char **argv)
     }
     editor.tool_state = queryState;
     setSpeed(3);
+    if (argc > 3 && !strncmp(argv[3], "notice=", 7)) { notice_show(atoi(argv[3] + 7)); notice_dirty = 1; }   /* debug */
     int running = 1, tick = 0, frame = 0;
     static const int delay[4] = { 0, 12, 4, 1 };      /* video frames per simulation step */
     while (running) {
@@ -663,8 +722,9 @@ static int real_main(int argc, char **argv)
                 case 0x21: view_y++; break;
                 case 0x22: view_x++; break;
                 case 0x20: view_x--; break;
-                case 0x45: if (budget_visible) budget_key_close(); else running = 0; break;   /* Esc */
-                case 0x44: budget_key_close(); break;                    /* Return */
+                case 0x45: if (notice_visible) { notice_close(); notice_dirty = 1; } else if (budget_visible) budget_key_close(); else running = 0; break;   /* Esc */
+                case 0x44: if (notice_visible) notice_close(); else budget_key_close(); break;   /* Return */
+                case 0x40: if (notice_visible) notice_close(); break;                             /* Space */
                 case 0x4c: view_y--; break;                               /* cursor keys scroll */
                 case 0x4d: view_y++; break;
                 case 0x4e: view_x++; break;
@@ -684,6 +744,12 @@ static int real_main(int argc, char **argv)
                 int inview = mx >= TB_W && my >= BAR_H;
                 int wx = (view_x << 4) + (mx - TB_W), wy = (view_y << 4) + (my - BAR_H);
                 mouse_x = mx; mouse_y = my;
+                if (notice_visible) {
+                    hover_x = -1;
+                    if (cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) { notice_click(mx, my); notice_dirty = 1; }
+                    dirty = 1;
+                    continue;
+                }
                 if (budget_visible) {
                     hover_x = -1;
                     if (cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) budget_click(mx, my);
@@ -766,6 +832,7 @@ out:
 }
 
 static void at_exit_log(void) { app_log("atexit handler"); }
+static void __attribute__((destructor)) dtor_log(void) { app_log("destructor"); }
 
 int main(int argc, char **argv)
 {

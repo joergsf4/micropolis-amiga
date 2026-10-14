@@ -33,15 +33,16 @@ int run_with_stack(int (*fn)(int, char **), int argc, char **argv, ULONG size)
     parent_task = FindTask(NULL);
     parent_sig = 1UL << sig;
 
-    dir = CurrentDir(0);           /* peek at the current directory ... */
-    CurrentDir(dir);               /* ... and put it back */
+    dir = Lock((CONST_STRPTR)"", ACCESS_READ);     /* lock on the current directory: the child gets (and frees) it */
     in = Input(); out = Output();
     child = CreateNewProcTags(NP_Entry, (ULONG)child_entry, NP_StackSize, size, NP_Name, (ULONG)"Micropolis",
-                              NP_CurrentDir, dir ? DupLock(dir) : 0,
+                              NP_CurrentDir, (ULONG)dir,
                               NP_Input, in, NP_CloseInput, FALSE,
                               NP_Output, out, NP_CloseOutput, FALSE, TAG_DONE);
     if (!child) { FreeSignal(sig); return 20; }
     Wait(parent_sig);
+    app_log("parent: child signalled");
     FreeSignal(sig);
+    app_log("parent: signal freed");
     return child_rc;
 }
