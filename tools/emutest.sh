@@ -9,7 +9,7 @@ CMD="${1:?command}"; TMO="${2:-120}"
 rm -rf out/testhd; mkdir -p out/testhd/S out/testhd/Libs
 cp -R "$HOME/dev/AmigaProjekt/workbench/share/Micropolis/." out/testhd/
 printf 'Assign ENV: SYS:ENV\nAssign C: SYS:C\nCD SYS:\n%s >result.txt\necho DONE >>result.txt\n' "$CMD" > out/testhd/S/Startup-Sequence
-mkdir -p out/testhd/C out/testhd/ENV; cp out/libs/*.library out/testhd/Libs/; cp out/libs/Assign out/libs/MakeDir out/testhd/C/   # from Workbench3.2.adf (see README)
+rm -f out/testhd/micropolis.log*; mkdir -p out/testhd/C out/testhd/ENV; cp out/libs/*.library out/testhd/Libs/; cp out/libs/Assign out/libs/MakeDir out/testhd/C/   # from Workbench3.2.adf (see README)
 cp "$ROM" out/kick.rom
 docker run --rm -i -v "$PWD":/project -w /project -e HOME=/tmp -e TMO="$TMO" -e EXTRA="${EXTRA:-}" dnd-amiga-emutest bash -s <<'EOS'
 Xvfb :99 -screen 0 1024x800x24 >/dev/null 2>&1 &

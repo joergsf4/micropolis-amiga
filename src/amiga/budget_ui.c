@@ -1,0 +1,212 @@
+/* Budget panel: modal overlay drawn into the frame buffer. The simulation core pauses itself and
+ * sends "UIShowBudgetAndWait"; the numbers come from its "UISetBudget*" notifications, the
+ * settings (tax rate, road/fire/police funding) are the core's own globals. Mirrors upstream
+ * res/wbudget.tcl + the Budget* procs in res/micropolis.tcl. */
+#define GetSprite sim_GetSprite
+#include "sim.h"
+#include "ui.h"
+#undef GetSprite
+#include <stdio.h>
+#include <string.h>
+#include <proto/graphics.h>
+#include "budget_ui.h"
+
+extern float roadPercent, policePercent, firePercent;
+extern QUAD roadMaxValue, policeMaxValue, fireMaxValue;
+void UpdateFundEffects(void);
+void UpdateBudget(void);
+void UpdateBudgetWindow(void);
+void Resume(void);
+void drawBudgetWindow(void);
+
+int budget_visible;
+
+/* panel geometry (frame buffer pixels) */
+#define PX 120
+#define PY 80
+#define PW 400
+#define PH 320
+#define ROW_TAX    (PY + 150)
+#define ROW_ROAD   (PY + 186)
+#define ROW_FIRE   (PY + 222)
+#define ROW_POLICE (PY + 258)
+#define BTN_Y      (PY + 288)
+#define MINUS_X    (PX + 150)
+#define PLUS_X     (PX + 232)
+#define STEP_W 28
+#define STEP_H 20
+
+static char flow[24], previous[24], current[24], collected[24];
+static short old_tax;
+static int old_road, old_fire, old_police;
+
+static void get_braced(const char *s, int n, char *out, size_t max)
+{
+    out[0] = 0;
+    while (n-- >= 0) {
+        s = strchr(s, '{');
+        if (!s) return;
+        if (n < 0) {
+            const char *e = strchr(s, '}');
+            size_t len = e ? (size_t)(e - s - 1) : 0;
+            if (len >= max) len = max - 1;
+            memcpy(out, s + 1, len); out[len] = 0;
+            return;
+        }
+        s = strchr(s, '}');
+        if (!s) return;
+    }
+}
+
+void budget_set_totals(const char *cmd)
+{
+    get_braced(cmd, 0, flow, sizeof flow);
+    get_braced(cmd, 1, previous, sizeof previous);
+    get_braced(cmd, 2, current, sizeof current);
+    get_braced(cmd, 3, collected, sizeof collected);
+}
+
+void budget_set_values(const char *cmd) {}      /* percentages are read from the core's globals */
+
+void budget_show(void)
+{
+    if (!budget_visible) {                      /* remember the values for "Cancel" (as upstream's BudgetReset) */
+        old_tax = CityTax;
+        old_road = (int)(roadPercent * 100.0 + 0.5);
+        old_fire = (int)(firePercent * 100.0 + 0.5);
+        old_police = (int)(policePercent * 100.0 + 0.5);
+    }
+    budget_visible = 1;
+    UpdateBudget();
+    UpdateBudgetWindow();
+}
+
+static void rect(UBYTE *fb, int stride, int x, int y, int w, int h, UBYTE c)
+{
+    for (int j = 0; j < h; j++) memset(fb + (y + j) * stride + x, c, w);
+}
+
+static void stepper(UBYTE *fb, int stride, int row)
+{
+    rect(fb, stride, MINUS_X, row, STEP_W, STEP_H, PEN_BTN);
+    rect(fb, stride, PLUS_X, row, STEP_W, STEP_H, PEN_BTN);
+}
+
+void budget_draw(UBYTE *fb, int stride)
+{
+    if (!budget_visible) return;
+    rect(fb, stride, PX - 2, PY - 2, PW + 4, PH + 4, PEN_TEXT);
+    rect(fb, stride, PX, PY, PW, PH, PEN_BAR);
+    stepper(fb, stride, ROW_TAX - 14);
+    stepper(fb, stride, ROW_ROAD - 14);
+    stepper(fb, stride, ROW_FIRE - 14);
+    stepper(fb, stride, ROW_POLICE - 14);
+    rect(fb, stride, PX + 40, BTN_Y, 140, 24, PEN_SEL);
+    rect(fb, stride, PX + 220, BTN_Y, 140, 24, PEN_BTN);
+}
+
+static void put(struct RastPort *rp, int x, int y, const char *s)
+{
+    Move(rp, x, y);
+    Text(rp, (CONST_STRPTR)s, strlen(s));
+}
+
+void budget_text(struct RastPort *rp)
+{
+    char b[60];
+    if (!budget_visible) return;
+    SetAPen(rp, PEN_TEXT);
+    SetBPen(rp, PEN_BAR);
+    put(rp, PX + 140, PY + 22, "B U D G E T");
+    sprintf(b, "Taxes collected %12s", collected);  put(rp, PX + 16, PY + 52, b);
+    sprintf(b, "Cash flow       %12s", flow);       put(rp, PX + 16, PY + 72, b);
+    sprintf(b, "Previous funds  %12s", previous);   put(rp, PX + 16, PY + 92, b);
+    sprintf(b, "Current funds   %12s", current);    put(rp, PX + 16, PY + 112, b);
+
+    SetBPen(rp, PEN_BTN);                            /* the +/- labels sit on the buttons */
+    put(rp, MINUS_X + 10, ROW_TAX, "-");  put(rp, PLUS_X + 10, ROW_TAX, "+");
+    SetBPen(rp, PEN_BAR);
+    put(rp, PX + 16, ROW_TAX, "Tax rate");
+    sprintf(b, "%3d%%", (int)CityTax);  put(rp, PX + 188, ROW_TAX, b);
+
+    SetBPen(rp, PEN_BTN);
+    put(rp, MINUS_X + 10, ROW_ROAD, "-");   put(rp, PLUS_X + 10, ROW_ROAD, "+");
+    put(rp, MINUS_X + 10, ROW_FIRE, "-");   put(rp, PLUS_X + 10, ROW_FIRE, "+");
+    put(rp, MINUS_X + 10, ROW_POLICE, "-"); put(rp, PLUS_X + 10, ROW_POLICE, "+");
+    SetBPen(rp, PEN_BAR);
+    put(rp, PX + 16, ROW_ROAD, "Road fund");
+    sprintf(b, "%3d%%", (int)(roadPercent * 100.0 + 0.5));   put(rp, PX + 188, ROW_ROAD, b);
+    put(rp, PX + 16, ROW_FIRE, "Fire fund");
+    sprintf(b, "%3d%%", (int)(firePercent * 100.0 + 0.5));   put(rp, PX + 188, ROW_FIRE, b);
+    put(rp, PX + 16, ROW_POLICE, "Police fund");
+    sprintf(b, "%3d%%", (int)(policePercent * 100.0 + 0.5)); put(rp, PX + 188, ROW_POLICE, b);
+
+    SetBPen(rp, PEN_SEL);   put(rp, PX + 70, BTN_Y + 16, "  Continue  ");
+    SetBPen(rp, PEN_BTN);   put(rp, PX + 262, BTN_Y + 16, "   Cancel   ");
+}
+
+static void set_tax(int t)
+{
+    if (t < 0) t = 0;
+    if (t > 20) t = 20;
+    CityTax = t;
+    drawBudgetWindow();
+    Kick();
+}
+
+static void set_road(int p)
+{
+    if (p < 0) p = 0;
+    if (p > 100) p = 100;
+    roadPercent = p / 100.0;
+    RoadSpend = (roadMaxValue * p) / 100;
+    UpdateFundEffects(); Kick();
+}
+
+static void set_fire(int p)
+{
+    if (p < 0) p = 0;
+    if (p > 100) p = 100;
+    firePercent = p / 100.0;
+    FireSpend = (fireMaxValue * p) / 100;
+    UpdateFundEffects(); Kick();
+}
+
+static void set_police(int p)
+{
+    if (p < 0) p = 0;
+    if (p > 100) p = 100;
+    policePercent = p / 100.0;
+    PoliceSpend = (policeMaxValue * p) / 100;
+    UpdateFundEffects(); Kick();
+}
+
+static void close_budget(int keep)
+{
+    if (!keep) {
+        set_tax(old_tax); set_road(old_road); set_fire(old_fire); set_police(old_police);
+        ClearMes(); SendMes(0);
+    }
+    budget_visible = 0;
+    Resume();
+}
+
+void budget_key_close(void) { if (budget_visible) close_budget(1); }
+
+int budget_click(int x, int y)
+{
+    int pct;
+    if (!budget_visible) return 0;
+    int minus_hit = x >= MINUS_X && x < MINUS_X + STEP_W;
+    int plus_hit = x >= PLUS_X && x < PLUS_X + STEP_W;
+    int d = minus_hit ? -1 : plus_hit ? 1 : 0;
+#define IN_ROW(r) (y >= (r) - 14 && y < (r) - 14 + STEP_H)
+    if (d && IN_ROW(ROW_TAX)) set_tax(CityTax + d);
+    else if (d && IN_ROW(ROW_ROAD))   { pct = (int)(roadPercent * 100.0 + 0.5);   set_road(pct + 5 * d); }
+    else if (d && IN_ROW(ROW_FIRE))   { pct = (int)(firePercent * 100.0 + 0.5);   set_fire(pct + 5 * d); }
+    else if (d && IN_ROW(ROW_POLICE)) { pct = (int)(policePercent * 100.0 + 0.5); set_police(pct + 5 * d); }
+    else if (y >= BTN_Y && y < BTN_Y + 24 && x >= PX + 40 && x < PX + 180) close_budget(1);
+    else if (y >= BTN_Y && y < BTN_Y + 24 && x >= PX + 220 && x < PX + 360) close_budget(0);
+    UpdateBudget(); UpdateBudgetWindow();
+    return 1;
+}

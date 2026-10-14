@@ -5,6 +5,7 @@
 #include "sim.h"
 #include "ui.h"
 #include "stack.h"
+#include "budget_ui.h"
 #undef GetSprite
 #include <stdio.h>
 #include <string.h>
@@ -36,10 +37,6 @@ struct Library *AslBase;
 #define VIEW_COLS ((SCR_W - TB_W) / 16) /* 35 */
 #define VIEW_ROWS ((SCR_H - BAR_H) / 16) /* 28 */
 
-#define PEN_BAR   32                   /* extra palette entries behind the game's own colors */
-#define PEN_TEXT  33
-#define PEN_SEL   34
-#define PEN_BTN   35
 
 void app_log(const char *msg);
 static void logmsg(const char *msg) { app_log(msg); }
@@ -98,6 +95,9 @@ int ui_eval(const char *cmd)
         sprintf(status_msg, "%s, %s, %s, %s", a, b, c, d);
         dirty = 1;
     }
+    else if (!strncmp(cmd, "UISetBudget ", 12))       { budget_set_totals(cmd); dirty = 1; }
+    else if (!strncmp(cmd, "UISetBudgetValues ", 18)) { budget_set_values(cmd); dirty = 1; }
+    else if (!strncmp(cmd, "UIShowBudgetAndWait", 19)) { budget_show(); dirty = 1; }
     else if (!strncmp(cmd, "UISetMessage ", 13)) { copy_braced(status_msg, sizeof status_msg, cmd); dirty = 1; }
     return 0;
 }
@@ -219,6 +219,7 @@ static void render_map(void)
     for (SimSprite *s = sim->sprite; s; s = s->next) draw_sprite(s);
     draw_cursor();
     draw_toolbar();
+    budget_draw(fb, SCR_W);
 }
 
 static void present(struct Window *win)
@@ -239,12 +240,14 @@ static void present(struct Window *win)
         Move(rp, 4, BAR_H + i * TB_BTN_H + 17);
         Text(rp, (CONST_STRPTR)toolbtn[i].name, strlen(toolbtn[i].name));
     }
+    budget_text(rp);
 }
 
 /* ---------- menus and commands ---------- */
 enum { CMD_NEW = 1, CMD_LOAD, CMD_SAVE, CMD_SAVEAS, CMD_QUIT,
        CMD_PAUSE = 10, CMD_SLOW, CMD_MEDIUM, CMD_FAST,
        CMD_AUTOBULLDOZE = 20, CMD_AUTOBUDGET, CMD_DISASTERS, CMD_SOUND,
+       CMD_BUDGET = 40,
        CMD_FIRE = 30, CMD_FLOOD, CMD_TORNADO, CMD_QUAKE, CMD_MONSTER, CMD_MELTDOWN };
 
 static struct NewMenu newmenu[40];
@@ -278,6 +281,8 @@ static struct Menu *make_menus(struct Screen *scr, APTR *vi_out)
     mi(NM_ITEM, "Auto Budget", NULL, CHECKIT | MENUTOGGLE | (autoBudget ? CHECKED : 0), CMD_AUTOBUDGET);
     mi(NM_ITEM, "Disasters", NULL, CHECKIT | MENUTOGGLE | (NoDisasters ? 0 : CHECKED), CMD_DISASTERS);
     mi(NM_ITEM, "Sound", NULL, CHECKIT | MENUTOGGLE | (UserSoundOn ? CHECKED : 0), CMD_SOUND);
+    mi(NM_TITLE, "Windows", NULL, 0, 0);
+    mi(NM_ITEM, "Budget...", "B", 0, CMD_BUDGET);
     mi(NM_TITLE, "Disasters", NULL, 0, 0);
     mi(NM_ITEM, "Fire", NULL, 0, CMD_FIRE);
     mi(NM_ITEM, "Flood", NULL, 0, CMD_FLOOD);
@@ -325,7 +330,7 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
     int checked = item && (item->Flags & CHECKED);
     switch (id) {
     case CMD_NEW:
-        GenerateNewCity(); SimSpeed = 3; recenter();
+        GenerateNewCity(); setSpeed(3); recenter();
         sprintf(status_msg, "New city generated."); break;
     case CMD_LOAD:
         if (ask_file(win, 0, path, sizeof path)) {
@@ -342,14 +347,15 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
         }
         break;
     case CMD_QUIT: return 0;
-    case CMD_PAUSE: SimSpeed = 0; break;
-    case CMD_SLOW: SimSpeed = 1; break;
-    case CMD_MEDIUM: SimSpeed = 2; break;
-    case CMD_FAST: SimSpeed = 3; break;
+    case CMD_PAUSE: setSpeed(0); break;
+    case CMD_SLOW: setSpeed(1); break;
+    case CMD_MEDIUM: setSpeed(2); break;
+    case CMD_FAST: setSpeed(3); break;
     case CMD_AUTOBULLDOZE: autoBulldoze = checked; break;
     case CMD_AUTOBUDGET: autoBudget = checked; break;
     case CMD_DISASTERS: NoDisasters = !checked; break;
     case CMD_SOUND: UserSoundOn = checked; break;
+    case CMD_BUDGET: DoBudgetFromMenu(); break;
     case CMD_FIRE: MakeFire(); break;
     case CMD_FLOOD: MakeFlood(); break;
     case CMD_TORNADO: MakeTornado(); break;
@@ -430,7 +436,7 @@ static int real_main(int argc, char **argv)
         if (menu) SetMenuStrip(win, menu);
     }
     editor.tool_state = queryState;
-    SimSpeed = 3;
+    setSpeed(3);
     int running = 1, tick = 0, frame = 0;
     static const int delay[4] = { 0, 12, 4, 1 };      /* video frames per simulation step */
     while (running) {
@@ -454,20 +460,24 @@ static int real_main(int argc, char **argv)
                 if (code & IECODE_UP_PREFIX) continue;
                 { static int n; if (n < 25) { char b[40]; sprintf(b, "rawkey 0x%02x", (unsigned)code); logmsg(b); n++; } }
                 switch (code) {
+                case 0x7a: view_y -= 2; break;                            /* mouse wheel */
+                case 0x7b: view_y += 2; break;
                 case 0x11: view_y--; break;                               /* W A S D scroll, too */
                 case 0x21: view_y++; break;
                 case 0x22: view_x++; break;
                 case 0x20: view_x--; break;
-                case 0x45: running = 0; break;                            /* Esc */
+                case 0x45: if (budget_visible) budget_key_close(); else running = 0; break;   /* Esc */
+                case 0x44: budget_key_close(); break;                    /* Return */
                 case 0x4c: view_y--; break;                               /* cursor keys scroll */
                 case 0x4d: view_y++; break;
                 case 0x4e: view_x++; break;
                 case 0x4f: view_x--; break;
-                case 0x0a: SimSpeed = 0; break;                           /* 0 = pause */
-                case 0x01: SimSpeed = 1; break;
-                case 0x02: SimSpeed = 2; break;
-                case 0x03: SimSpeed = 3; break;
-                case 0x19: SimSpeed = SimSpeed ? 0 : 3; break;            /* P */
+                case 0x0a: setSpeed(0); break;                           /* 0 = pause */
+                case 0x01: setSpeed(1); break;
+                case 0x02: setSpeed(2); break;
+                case 0x03: setSpeed(3); break;
+                case 0x19: setSpeed(SimMetaSpeed ? 0 : 3); break;        /* P */
+                case 0x35: DoBudgetFromMenu(); break;                      /* B */
                 }
                 clamp_view();
             } else {
@@ -475,6 +485,12 @@ static int real_main(int argc, char **argv)
                 int inview = mx >= TB_W && my >= BAR_H;
                 int wx = (view_x << 4) + (mx - TB_W), wy = (view_y << 4) + (my - BAR_H);
                 mouse_x = mx; mouse_y = my;
+                if (budget_visible) {
+                    hover_x = -1;
+                    if (cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) budget_click(mx, my);
+                    dirty = 1;
+                    continue;
+                }
                 if (inview) { hover_x = wx >> 4; hover_y = wy >> 4; } else hover_x = -1;
                 if (cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) {
                     if (mx < TB_W && my >= BAR_H) {
