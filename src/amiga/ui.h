@@ -5,6 +5,13 @@
 #define PEN_TEXT  33
 #define PEN_SEL   34
 #define PEN_BTN   35
+#define PEN_V_LGRAY  36               /* map overlay colors */
+#define PEN_V_YELLOW 37
+#define PEN_V_ORANGE 38
+#define PEN_V_RED    39
+#define PEN_V_DGREEN 40
+#define PEN_V_LGREEN 41
+#define PEN_V_LBLUE  42
 #define UI_MAPS    1
 #define UI_EDITORS 2
 int  ui_eval(const char *cmd);

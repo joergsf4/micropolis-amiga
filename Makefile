@@ -21,10 +21,10 @@ out/obj/amiga/%.o: src/amiga/%.c $(wildcard src/core/*.h src/amiga/*.h)
 	@mkdir -p $(dir $@)
 	$(CC) $(AMIFLAGS) -c $< -o $@
 
-out/headless: $(CORE_OBJ) out/obj/amiga/ui_core.o out/obj/amiga/stack.o out/obj/amiga/headless.o
+out/headless: $(CORE_OBJ) out/obj/amiga/ui_core.o out/obj/amiga/stack.o out/obj/amiga/mapview.o out/obj/amiga/headless.o
 	$(CC) $(ARCH) -o $@ $^ -lm
 
-out/micropolis: $(CORE_OBJ) out/obj/amiga/ui_core.o out/obj/amiga/stack.o out/obj/amiga/budget_ui.o out/obj/amiga/main.o
+out/micropolis: $(CORE_OBJ) out/obj/amiga/ui_core.o out/obj/amiga/stack.o out/obj/amiga/budget_ui.o out/obj/amiga/mapview.o out/obj/amiga/main.o
 	$(CC) $(ARCH) -o $@ $^ -lm
 
 out/rtgtest: src/amiga/rtgtest.c

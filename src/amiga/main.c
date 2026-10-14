@@ -6,6 +6,7 @@
 #include "ui.h"
 #include "stack.h"
 #include "budget_ui.h"
+#include "mapview.h"
 #undef GetSprite
 #include <stdio.h>
 #include <string.h>
@@ -53,11 +54,16 @@ static UBYTE palette[256 * 3];
 
 static int view_x, view_y;             /* top-left tile of the view */
 static char status_date[32] = "", status_funds[48] = "", status_msg[96] = "";
+extern int sim_loops;
 static int dirty = 1;
+static int map_dirty = 1;
+#define MAP_X (SCR_W - MV_W - 6)
+#define MAP_Y (SCR_H - MV_H - 6)
 
 static SimView editor;                 /* the core's tools take a SimView; only tool_state/last_x/y are used */
 static int hover_x = -1, hover_y = -1; /* tile under the mouse, -1 = none */
 static int dragging;
+static int map_drag;
 static const int panning = 0;            /* (right button is the menu button now) */
 static int mouse_x = -1, mouse_y = -1;   /* last window position, for edge scrolling */
 
@@ -125,11 +131,16 @@ static int load_assets(void)
     tiles = load_file("res/tiles.bin", NULL);
     objects = load_file("res/objects.bin", NULL);
     if (!pal || !tiles || !objects) { printf("Assets fehlen (res/*.bin)\n"); return 0; }
+    map_load();
     memcpy(palette, pal, 256 * 3);
     FreeVec(pal);
     palette[PEN_BAR * 3 + 0] = 0x20; palette[PEN_BAR * 3 + 1] = 0x28; palette[PEN_BAR * 3 + 2] = 0x50;
     palette[PEN_TEXT * 3 + 0] = 0xff; palette[PEN_TEXT * 3 + 1] = 0xff; palette[PEN_TEXT * 3 + 2] = 0xff;
     palette[PEN_SEL * 3 + 0] = 0xb0; palette[PEN_SEL * 3 + 1] = 0x60; palette[PEN_SEL * 3 + 2] = 0x20;
+    {   static const UBYTE v[7][3] = { {0xbf,0xbf,0xbf}, {0xff,0xff,0x00}, {0xff,0x7f,0x00}, {0xff,0x00,0x00},
+                                       {0x00,0x7f,0x00}, {0x00,0xe6,0x00}, {0x66,0x66,0xe6} };
+        for (int i = 0; i < 7; i++) memcpy(&palette[(PEN_V_LGRAY + i) * 3], v[i], 3);
+    }
     palette[PEN_BTN * 3 + 0] = 0x40; palette[PEN_BTN * 3 + 1] = 0x48; palette[PEN_BTN * 3 + 2] = 0x70;
     return 1;
 }
@@ -219,6 +230,11 @@ static void render_map(void)
     for (SimSprite *s = sim->sprite; s; s = s->next) draw_sprite(s);
     draw_cursor();
     draw_toolbar();
+    if (map_visible) {
+        static int last_loops = -1000;
+        if (map_dirty || sim_loops - last_loops >= 16) { map_refresh(); map_dirty = 0; last_loops = sim_loops; }
+        map_blit(fb, SCR_W, MAP_X, MAP_Y, view_x, view_y, VIEW_COLS, VIEW_ROWS);
+    }
     budget_draw(fb, SCR_W);
 }
 
@@ -247,7 +263,7 @@ static void present(struct Window *win)
 enum { CMD_NEW = 1, CMD_LOAD, CMD_SAVE, CMD_SAVEAS, CMD_QUIT,
        CMD_PAUSE = 10, CMD_SLOW, CMD_MEDIUM, CMD_FAST,
        CMD_AUTOBULLDOZE = 20, CMD_AUTOBUDGET, CMD_DISASTERS, CMD_SOUND,
-       CMD_BUDGET = 40,
+       CMD_BUDGET = 40, CMD_MAP = 41, CMD_MAPMODE = 100,
        CMD_FIRE = 30, CMD_FLOOD, CMD_TORNADO, CMD_QUAKE, CMD_MONSTER, CMD_MELTDOWN };
 
 static struct NewMenu newmenu[40];
@@ -283,6 +299,10 @@ static struct Menu *make_menus(struct Screen *scr, APTR *vi_out)
     mi(NM_ITEM, "Sound", NULL, CHECKIT | MENUTOGGLE | (UserSoundOn ? CHECKED : 0), CMD_SOUND);
     mi(NM_TITLE, "Windows", NULL, 0, 0);
     mi(NM_ITEM, "Budget...", "B", 0, CMD_BUDGET);
+    mi(NM_TITLE, "Map", NULL, 0, 0);
+    mi(NM_ITEM, "Show Map", "M", CHECKIT | MENUTOGGLE | (map_visible ? CHECKED : 0), CMD_MAP);
+    mi(NM_ITEM, (const char *)NM_BARLABEL, NULL, 0, 0);
+    for (int i = 0; i < MAP_MODES; i++) mi(NM_ITEM, map_names[i], NULL, 0, CMD_MAPMODE + i);
     mi(NM_TITLE, "Disasters", NULL, 0, 0);
     mi(NM_ITEM, "Fire", NULL, 0, CMD_FIRE);
     mi(NM_ITEM, "Flood", NULL, 0, CMD_FLOOD);
@@ -328,6 +348,11 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
 {
     char path[256];
     int checked = item && (item->Flags & CHECKED);
+    if (id >= CMD_MAPMODE && id < CMD_MAPMODE + MAP_MODES) {
+        map_mode = id - CMD_MAPMODE; map_visible = 1; map_dirty = 1;
+        sprintf(status_msg, "Map: %s", map_names[map_mode]);
+        return 1;
+    }
     switch (id) {
     case CMD_NEW:
         GenerateNewCity(); setSpeed(3); recenter();
@@ -356,6 +381,7 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
     case CMD_DISASTERS: NoDisasters = !checked; break;
     case CMD_SOUND: UserSoundOn = checked; break;
     case CMD_BUDGET: DoBudgetFromMenu(); break;
+    case CMD_MAP: map_visible = checked; map_dirty = 1; break;
     case CMD_FIRE: MakeFire(); break;
     case CMD_FLOOD: MakeFlood(); break;
     case CMD_TORNADO: MakeTornado(); break;
@@ -478,6 +504,8 @@ static int real_main(int argc, char **argv)
                 case 0x03: setSpeed(3); break;
                 case 0x19: setSpeed(SimMetaSpeed ? 0 : 3); break;        /* P */
                 case 0x35: DoBudgetFromMenu(); break;                      /* B */
+                case 0x37: map_visible = !map_visible; map_dirty = 1; break;   /* M */
+                case 0x36: if (map_visible) { map_mode = (map_mode + 1) % MAP_MODES; map_dirty = 1; sprintf(status_msg, "Map: %s", map_names[map_mode]); } break;   /* C: next overlay */
                 }
                 clamp_view();
             } else {
@@ -492,6 +520,15 @@ static int real_main(int argc, char **argv)
                     continue;
                 }
                 if (inview) { hover_x = wx >> 4; hover_y = wy >> 4; } else hover_x = -1;
+                if (map_visible && ((cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) || (cls == IDCMP_MOUSEMOVE && map_drag))) {
+                    int tx, ty;
+                    if (map_hit(mx, my, MAP_X, MAP_Y, &tx, &ty)) {          /* click on the map: scroll there */
+                        view_x = tx - VIEW_COLS / 2; view_y = ty - VIEW_ROWS / 2; clamp_view();
+                        map_drag = 1;
+                        continue;
+                    }
+                }
+                if (cls == IDCMP_MOUSEBUTTONS && code == SELECTUP) map_drag = 0;
                 if (cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) {
                     if (mx < TB_W && my >= BAR_H) {
                         int i = (my - BAR_H) / TB_BTN_H;

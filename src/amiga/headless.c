@@ -3,6 +3,7 @@
 #include "sim.h"
 #include "ui.h"
 #include "stack.h"
+#include "mapview.h"
 
 void app_log(const char *msg) {}
 static int verbose = 0;
@@ -28,6 +29,19 @@ static int real_main(int argc, char **argv)
     printf("loaded %s: year %d, funds %ld, pop %ld, class %d\n", argv[1], (int)CurrentYear(),
            (long)TotalFunds, (long)CityPop, (int)CityClass);
     SimSpeed = 3;
+    if (argc > 3 && !strcmp(argv[3], "mapdump")) {        /* render the overview map in every mode to files */
+        char name[32];
+        if (!map_load()) { printf("no res/tilessm.bin\n"); return 10; }
+        for (i = 0; i < 80; i++) sim_loop(1);              /* let the census fill the density maps */
+        for (map_mode = 0; map_mode < MAP_MODES; map_mode++) {
+            FILE *f;
+            map_refresh();
+            sprintf(name, "map%02d.raw", map_mode);
+            f = fopen(name, "wb");
+            if (f) { fwrite(map_buffer(), 1, MV_W * MV_H, f); fclose(f); }
+        }
+        return 0;
+    }
     if (argc > 3 && !strcmp(argv[3], "budget")) {      /* budget panel experiment */
         extern float roadPercent, policePercent, firePercent;
         extern void UpdateBudget(void), UpdateBudgetWindow(void), drawBudgetWindow(void), Kick(void);
