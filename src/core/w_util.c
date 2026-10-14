@@ -74,6 +74,12 @@ makeDollarDecimalStr(char *numStr, char *dollarStr)
   register short numIndex = 0;
   register short x;
 
+  if (numStr[0] == '-') {               /* AMIGA: negative amounts gave "$-,281" */
+    dollarStr[0] = '-';
+    makeDollarDecimalStr(numStr + 1, dollarStr + 1);
+    return;
+  }
+
   numOfDigits = strlen(numStr);
 
   if (numOfDigits == 1) {

@@ -459,7 +459,7 @@ static void render_frame(struct Window *win)
         char line[200];
         SetAPen(rp, PEN_TEXT);
         SetBPen(rp, PEN_BAR);
-        sprintf(line, " %-9s  %-22s  Pop %-8ld  Speed %d%s ", status_date, status_funds, (long)CityPop, (int)SimSpeed,
+        sprintf(line, " %-9s %-21s Pop %-7ld Speed %d%s", status_date, status_funds, (long)CityPop, (int)SimSpeed,
                 SimSpeed ? "" : " (Pause)");
         if (strcmp(line, last_line1)) { put_text(rp, 4, 12, line); strcpy(last_line1, line); }
         sprintf(line, " %-58.58s", status_msg);
