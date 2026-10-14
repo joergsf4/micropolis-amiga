@@ -1,0 +1,4 @@
+out/
+.DS_Store
+# upstream sources and its EA-copyrighted graphics/sounds: fetched by tools/fetch_upstream.sh, not republished
+upstream/
