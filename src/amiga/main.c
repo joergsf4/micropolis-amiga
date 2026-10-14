@@ -53,6 +53,8 @@ static int dirty = 1;
 static SimView editor;                 /* the core's tools take a SimView; only tool_state/last_x/y are used */
 static int hover_x = -1, hover_y = -1; /* tile under the mouse, -1 = none */
 static int dragging;
+static int panning, pan_mx, pan_my;      /* right mouse button drag scrolls the map */
+static int mouse_x = -1, mouse_y = -1;   /* last window position, for edge scrolling */
 
 static const struct { const char *name; short state; } toolbtn[16] = {
     { "Query", queryState },       { "Doze 1", dozeState },       { "Road 10", roadState },
@@ -294,7 +296,7 @@ static int real_main(int argc, char **argv)
     logmsg("window open");
     editor.tool_state = queryState;
     SimSpeed = 3;
-    int running = 1, tick = 0;
+    int running = 1, tick = 0, frame = 0;
     static const int delay[4] = { 0, 12, 4, 1 };      /* video frames per simulation step */
     while (running) {
         struct IntuiMessage *m;
@@ -305,7 +307,12 @@ static int real_main(int argc, char **argv)
             ReplyMsg((struct Message *)m);
             if (cls == IDCMP_RAWKEY) {
                 if (code & IECODE_UP_PREFIX) continue;
+                { static int n; if (n < 25) { char b[40]; sprintf(b, "rawkey 0x%02x", (unsigned)code); logmsg(b); n++; } }
                 switch (code) {
+                case 0x11: view_y--; break;                               /* W A S D scroll, too */
+                case 0x21: view_y++; break;
+                case 0x22: view_x++; break;
+                case 0x20: view_x--; break;
                 case 0x45: running = 0; break;                            /* Esc */
                 case 0x4c: view_y--; break;                               /* cursor keys scroll */
                 case 0x4d: view_y++; break;
@@ -321,6 +328,17 @@ static int real_main(int argc, char **argv)
             } else {
                 /* mouse: window coordinates -> tile / world pixel */
                 int inview = mx >= TB_W && my >= BAR_H;
+                mouse_x = mx; mouse_y = my;
+                if (cls == IDCMP_MOUSEBUTTONS && code == MENUDOWN) { panning = 1; pan_mx = mx; pan_my = my; }
+                else if (cls == IDCMP_MOUSEBUTTONS && code == MENUUP) panning = 0;
+                else if (cls == IDCMP_MOUSEMOVE && panning) {
+                    /* drag the map: 16 pixels of mouse movement = one tile */
+                    while (mx - pan_mx >= 16) { view_x--; pan_mx += 16; }
+                    while (pan_mx - mx >= 16) { view_x++; pan_mx -= 16; }
+                    while (my - pan_my >= 16) { view_y--; pan_my += 16; }
+                    while (pan_my - my >= 16) { view_y++; pan_my -= 16; }
+                    clamp_view();
+                }
                 int wx = (view_x << 4) + (mx - TB_W), wy = (view_y << 4) + (my - BAR_H);
                 if (inview) { hover_x = wx >> 4; hover_y = wy >> 4; } else hover_x = -1;
                 if (cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) {
@@ -339,6 +357,15 @@ static int real_main(int argc, char **argv)
                 }
             }
             dirty = 1;
+        }
+        if (mouse_x >= 0 && !panning && (++frame & 3) == 0) {   /* edge scrolling */
+            int ox = view_x, oy = view_y;
+            if (mouse_x >= TB_W && mouse_x < TB_W + 6) view_x--;
+            if (mouse_x >= SCR_W - 6) view_x++;
+            if (mouse_y >= BAR_H && mouse_y < BAR_H + 4) view_y--;
+            if (mouse_y >= SCR_H - 4) view_y++;
+            clamp_view();
+            if (ox != view_x || oy != view_y) dirty = 1;
         }
         if (SimSpeed && ++tick >= delay[SimSpeed]) {
             tick = 0;
