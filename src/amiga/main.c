@@ -26,11 +26,14 @@ struct GfxBase *GfxBase;
 #define SCR_W 640
 #define SCR_H 480
 #define BAR_H 32                       /* status bar on top */
-#define VIEW_COLS (SCR_W / 16)         /* 40 */
+#define TB_W 80                        /* tool palette on the left */
+#define VIEW_COLS ((SCR_W - TB_W) / 16) /* 35 */
 #define VIEW_ROWS ((SCR_H - BAR_H) / 16) /* 28 */
 
 #define PEN_BAR   32                   /* extra palette entries behind the game's own colors */
 #define PEN_TEXT  33
+#define PEN_SEL   34
+#define PEN_BTN   35
 
 static void logmsg(const char *msg)   /* progress log: when started from the Workbench there is no console */
 {
@@ -46,6 +49,20 @@ static UBYTE palette[256 * 3];
 static int view_x, view_y;             /* top-left tile of the view */
 static char status_date[32] = "", status_funds[48] = "", status_msg[96] = "";
 static int dirty = 1;
+
+static SimView editor;                 /* the core's tools take a SimView; only tool_state/last_x/y are used */
+static int hover_x = -1, hover_y = -1; /* tile under the mouse, -1 = none */
+static int dragging;
+
+static const struct { const char *name; short state; } toolbtn[16] = {
+    { "Query", queryState },       { "Doze 1", dozeState },       { "Road 10", roadState },
+    { "Rail 20", rrState },        { "Wire 5", wireState },       { "Park 10", parkState },
+    { "Resid 100", residentialState }, { "Comm 100", commercialState }, { "Indus 100", industrialState },
+    { "Fire 500", fireState },     { "Police 500", policeState }, { "Stadm 5k", stadiumState },
+    { "Coal 3k", powerState },     { "Nucl 5k", nuclearState },   { "Sea 3k", seaportState },
+    { "Airp 10k", airportState },
+};
+#define TB_BTN_H ((SCR_H - BAR_H) / 16)
 
 /* ---------- notifications from the simulation core (see ui_core.c) ---------- */
 static void copy_braced(char *dst, size_t n, const char *s)
@@ -63,6 +80,14 @@ int ui_eval(const char *cmd)
 {
     if (!strncmp(cmd, "UISetDate ", 10))         { copy_braced(status_date, sizeof status_date, cmd); dirty = 1; }
     else if (!strncmp(cmd, "UISetFunds ", 11))   { copy_braced(status_funds, sizeof status_funds, cmd); dirty = 1; }
+    else if (!strncmp(cmd, "UIShowZoneStatus ", 17)) {
+        char a[24] = "", b[24] = "", c[24] = "", d[24] = "", e[24] = "";
+        const char *q = cmd;
+        char *dst[5] = { a, b, c, d, e };
+        for (int i = 0; i < 5 && (q = strchr(q, '{')); i++) { copy_braced(dst[i], 24, q); q = strchr(q, '}'); if (!q) break; }
+        sprintf(status_msg, "%s, %s, %s, %s", a, b, c, d);
+        dirty = 1;
+    }
     else if (!strncmp(cmd, "UISetMessage ", 13)) { copy_braced(status_msg, sizeof status_msg, cmd); dirty = 1; }
     return 0;
 }
@@ -94,6 +119,8 @@ static int load_assets(void)
     FreeVec(pal);
     palette[PEN_BAR * 3 + 0] = 0x20; palette[PEN_BAR * 3 + 1] = 0x28; palette[PEN_BAR * 3 + 2] = 0x50;
     palette[PEN_TEXT * 3 + 0] = 0xff; palette[PEN_TEXT * 3 + 1] = 0xff; palette[PEN_TEXT * 3 + 2] = 0xff;
+    palette[PEN_SEL * 3 + 0] = 0xb0; palette[PEN_SEL * 3 + 1] = 0x60; palette[PEN_SEL * 3 + 2] = 0x20;
+    palette[PEN_BTN * 3 + 0] = 0x40; palette[PEN_BTN * 3 + 1] = 0x48; palette[PEN_BTN * 3 + 2] = 0x70;
     return 1;
 }
 
@@ -101,7 +128,7 @@ static int load_assets(void)
 static void draw_tile(int col, int row, int tile)
 {
     UBYTE *src = tiles + tile * 256;
-    UBYTE *dst = fb + (BAR_H + row * 16) * SCR_W + col * 16;
+    UBYTE *dst = fb + (BAR_H + row * 16) * SCR_W + TB_W + col * 16;
     for (int y = 0; y < 16; y++, src += 16, dst += SCR_W)
         memcpy(dst, src, 16);
 }
@@ -115,7 +142,7 @@ static void draw_sprite(SimSprite *s)
         if (tab[0] != s->type || tab[1] != s->frame - 1) continue;
         int w = tab[2], h = tab[3];
         UBYTE *px = objects + *(ULONG *)(tab + 4);
-        int x0 = s->x - (view_x << 4) + s->x_offset;
+        int x0 = s->x - (view_x << 4) + s->x_offset + TB_W;
         int y0 = s->y - (view_y << 4) + s->y_offset + BAR_H;
         for (int y = 0; y < h; y++) {
             int dy = y0 + y;
@@ -123,10 +150,43 @@ static void draw_sprite(SimSprite *s)
             for (int x = 0; x < w; x++) {
                 int dx = x0 + x;
                 UBYTE c = px[y * w + x];
-                if (c && dx >= 0 && dx < SCR_W) fb[dy * SCR_W + dx] = c;
+                if (c && dx >= TB_W && dx < SCR_W) fb[dy * SCR_W + dx] = c;
             }
         }
         return;
+    }
+}
+
+static void hline(int x0, int x1, int y, UBYTE c)
+{
+    if (y < BAR_H || y >= SCR_H) return;
+    for (int x = x0; x <= x1; x++) if (x >= TB_W && x < SCR_W) fb[y * SCR_W + x] = c;
+}
+
+static void vline(int x, int y0, int y1, UBYTE c)
+{
+    if (x < TB_W || x >= SCR_W) return;
+    for (int y = y0; y <= y1; y++) if (y >= BAR_H && y < SCR_H) fb[y * SCR_W + x] = c;
+}
+
+/* outline of the area the current tool would build on, at the mouse position */
+static void draw_cursor(void)
+{
+    int st = editor.tool_state, size = toolSize[st];
+    if (hover_x < 0 || size <= 0) return;
+    int tx = hover_x - toolOffset[st], ty = hover_y - toolOffset[st];
+    int x0 = TB_W + (tx - view_x) * 16, y0 = BAR_H + (ty - view_y) * 16;
+    int x1 = x0 + size * 16 - 1, y1 = y0 + size * 16 - 1;
+    hline(x0, x1, y0, PEN_TEXT); hline(x0, x1, y1, PEN_TEXT);
+    vline(x0, y0, y1, PEN_TEXT); vline(x1, y0, y1, PEN_TEXT);
+}
+
+static void draw_toolbar(void)
+{
+    for (int i = 0; i < 16; i++) {
+        UBYTE c = toolbtn[i].state == editor.tool_state ? PEN_SEL : PEN_BTN;
+        for (int y = 0; y < TB_BTN_H; y++)
+            memset(fb + (BAR_H + i * TB_BTN_H + y) * SCR_W, (y == TB_BTN_H - 1) ? PEN_BAR : c, TB_W);
     }
 }
 
@@ -147,6 +207,8 @@ static void render_map(void)
         }
     }
     for (SimSprite *s = sim->sprite; s; s = s->next) draw_sprite(s);
+    draw_cursor();
+    draw_toolbar();
 }
 
 static void present(struct Window *win)
@@ -161,6 +223,12 @@ static void present(struct Window *win)
     Move(rp, 4, 12);  Text(rp, (CONST_STRPTR)line, strlen(line));
     sprintf(line, " %-70s", status_msg);
     Move(rp, 4, 27);  Text(rp, (CONST_STRPTR)line, strlen(line));
+    SetAPen(rp, PEN_TEXT);
+    for (int i = 0; i < 16; i++) {
+        SetBPen(rp, toolbtn[i].state == editor.tool_state ? PEN_SEL : PEN_BTN);
+        Move(rp, 4, BAR_H + i * TB_BTN_H + 17);
+        Text(rp, (CONST_STRPTR)toolbtn[i].name, strlen(toolbtn[i].name));
+    }
 }
 
 static void clamp_view(void)
@@ -219,32 +287,57 @@ static int real_main(int argc, char **argv)
     LoadRGB32(&scr->ViewPort, pal);
     win = OpenWindowTags(NULL, WA_CustomScreen, (ULONG)scr, WA_Left, 0, WA_Top, 0, WA_Width, SCR_W,
                          WA_Height, SCR_H, WA_Borderless, TRUE, WA_Backdrop, TRUE, WA_Activate, TRUE,
-                         WA_RMBTrap, TRUE, WA_IDCMP, IDCMP_RAWKEY, TAG_DONE);
+                         WA_RMBTrap, TRUE, WA_ReportMouse, TRUE,
+                         WA_IDCMP, IDCMP_RAWKEY | IDCMP_MOUSEBUTTONS | IDCMP_MOUSEMOVE, TAG_DONE);
     if (!win) { printf("OpenWindow fehlgeschlagen\n"); goto out; }
 
     logmsg("window open");
+    editor.tool_state = queryState;
     SimSpeed = 3;
     int running = 1, tick = 0;
     static const int delay[4] = { 0, 12, 4, 1 };      /* video frames per simulation step */
     while (running) {
         struct IntuiMessage *m;
         while ((m = (struct IntuiMessage *)GetMsg(win->UserPort))) {
+            ULONG cls = m->Class;
             UWORD code = m->Code;
+            int mx = m->MouseX, my = m->MouseY;
             ReplyMsg((struct Message *)m);
-            if (code & IECODE_UP_PREFIX) continue;
-            switch (code) {
-            case 0x45: running = 0; break;                            /* Esc */
-            case 0x4c: view_y--; break;                               /* cursor keys scroll */
-            case 0x4d: view_y++; break;
-            case 0x4e: view_x++; break;
-            case 0x4f: view_x--; break;
-            case 0x0a: SimSpeed = 0; break;                           /* 0 = pause */
-            case 0x01: SimSpeed = 1; break;
-            case 0x02: SimSpeed = 2; break;
-            case 0x03: SimSpeed = 3; break;
-            case 0x19: SimSpeed = SimSpeed ? 0 : 3; break;            /* P */
+            if (cls == IDCMP_RAWKEY) {
+                if (code & IECODE_UP_PREFIX) continue;
+                switch (code) {
+                case 0x45: running = 0; break;                            /* Esc */
+                case 0x4c: view_y--; break;                               /* cursor keys scroll */
+                case 0x4d: view_y++; break;
+                case 0x4e: view_x++; break;
+                case 0x4f: view_x--; break;
+                case 0x0a: SimSpeed = 0; break;                           /* 0 = pause */
+                case 0x01: SimSpeed = 1; break;
+                case 0x02: SimSpeed = 2; break;
+                case 0x03: SimSpeed = 3; break;
+                case 0x19: SimSpeed = SimSpeed ? 0 : 3; break;            /* P */
+                }
+                clamp_view();
+            } else {
+                /* mouse: window coordinates -> tile / world pixel */
+                int inview = mx >= TB_W && my >= BAR_H;
+                int wx = (view_x << 4) + (mx - TB_W), wy = (view_y << 4) + (my - BAR_H);
+                if (inview) { hover_x = wx >> 4; hover_y = wy >> 4; } else hover_x = -1;
+                if (cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) {
+                    if (mx < TB_W && my >= BAR_H) {
+                        int i = (my - BAR_H) / TB_BTN_H;
+                        if (i < 16) editor.tool_state = toolbtn[i].state;
+                    } else if (inview) {
+                        ToolDown(&editor, wx, wy);
+                        dragging = 1;
+                    }
+                } else if (cls == IDCMP_MOUSEBUTTONS && code == SELECTUP) {
+                    if (dragging && inview) ToolUp(&editor, wx, wy);
+                    dragging = 0;
+                } else if (cls == IDCMP_MOUSEMOVE && dragging && inview) {
+                    ToolDrag(&editor, wx, wy);
+                }
             }
-            clamp_view();
             dirty = 1;
         }
         if (SimSpeed && ++tick >= delay[SimSpeed]) {

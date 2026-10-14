@@ -15,5 +15,8 @@ void sim_loop(int doSim);
 int  LoadCity(char *filename);
 int  CurrentYear(void);
 void animateTiles(void);
+int  ToolDown(SimView *view, int x, int y);
+int  ToolUp(SimView *view, int x, int y);
+int  ToolDrag(SimView *view, int x, int y);
 void MakeSound(char *channel, char *id);
 #endif
