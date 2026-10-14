@@ -4,6 +4,7 @@
 #include "ui.h"
 #include "stack.h"
 
+void app_log(const char *msg) {}
 static int verbose = 0;
 int  ui_eval(const char *cmd) { if (verbose) printf("  [UI] %s\n", cmd); return 0; }
 void ui_invalidate(int what) {}

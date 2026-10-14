@@ -1,23 +1,47 @@
-/* The upstream core keeps large buffers on the stack; the shell/Workbench stack is only 4 KB, and
- * libnix' __stack variable is not honoured by this toolchain. So main() runs on its own stack. */
+/* The upstream core keeps large buffers on the stack, but the shell/Workbench stack is only 4 KB and
+ * libnix' __stack variable is not honoured by this toolchain (StackSwap() crashed on the way back).
+ * So the real main() runs in a child process with its own big stack; the parent waits for it. */
 #include <exec/types.h>
-#include <exec/memory.h>
 #include <exec/tasks.h>
+#include <dos/dos.h>
+#include <dos/dostags.h>
 #include <proto/exec.h>
+#include <proto/dos.h>
 #include "stack.h"
+
+static int (*child_fn)(int, char **);
+static int child_argc;
+static char **child_argv;
+static int child_rc = 20;
+static struct Task *parent_task;
+static ULONG parent_sig;
+
+static void child_entry(void)
+{
+    child_rc = child_fn(child_argc, child_argv);
+    Forbid();                      /* parent must not run (and unload this code) before we are gone */
+    Signal(parent_task, parent_sig);
+}
 
 int run_with_stack(int (*fn)(int, char **), int argc, char **argv, ULONG size)
 {
-    UBYTE *mem = AllocMem(size, MEMF_ANY);
-    struct StackSwapStruct sss;
-    int rc;
-    if (!mem) return 20;
-    sss.stk_Lower = mem;
-    sss.stk_Upper = (ULONG)(mem + size);
-    sss.stk_Pointer = (APTR)sss.stk_Upper;
-    StackSwap(&sss);
-    rc = fn(argc, argv);
-    StackSwap(&sss);
-    FreeMem(mem, size);
-    return rc;
+    BYTE sig = AllocSignal(-1);
+    BPTR dir, in, out;
+    struct Process *child;
+    if (sig < 0) return 20;
+    child_fn = fn; child_argc = argc; child_argv = argv;
+    parent_task = FindTask(NULL);
+    parent_sig = 1UL << sig;
+
+    dir = CurrentDir(0);           /* peek at the current directory ... */
+    CurrentDir(dir);               /* ... and put it back */
+    in = Input(); out = Output();
+    child = CreateNewProcTags(NP_Entry, (ULONG)child_entry, NP_StackSize, size, NP_Name, (ULONG)"Micropolis",
+                              NP_CurrentDir, dir ? DupLock(dir) : 0,
+                              NP_Input, in, NP_CloseInput, FALSE,
+                              NP_Output, out, NP_CloseOutput, FALSE, TAG_DONE);
+    if (!child) { FreeSignal(sig); return 20; }
+    Wait(parent_sig);
+    FreeSignal(sig);
+    return child_rc;
 }

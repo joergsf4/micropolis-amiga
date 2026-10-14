@@ -35,7 +35,9 @@ struct GfxBase *GfxBase;
 #define PEN_SEL   34
 #define PEN_BTN   35
 
-static void logmsg(const char *msg)   /* progress log: when started from the Workbench there is no console */
+void app_log(const char *msg);
+static void logmsg(const char *msg) { app_log(msg); }
+void app_log(const char *msg)   /* progress log: when started from the Workbench there is no console */
 {
     FILE *f = fopen("micropolis.log", "a");
     if (f) { fputs(msg, f); fputc(10, f); fclose(f); }
@@ -385,14 +387,23 @@ static int real_main(int argc, char **argv)
     }
     rc = 0;
 out:
+    logmsg("cleanup");
     if (win) CloseWindow(win);
+    logmsg("window closed");
     if (scr) CloseScreen(scr);
+    logmsg("screen closed");
     if (fb) FreeVec(fb);
     if (CyberGfxBase) CloseLibrary(CyberGfxBase);
+    logmsg("cleanup done");
     return rc;
 }
 
+static void at_exit_log(void) { app_log("atexit handler"); }
+
 int main(int argc, char **argv)
 {
-    return run_with_stack(real_main, argc, argv, BIG_STACK);
+    atexit(at_exit_log);
+    int rc = run_with_stack(real_main, argc, argv, BIG_STACK);
+    app_log("main() is returning");
+    return rc;
 }
