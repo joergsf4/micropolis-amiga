@@ -36,7 +36,9 @@
 #include <workbench/startup.h>
 #include <workbench/workbench.h>
 
-static const char verstag[] __attribute__((used)) = "$VER: Micropolis 0.3 (15.10.2026)";
+#include "version.h"
+#include "buildinfo.h"
+static const char verstag[] __attribute__((used)) = "$VER: Micropolis " VERSION " (" VER_DATE ")";
 
 struct Library *CyberGfxBase;
 struct IntuitionBase *IntuitionBase;
@@ -130,7 +132,7 @@ int ui_eval(const char *cmd)
         int r, c, i;
         if (sscanf(cmd + 12, "%d %d %d", &r, &c, &i) == 3) { demand_r = r; demand_c = c; demand_i = i; demand_dirty = 1; dirty = 1; }
     }
-    else if (!strncmp(cmd, "UIShowPicture ", 14))   { notice_show(atoi(cmd + 14)); notice_dirty = 1; dirty = 1; }
+    else if (!strncmp(cmd, "UIShowPicture ", 14))   { if (!debug_show) notice_show(atoi(cmd + 14)); notice_dirty = 1; dirty = 1; }
     else if (!strncmp(cmd, "UIAutoGoto ", 11)) {
         int x, y;
         if (autoGo && sscanf(cmd + 11, "%d %d", &x, &y) == 2) { view_x = x - VIEW_COLS / 2; view_y = y - VIEW_ROWS / 2; clamp_view(); dirty = 1; }
@@ -590,13 +592,14 @@ static void render_frame(struct Window *win)
 enum { CMD_NEW = 1, CMD_LOAD, CMD_SAVE, CMD_SAVEAS, CMD_QUIT,
        CMD_PAUSE = 10, CMD_SLOW, CMD_MEDIUM, CMD_FAST,
        CMD_AUTOBULLDOZE = 20, CMD_AUTOBUDGET, CMD_DISASTERS, CMD_SOUND,
-       CMD_BUDGET = 40, CMD_MAP = 41, CMD_EVAL = 42, CMD_GRAPHS = 43, CMD_MAPMODE = 100,
+       CMD_ABOUT = 44, CMD_BUDGET = 40, CMD_MAP = 41, CMD_EVAL = 42, CMD_GRAPHS = 43, CMD_MAPMODE = 100,
        CMD_FIRE = 30, CMD_FLOOD, CMD_TORNADO, CMD_QUAKE, CMD_MONSTER, CMD_MELTDOWN };
 
-static struct NewMenu newmenu[40];
+static struct NewMenu newmenu[64];                      /* the menus have about 48 entries */
 static int nmenu;
 static void mi(UBYTE type, const char *label, const char *key, UWORD flags, int id)
 {
+    if (nmenu >= (int)(sizeof newmenu / sizeof newmenu[0]) - 1) return;     /* never overrun the table */
     struct NewMenu *n = &newmenu[nmenu++];
     n->nm_Type = type; n->nm_Label = (STRPTR)label; n->nm_CommKey = (STRPTR)key;
     n->nm_Flags = flags; n->nm_MutualExclude = 0; n->nm_UserData = (APTR)(long)id;
@@ -608,6 +611,8 @@ static struct Menu *make_menus(struct Screen *scr, APTR *vi_out)
     struct Menu *menu;
     nmenu = 0;
     mi(NM_TITLE, "Project", NULL, 0, 0);
+    mi(NM_ITEM, "About Micropolis...", NULL, 0, CMD_ABOUT);
+    mi(NM_ITEM, (const char *)NM_BARLABEL, NULL, 0, 0);
     mi(NM_ITEM, "New City", "N", 0, CMD_NEW);
     mi(NM_ITEM, "Load City...", "L", 0, CMD_LOAD);
     mi(NM_ITEM, "Save City", "S", 0, CMD_SAVE);
@@ -672,6 +677,40 @@ static void recenter(void)
     view_y = WORLD_Y / 2 - VIEW_ROWS / 2;
 }
 
+/* ---------- About box: version, build, machine - to tell which variant is running ---------- */
+static int scr_depth_shown, scr_mode_shown;       /* filled in at startup */
+
+static void show_about(void)
+{
+    char txt[800], cpu[40] = "68000", fpu[24] = "no FPU", modeline[60];
+    sprintf(modeline, "Screen mode 0x%08lx, %d bit", (unsigned long)scr_mode_shown, scr_depth_shown);
+    UWORD af = SysBase->AttnFlags;
+    if (af & AFF_68010) strcpy(cpu, "68010");
+    if (af & AFF_68020) strcpy(cpu, "68020");
+    if (af & AFF_68030) strcpy(cpu, "68030");
+    if (af & AFF_68040) strcpy(cpu, "68040");
+    if (af & 0x80) strcpy(cpu, "68060");                 /* AFF_68060 */
+    if (af & (AFF_68881 | AFF_68882)) strcpy(fpu, (af & AFF_68882) ? "68882" : "68881");
+    if (af & AFF_FPU40) strcpy(fpu, "FPU");
+    sprintf(txt,
+        "Micropolis for AmigaOS 3\n"
+        "Version %s (%s)\n"
+        "Build  %s  %s\n"
+        "\n"
+        "CPU %s, %s\n"
+        "%s\n"
+        "Memory: %ld KB Chip, %ld KB Fast free\n"
+        "\n"
+        "Simulation and graphics from Micropolis, the open-source SimCity (GPL v3, (c) Electronic Arts). "
+        "Original design Will Wright, Unix version Don Hopkins.\n"
+        "github.com/joergsf4/micropolis-amiga",
+        VERSION, VER_DATE, BUILD_TIME, BUILD_REV, cpu, fpu,
+        modeline,
+        (long)(AvailMem(MEMF_CHIP) / 1024), (long)(AvailMem(MEMF_FAST) / 1024));
+    notice_show_text("About Micropolis", txt);
+    notice_dirty = 1;
+}
+
 /* returns 0 to quit */
 static int do_command(int id, struct Window *win, struct MenuItem *item)
 {
@@ -683,6 +722,7 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
         return 1;
     }
     switch (id) {
+    case CMD_ABOUT: show_about(); break;
     case CMD_NEW:
         GenerateNewCity(); setSpeed(3); recenter();
         sprintf(status_msg, "New city generated."); break;
@@ -846,6 +886,7 @@ static int real_main(int argc, char **argv)
     logmsg("sim_init done");
     if (!LoadCity((char *)city)) { fail("Cannot load the city file '%s'.", city); goto out; }
     logmsg("city loaded");
+    sprintf(status_msg, "Micropolis %s (%s)", VERSION, BUILD_REV);
     view_x = WORLD_X / 2 - VIEW_COLS / 2;
     view_y = WORLD_Y / 2 - VIEW_ROWS / 2;
     clamp_view();
@@ -858,6 +899,7 @@ static int real_main(int argc, char **argv)
         goto out;
     }
     true_color = depth > 8;
+    scr_mode_shown = (int)id; scr_depth_shown = depth;
     { char b[100]; sprintf(b, "screen mode 0x%08lx, depth %d", (unsigned long)id, depth); logmsg(b); }
     scr = OpenScreenTags(NULL, SA_DisplayID, id, SA_Width, SCR_W, SA_Height, SCR_H, SA_Depth, depth,
                          SA_Quiet, TRUE, SA_ShowTitle, FALSE, TAG_DONE);
@@ -891,6 +933,7 @@ static int real_main(int argc, char **argv)
     if (argc > 3 && !strncmp(argv[3], "jump=", 5)) { int jx = 0, jy = 0; sscanf(argv[3] + 5, "%d,%d", &jx, &jy); view_x = jx; view_y = jy; clamp_view(); setSpeed(0); }
     if (argc > 3 && !strncmp(argv[3], "sound=", 6)) sound_play(argv[3] + 6);               /* debug: play a sound at start */
     if (argc > 3 && !strncmp(argv[3], "show=", 5)) debug_show = 1;
+    if (argc > 3 && !strcmp(argv[3], "show=about")) show_about();
     if (argc > 3 && !strcmp(argv[3], "show=eval")) open_info_panel(P_EVAL);              /* debug: open a panel at start */
     if (argc > 3 && !strcmp(argv[3], "show=graph")) open_info_panel(P_GRAPH);
     if (argc > 3 && !strncmp(argv[3], "notice=", 7)) { notice_show(atoi(argv[3] + 7)); notice_dirty = 1; }   /* debug */
@@ -991,7 +1034,7 @@ static int real_main(int argc, char **argv)
             if (ox != view_x || oy != view_y) dirty = 1;
         }
         sound_poll();
-        if (debug_show && notice_visible) notice_close();
+        if (debug_show && notice_visible && !(argc > 3 && !strcmp(argv[3], "show=about"))) notice_close();
         if (dbg_scroll > 0 && (frame & 3) == 0) { view_x++; if (dbg_scroll & 1) view_y++; dbg_scroll--; clamp_view(); dirty = 1; }
         if (SimSpeed && ++tick >= delay[SimSpeed]) {
             struct timeval t0, t1;

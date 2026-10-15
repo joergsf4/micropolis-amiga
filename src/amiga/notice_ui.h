@@ -11,5 +11,6 @@ void notice_show(int id);                    /* "UIShowPicture id" and the win/l
 void notice_draw(UBYTE *fb, int stride);     /* panel graphics into the frame buffer */
 void notice_text(void);                      /* panel text into the frame buffer (gfx_target must be set), after notice_draw */
 int  notice_click(int x, int y);             /* returns 1 when handled (closes on click inside the button) */
+void notice_show_text(const char *title, const char *text);   /* free text, lines separated by newline characters */
 void notice_close(void);
 #endif

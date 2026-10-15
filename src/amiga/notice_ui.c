@@ -67,7 +67,7 @@ static void wrap(const char *s)
     lines[0][0] = 0;
 #define NEWLINE() do { if (nlines < MAX_LINES - 1) nlines++; lines[nlines][0] = 0; col = 0; } while (0)
     for (;; s++) {
-        int end = (*s == 0), brk = (s[0] == '\\' && s[1] == 'n');
+        int end = (*s == 0), brk = (s[0] == '\\' && s[1] == 'n') || *s == '\n';
         if (*s == ' ' || end || brk) {
             if (wl) {
                 word[wl] = 0;
@@ -76,7 +76,7 @@ static void wrap(const char *s)
                 strcat(lines[nlines], word); col += wl; wl = 0;
             }
             if (end) break;
-            if (brk) { NEWLINE(); s++; }
+            if (brk) { NEWLINE(); if (*s == '\\') s++; }
         } else if (wl < 60) {
             word[wl++] = *s;
         }
@@ -94,6 +94,18 @@ void notice_show(int id)
             return;
         }
     }
+}
+
+void notice_show_text(const char *title, const char *text)       /* free text instead of a table entry (About box) */
+{
+    static struct notice custom;
+    static char tbuf[80], bbuf[900];
+    strncpy(tbuf, title, sizeof tbuf - 1); tbuf[sizeof tbuf - 1] = 0;
+    strncpy(bbuf, text, sizeof bbuf - 1); bbuf[sizeof bbuf - 1] = 0;
+    custom.id = -1; custom.title = tbuf; custom.body = bbuf;
+    cur = &custom;
+    wrap(cur->body);
+    notice_visible = 1;
 }
 
 void notice_close(void) { notice_visible = 0; cur = NULL; }

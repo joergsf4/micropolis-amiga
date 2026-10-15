@@ -49,6 +49,7 @@ ToolTypes (icon information): `CITY=cities/bruce.cty` city to open at start, `DE
 | Graphs | `G` or Windows > Graphs (residential, commercial, industrial, money, crime, pollution; 10 or 120 years) |
 | Overview map | `M` on/off, `C` next overlay (power, traffic, pollution, crime, land value, ...) |
 | Quit | Esc or Project > Quit |
+| Version | Project > About Micropolis (version, build, CPU, screen mode, free memory) |
 
 The bars at the top right show what the city needs: **R**esidential, **C**ommercial, **I**ndustrial
 (up = demand, down = too many). Events and warnings open a message window (Continue / Return / Space).

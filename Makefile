@@ -2,7 +2,7 @@ CC       = m68k-amigaos-gcc
 ARCH     = -noixemul -m68020 -fsingle-precision-constant -O2 -fomit-frame-pointer
 # the upstream simulation core is old K&R-ish C: no warnings from it
 COREFLAGS = $(ARCH) -std=gnu89 -w -Isrc/core -Isrc/amiga
-AMIFLAGS  = $(ARCH) -std=gnu99 -Wall -Wno-unused-parameter -Isrc/core -Isrc/amiga
+AMIFLAGS  = $(ARCH) -std=gnu99 -Wall -Wno-unused-parameter -Isrc/core -Isrc/amiga -Iout
 DEST     = /share/Micropolis
 UP       = upstream
 
@@ -22,7 +22,7 @@ out/obj/core/%.o: src/core/%.c $(wildcard src/core/*.h)
 	@mkdir -p $(dir $@)
 	$(CC) $(COREFLAGS) -c $< -o $@
 
-out/obj/amiga/%.o: src/amiga/%.c $(wildcard src/core/*.h src/amiga/*.h)
+out/obj/amiga/%.o: src/amiga/%.c $(wildcard src/core/*.h src/amiga/*.h) out/buildinfo.h
 	@mkdir -p $(dir $@)
 	$(CC) $(AMIFLAGS) -c $< -o $@
 

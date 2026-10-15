@@ -5,7 +5,7 @@
 # usage: tools/release.sh [version]     (default: read from src/amiga/main.c $VER)
 set -euo pipefail
 cd "$(dirname "$0")/.."
-VER="${1:-$(sed -n 's/.*\$VER: Micropolis \([0-9.]*\) .*/\1/p' src/amiga/main.c | head -1)}"
+VER="${1:-$(sed -n 's/#define VERSION  "\(.*\)"/\1/p' src/amiga/version.h)}"
 SHARE="$HOME/dev/AmigaProjekt/workbench/share/Micropolis"
 OUT=out/release; D=$OUT/stage
 ./build.sh >/dev/null                              # fresh build + data

@@ -2,7 +2,7 @@ Short:        Micropolis (open-source SimCity) with RTG graphics
 Author:       Electronic Arts / Will Wright / Don Hopkins (original), Amiga port: joergsf4
 Uploader:     joergsf4
 Type:         game/strategy
-Version:      0.3
+Version:      0.3.1
 Requires:     AmigaOS 3.x, 68020+, RTG card (Picasso96 or CyberGraphX), 2 MB Chip + 2 MB Fast
 Architecture: m68k-amigaos >= 3.0.0
 
@@ -56,6 +56,7 @@ Evaluation     E, or menu Windows/Evaluation (opinion, problems, score)
 Graphs         G, or menu Windows/Graphs (6 histories, 10 or 120 years)
 Overview map   M on/off, C next overlay (14 overlays in the Map menu)
 Quit           Esc, or Project/Quit
+About          Project/About Micropolis: version, build, CPU, screen mode, free memory
 
 The R C I bars at the top right show the demand for residential, commercial and industrial zones.
 Warnings and events open a message window (Continue, Return or Space closes it).
