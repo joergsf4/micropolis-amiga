@@ -73,6 +73,7 @@ question on again. `SIZE=` (ToolType or argument) skips the question and uses th
 | Options | Auto Goto, Animation, Messages, Message windows can be switched off in the Options menu; "Speak tool names" (off by default) says the tool when you choose it |
 | Help | `Help` key or Project > Help (AmigaGuide document `Micropolis.guide`) |
 | Preferences | screen mode, options, speed, level and window positions are remembered (ENVARC:Micropolis.prefs) |
+| Language | Options > ... Language: automatic (the system's locale), English, Deutsch or Polski (used from the next start; `lang=deutsch` on the command line, ToolType `LANGUAGE=`). Translations live in `l10n/*.ct` (FlexCat format, see `tools/l10n/l10n.py`); Polish is written without diacritics (the Amiga system fonts have no Latin-2 letters). **The German and Polish texts are machine translations and need review by native speakers.** |
 | Quit | Esc or Project > Quit |
 | Version | Project > About Micropolis (version, build, CPU, screen mode, free memory) |
 

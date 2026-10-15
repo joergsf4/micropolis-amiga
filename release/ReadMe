@@ -81,6 +81,9 @@ Options        Auto Goto, Animation, Messages, Message windows can be switched o
 Scenarios      menu Scenarios: 8 historic disasters/challenges with story and goal
 Help           Help key, or menu Project/Help (Micropolis.guide, AmigaGuide)
 Preferences    screen mode, options, speed, level and window positions are remembered (ENVARC:Micropolis.prefs)
+Language       menu Language: automatic (system locale), English, Deutsch, Polski (from the next start);
+               lang=deutsch on the command line or ToolType LANGUAGE=. Translations: Catalogs drawer.
+               German and Polish are machine translations and still need native review (l10n/*.ct in the source).
 Quit           Esc, or Project/Quit
 About          Project/About Micropolis: version, build, CPU, screen mode, free memory
 

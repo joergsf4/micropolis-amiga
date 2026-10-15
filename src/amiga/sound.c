@@ -15,6 +15,7 @@
 #include <proto/dos.h>
 #include <proto/datatypes.h>
 #include "sound.h"
+#include "l10n.h"
 #include "stack.h"             /* app_log() */
 
 #define MAX_OBJ 20
@@ -83,7 +84,7 @@ void sound_exit(void)
 
 const char *sound_status(char *buf)            /* one line for the About box */
 {
-    if (!DataTypesBase) sprintf(buf, "Sound: datatypes.library missing");
-    else sprintf(buf, "Sound: datatype, %d played, %d not loadable", played_count, failed_load);
+    if (!DataTypesBase) sprintf(buf, "%s", T("Sound: datatypes.library missing"));
+    else sprintf(buf, T("Sound: datatype, %d played, %d not loadable"), played_count, failed_load);
     return buf;
 }

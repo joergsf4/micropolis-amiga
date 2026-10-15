@@ -8,6 +8,7 @@
 #undef GetSprite
 #include <stdio.h>
 #include <string.h>
+#include "l10n.h"
 #include "gfx.h"
 #include "budget_ui.h"
 
@@ -119,16 +120,16 @@ void budget_text(void)
     if (!budget_visible) return;
     SetAPen(rp, PEN_TEXT);
     SetBPen(rp, PEN_BAR);
-    put(rp, PX + 140, PY + 22, "B U D G E T");
-    sprintf(b, "Taxes collected %12s", collected);  put(rp, PX + 16, PY + 52, b);
-    sprintf(b, "Cash flow       %12s", flow);       put(rp, PX + 16, PY + 72, b);
-    sprintf(b, "Previous funds  %12s", previous);   put(rp, PX + 16, PY + 92, b);
-    sprintf(b, "Current funds   %12s", current);    put(rp, PX + 16, PY + 112, b);
+    gfx_print_c(PX + 200, PY + 22, T("B U D G E T"));
+    put(rp, PX + 16, PY + 52, T("Taxes collected")); gfx_print_r(PX + 16 + 28 * 8, PY + 52, collected);
+    put(rp, PX + 16, PY + 72, T("Cash flow")); gfx_print_r(PX + 16 + 28 * 8, PY + 72, flow);
+    put(rp, PX + 16, PY + 92, T("Previous funds")); gfx_print_r(PX + 16 + 28 * 8, PY + 92, previous);
+    put(rp, PX + 16, PY + 112, T("Current funds")); gfx_print_r(PX + 16 + 28 * 8, PY + 112, current);
 
     SetBPen(rp, PEN_BTN);                            /* the +/- labels sit on the buttons */
     put(rp, MINUS_X + 10, ROW_TAX, "-");  put(rp, PLUS_X + 10, ROW_TAX, "+");
     SetBPen(rp, PEN_BAR);
-    put(rp, PX + 16, ROW_TAX, "Tax rate");
+    put(rp, PX + 16, ROW_TAX, T("Tax rate"));
     sprintf(b, "%3d%%", (int)CityTax);  put(rp, PX + 188, ROW_TAX, b);
 
     SetBPen(rp, PEN_BTN);
@@ -136,15 +137,15 @@ void budget_text(void)
     put(rp, MINUS_X + 10, ROW_FIRE, "-");   put(rp, PLUS_X + 10, ROW_FIRE, "+");
     put(rp, MINUS_X + 10, ROW_POLICE, "-"); put(rp, PLUS_X + 10, ROW_POLICE, "+");
     SetBPen(rp, PEN_BAR);
-    put(rp, PX + 16, ROW_ROAD, "Road fund");
+    put(rp, PX + 16, ROW_ROAD, T("Road fund"));
     sprintf(b, "%3d%%", (int)(roadPercent * 100.0 + 0.5));   put(rp, PX + 188, ROW_ROAD, b);
-    put(rp, PX + 16, ROW_FIRE, "Fire fund");
+    put(rp, PX + 16, ROW_FIRE, T("Fire fund"));
     sprintf(b, "%3d%%", (int)(firePercent * 100.0 + 0.5));   put(rp, PX + 188, ROW_FIRE, b);
-    put(rp, PX + 16, ROW_POLICE, "Police fund");
+    put(rp, PX + 16, ROW_POLICE, T("Police fund"));
     sprintf(b, "%3d%%", (int)(policePercent * 100.0 + 0.5)); put(rp, PX + 188, ROW_POLICE, b);
 
-    SetBPen(rp, PEN_SEL);   put(rp, PX + 70, BTN_Y + 16, "  Continue  ");
-    SetBPen(rp, PEN_BTN);   put(rp, PX + 262, BTN_Y + 16, "   Cancel   ");
+    SetBPen(rp, PEN_SEL);   gfx_print_c(PX + 110, BTN_Y + 16, T("Continue"));
+    SetBPen(rp, PEN_BTN);   gfx_print_c(PX + 290, BTN_Y + 16, T("Cancel"));
 }
 
 static void set_tax(int t)

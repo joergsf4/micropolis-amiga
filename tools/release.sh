@@ -18,6 +18,7 @@ cp COPYING "$D/Micropolis/COPYING"; cp release/Micropolis.guide "$D/Micropolis/M
 cp out/rtgtest "$D/Micropolis/Tools/RTGTest"; cp out/listmodes "$D/Micropolis/Tools/ListModes"
 cp -R "$SHARE"/res/. "$D/Micropolis/res/"
 cp "$SHARE"/cities/*.cty "$D/Micropolis/cities/"
+cp -R "$SHARE"/Catalogs "$D/Micropolis/Catalogs"
 ARC="Micropolis-$VER.lha"
 docker run --rm -v "$PWD/$D":/stage -v "$PWD/$OUT":/out -w /stage sacredbanana/amiga-compiler:m68k-amigaos \
     sh -c "rm -f /out/$ARC; lha a1o5 /out/$ARC Micropolis.info Micropolis >/dev/null 2>&1 && lha lv /out/$ARC | tail -45"

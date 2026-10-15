@@ -1,0 +1,1038 @@
+## version $VER: Micropolis.catalog 1.0 (15.10.2026)
+## codeset 0
+## language deutsch
+;
+; Translation for Micropolis. Keep the %s %d %ld codes and the \n escapes; the comment lines show the English text.
+;
+S_27F5E460
+H A U S H A L T
+; B U D G E T
+S_70CBACA1
+Steuereinnahmen
+; Taxes collected
+S_765AA5C2
+Cashflow
+; Cash flow
+S_1B25B06C
+Vorher. Guthaben
+; Previous funds
+S_674B705A
+Aktuelles Guthaben
+; Current funds
+S_3BDC6ACC
+Steuersatz
+; Tax rate
+S_347CFC7A
+Straßenetat
+; Road fund
+S_5461C904
+Feuerwehretat
+; Fire fund
+S_3DF7955A
+Polizeietat
+; Police fund
+S_2B43D664
+Weiter
+; Continue
+S_35AFCA3B
+Abbrechen
+; Cancel
+S_25D6910C
+Stadtbewertung
+; City Evaluation
+S_7A07F7EC
+Umfrage: Macht der Bürgermeister gute Arbeit?
+; Public opinion: is the mayor doing a good job?
+S_33A43630
+Ja
+; Yes
+S_61E6BE1A
+Nein
+; No
+S_7BECB0B5
+Die größten Probleme:
+; The worst problems:
+S_79D22930
+Statistik:
+; Statistics:
+S_671CE5D2
+Einwohner
+; Population
+S_59C032BC
+Zuzug netto
+; Net migration
+S_51DA075F
+Schätzwert
+; Assessed value
+S_2FB3E591
+Kategorie
+; Category
+S_7AF7091D
+Schwierigkeit
+; Game level
+S_6461A31A
+Gesamtpunkte %s   (Änderung pro Jahr %s)
+; Overall score %s   (annual change %s)
+S_4D86ACC3
+Schließen
+; Close
+S_203DBB55
+Wohnen
+; Residential
+S_26B185C3
+Gewerbe
+; Commercial
+S_00E13A32
+Industrie
+; Industrial
+S_334B4BEF
+Geld
+; Money
+S_2E75BF95
+Kriminalität
+; Crime
+S_5AFA5AF9
+Verschmutzung
+; Pollution
+S_4B87DB94
+Verlauf - letzte %d Jahre
+; History graphs - last %d years
+S_24E5F95C
+10 J.
+; 10 yrs
+S_1A9FF916
+120 J.
+; 120 yrs
+S_7699A471
+Feuerwache
+; Fire Station
+S_1E89E783
+Abfrage
+; Query
+S_054F1297
+Polizeiwache
+; Police Station
+S_7387C0B8
+Stromleitung
+; Wire
+S_552F342A
+Planierraupe
+; Bulldozer
+S_0BD00519
+Schiene
+; Rail
+S_3D4C18BB
+Straße
+; Road
+S_65E38B98
+Kreide
+; Chalk
+S_700B2B05
+Radierer
+; Eraser
+S_0E06F700
+Stadion
+; Stadium
+S_4A5938D9
+Park
+; Park
+S_0A5D8E27
+Seehafen
+; Seaport
+S_15AA5A3F
+Kohlekraftwerk
+; Coal Power
+S_77B0BD64
+Kernkraftwerk
+; Nuclear Power
+S_49BC0450
+Flughafen
+; Airport
+S_73627527
+Geld:
+; Funds:
+S_588F6213
+Kosten: $%d
+; Cost: $%d
+S_06379167
+Zone
+; Zone
+S_600D253B
+Dichte
+; Density
+S_5147F96A
+Bodenwert
+; Value
+S_2FB835C6
+Wachstum
+; Growth
+S_31D24F4B
+Zonenabfrage
+; Query zone status
+S_2E0ED984
+Meldung
+; Message
+S_2715DDA8
+Haushalt
+; Budget
+S_7D96597F
+Verlauf
+; History
+S_27CDC1E8
+Übersichtskarte
+; Overview map
+S_36386070
+Einw.
+; Pop
+S_0A6B8020
+Tempo
+; Speed
+S_47F7351C
+ (Pause)
+;  (Pause)
+S_7B5FEA5E
+Projekt
+; Project
+S_12281108
+Hilfe...
+; Help...
+S_27F418AD
+Über Micropolis...
+; About Micropolis...
+S_14B6753C
+Neue Stadt
+; New City
+S_378CE3FA
+Stadt laden...
+; Load City...
+S_4DDE0BE7
+Stadt speichern
+; Save City
+S_4C833401
+Stadt speichern unter...
+; Save City As...
+S_47B3D356
+Beenden
+; Quit
+S_2BFE5074
+Szenarien
+; Scenarios
+S_08D1E631
+Dullsville 1900
+; Dullsville 1900
+S_615E2E2D
+San Francisco 1906
+; San Francisco 1906
+S_0D1D8A4B
+Hamburg 1944
+; Hamburg 1944
+S_001FB7AF
+Bern 1965
+; Bern 1965
+S_6A603865
+Tokio 1957
+; Tokyo 1957
+S_4563F1B3
+Detroit 1972
+; Detroit 1972
+S_6C7A3A17
+Boston 2010
+; Boston 2010
+S_43862A0F
+Rio de Janeiro 2047
+; Rio de Janeiro 2047
+S_44F9BF2D
+Pause
+; Pause
+S_6DC18ED8
+Langsam
+; Slow
+S_09BE5F96
+Mittel
+; Medium
+S_053AB7CF
+Schnell
+; Fast
+S_353E0D45
+Optionen
+; Options
+S_366E525F
+Auto-Abriss
+; Auto Bulldoze
+S_566DEBE3
+Auto-Haushalt
+; Auto Budget
+S_6C7CAA7F
+Katastrophen
+; Disasters
+S_33CA9A34
+Ton
+; Sound
+S_12929962
+Auto-Sprung (zu Ereignissen)
+; Auto Goto (jump to events)
+S_41E389FD
+Animation
+; Animation
+S_78611FD5
+Meldungen
+; Messages
+S_7AF7D57D
+Werkzeugnamen sprechen
+; Speak tool names
+S_4732F292
+Startmenü beim Start
+; Start menu at launch
+S_3539FD2D
+Klassische Werkzeug-Icons
+; Classic tool icons
+S_6830CC79
+Meldungsfenster
+; Message windows
+S_7E7E05E7
+Bildschirmmodus beim Start fragen
+; Ask for screen mode at start
+S_4155597D
+Stufe
+; Level
+S_5956FF2E
+Leicht (Start: $20.000)
+; Easy ($20,000 start)
+S_3E498FFE
+Mittel (Start: $10.000)
+; Medium ($10,000 start)
+S_4E82FB66
+Schwer (Start: $5.000)
+; Hard ($5,000 start)
+S_1A73DB9B
+Sprache
+; Language
+S_23144534
+Automatisch (Systemeinstellung)
+; Automatic (system setting)
+S_0640028A
+Fenster
+; Windows
+S_197A4F0E
+Haushalt...
+; Budget...
+S_65CD217B
+Bewertung...
+; Evaluation...
+S_62C2FEF2
+Diagramme...
+; Graphs...
+S_44A7F051
+Karte
+; Map
+S_393EFC1E
+Kartenfenster an/aus
+; Map window on/off
+S_7B23CB48
+Nächste Ansicht
+; Next overlay
+S_0ED762F9
+Feuer
+; Fire
+S_68A4207B
+Überschwemmung
+; Flood
+S_37B94C2A
+Tornado
+; Tornado
+S_60AE2420
+Erdbeben
+; Earthquake
+S_611F5E31
+Monster
+; Monster
+S_3F5A82CB
+Kernschmelze
+; Meltdown
+S_4766D2E4
+Stadt laden
+; Load City
+S_2DC0A276
+Ton: ausgeschaltet (Menü Optionen)
+; Sound: switched off (Options menu)
+S_30300A1A
+Bildschirm 0x%08lx, %dx%d, %d Bit
+; Screen 0x%08lx, %dx%d, %d bit
+S_5A57F997
+keine FPU
+; no FPU
+S_1A608DB3
+Micropolis für AmigaOS 3
+; Micropolis for AmigaOS 3
+S_3F42A734
+Version %s (%s)
+; Version %s (%s)
+S_6C967AD3
+Build  %s  %s
+; Build  %s  %s
+S_56C3CCD7
+CPU %s, %s
+; CPU %s, %s
+S_35613FE2
+Speicher: %ld KB Chip, %ld KB Fast frei
+; Memory: %ld KB Chip, %ld KB Fast free
+S_2020BA3C
+Simulation und Grafik von Micropolis, dem quelloffenen SimCity (GPL v3, (c) Electronic Arts). Originalentwurf Will Wright, Unix-Version Don Hopkins.
+; Simulation and graphics from Micropolis, the open-source SimCity (GPL v3, (c) Electronic Arts). Original design Will Wright, Unix version Don Hopkins.
+S_3B7368AE
+Übersetzungen: siehe die Kataloge im Ordner Catalogs.
+; Translations: see the catalogs in the Catalogs drawer.
+S_46493B89
+Über Micropolis
+; About Micropolis
+S_3904BF6B
+Die amigaguide.library ist nicht vorhanden.
+; amigaguide.library is not available.
+S_023344FF
+Micropolis.guide kann nicht geöffnet werden.
+; Cannot open Micropolis.guide.
+S_666B41E8
+%s gespeichert
+; Saved %s
+S_31818EDC
+%s konnte nicht gespeichert werden
+; Could not save %s
+S_2900C067
+Die Stadt kann nicht gespeichert werden:\n%s
+; Cannot save the city:\n%s
+S_63E45123
+unbekannter Fehler
+; unknown error
+S_4A3551F3
+Karte: %s
+; Map: %s
+S_1A23E67A
+Die Sprache ändert sich beim nächsten Start von Micropolis.
+; The language changes at the next start of Micropolis.
+S_05E4B82F
+OK
+; OK
+S_6D5268E7
+Stufe: %s
+; Level: %s
+S_6C33113B
+Leicht
+; Easy
+S_64EFA7FC
+Schwer
+; Hard
+S_7E6206A1
+Neue Stadt erzeugt.
+; New city generated.
+S_6EB4B2A4
+%s geladen
+; Loaded %s
+S_2CF5B95B
+%s konnte nicht geladen werden
+; Could not load %s
+S_2BCF1D35
+Der Bildschirmmodus wird beim nächsten Start gefragt.
+; The screen mode will be asked at the next start.
+S_7BC0ABC0
+Dieser Bildschirmmodus wird ab jetzt verwendet.
+; This screen mode is used from now on.
+S_5D4CC186
+Weitere...
+; More...
+S_42954BC2
+Zurück
+; Back
+S_7520EB33
+Szenario wählen:
+; Choose a scenario:
+S_2CBFBDB6
+Willkommen bei Micropolis!\nWomit möchten Sie beginnen?
+; Welcome to Micropolis!\nWhat do you want to start with?
+S_26C979C5
+Neue Stadt|Stadt laden...|Szenario...|Aktuelle Stadt
+; New city|Load city...|Scenario...|Current city
+S_7153DD68
+Micropolis: RTG-Bildschirmmodus wählen (640x480 bis 800x600)
+; Micropolis: choose an RTG screen mode (640x480 to 800x600)
+S_4077A8F2
+Das ist kein brauchbarer RTG-Modus.\nBitte wählen Sie einen der aufgeführten RTG-Modi\n(640x480 bis 800x600).
+; That is not a usable RTG mode.\nPlease choose one of the listed RTG modes\n(640x480 up to 800x600).
+S_4C2020AC
+Erneut wählen
+; Choose again
+S_6ADE8C48
+cybergraphics.library (Version 40) nicht gefunden.\nMicropolis benötigt eine RTG-Grafikkarte mit\ninstalliertem und laufendem Picasso96 oder CyberGraphX.
+; cybergraphics.library (version 40) not found.\nMicropolis needs an RTG graphics card with\nPicasso96 or CyberGraphX installed and running.
+S_05E3FEC7
+Die Programmdaten (Schublade res) wurden nicht gefunden.\nBitte Micropolis, die Schubladen res und cities\nzusammen in einer Schublade lassen.
+; Cannot find the program data (res drawer).\nPlease keep the Micropolis program, its res and\ncities drawers together in one drawer.
+S_43CA3BBE
+Die Stadtdatei '%s' kann nicht geladen werden.
+; Cannot load the city file '%s'.
+S_5614B52A
+Diesen Bildschirmmodus immer verwenden (%ldx%ld, %ld Bit)?\nOptionen > "Bildschirmmodus beim Start fragen" schaltet die Frage wieder ein.
+; Always use this screen mode (%ldx%ld, %ld bit)?\nOptions > "Ask for screen mode at start" turns the question on again.
+S_764B37B7
+Immer verwenden|Nächstes Mal fragen
+; Always use it|Ask me next time
+S_1D648ECD
+Kein geeigneter RTG-Bildschirmmodus gefunden.\nMicropolis braucht einen Modus mit mindestens 640x480 Pixeln\nund 8, 15, 16, 24 oder 32 Bit Farbtiefe.
+; No suitable RTG screen mode found.\nMicropolis needs a mode of at least 640x480 pixels\nwith 8, 15, 16, 24 or 32 bit colour.
+S_304ED817
+Der RTG-Bildschirm kann nicht geöffnet werden (Modus 0x%08lx, %d Bit).
+; Cannot open the RTG screen (mode 0x%08lx, %d bit).
+S_225A54C9
+Nicht genug Speicher für einen %dx%d-Bildschirm.
+; Not enough memory for a %dx%d screen.
+S_7B1CD329
+Der Nachrichten-Port kann nicht angelegt werden.
+; Cannot create a message port.
+S_0C38C5B7
+Das Spielfenster kann nicht geöffnet werden.
+; Cannot open the game window.
+S_3D334790
+(Pause)
+; (paused)
+S_75AFE364
+Alle
+; All
+S_7B10ACCA
+Stromnetz
+; Power grid
+S_125B0020
+Straßen und Schienen
+; Roads and rails
+S_108A5DF2
+Bevölkerungsdichte
+; Population density
+S_19188300
+Wachstumsrate
+; Growth rate
+S_4B589266
+Verkehr
+; Traffic
+S_27E72CCD
+Bodenwert
+; Land value
+S_3804B5AD
+Feuerwehr-Abdeckung
+; Fire coverage
+S_175C873F
+Polizei-Abdeckung
+; Police coverage
+S_365AA42E
+Ton: datatypes.library fehlt
+; Sound: datatypes.library missing
+S_1B092D66
+Ton: Datatype, %d abgespielt, %d nicht ladbar
+; Sound: datatype, %d played, %d not loadable
+S_31DD9521
+Niedrig
+; Low
+S_3E0A061D
+Hoch
+; High
+S_71B45C9F
+Sehr hoch
+; Very High
+S_54020D40
+Slum
+; Slum
+S_1361FD6E
+Unterschicht
+; Lower Class
+S_750B4E40
+Mittelschicht
+; Middle Class
+S_2D543A78
+Sicher
+; Safe
+S_0AD2F8CF
+Gering
+; Light
+S_0A93E020
+Mäßig
+; Moderate
+S_4BF01B93
+Gefährlich
+; Dangerous
+S_304FF7FB
+Keine
+; None
+S_39D577E0
+Stark
+; Heavy
+S_5AAA507E
+Sehr stark
+; Very Heavy
+S_5F756E2A
+Rückgang
+; Declining
+S_02B032B6
+Stabil
+; Stable
+S_798CA9B7
+Langsames Wachstum
+; Slow Growth
+S_7957609E
+Schnelles Wachstum
+; Fast Growth
+S_04A57FC2
+Frei
+; Clear
+S_563556B0
+Wasser
+; Water
+S_3DDF52F2
+Bäume
+; Trees
+S_40B07A7F
+Trümmer
+; Rubble
+S_77E17C68
+Radioaktiver Abfall
+; Radioactive Waste
+S_4749A5E6
+Strom
+; Power
+S_3097F575
+Feuerwehr
+; Fire Department
+S_4C5F718B
+Polizei
+; Police Department
+S_7DA34BAC
+Zugbrücke
+; Draw Bridge
+S_25BECD11
+Radarschüssel
+; Radar Dish
+S_0376E915
+Brunnen
+; Fountain
+S_7063F21B
+Steelers 38  Bears 3
+; Steelers 38  Bears 3
+S_2555F7E3
+Ur 238
+; Ur 238
+S_1C89ED8C
+Mehr Wohnzonen nötig.
+; More residential zones needed.
+S_6720A718
+Mehr Gewerbezonen nötig.
+; More commercial zones needed.
+S_4DCBFF69
+Mehr Industriezonen nötig.
+; More industrial zones needed.
+S_2C5D975A
+Mehr Straßen nötig.
+; More roads required.
+S_6DBF7779
+Schienennetz unzureichend.
+; Inadequate rail system.
+S_0CA36F62
+Baue ein Kraftwerk.
+; Build a Power Plant.
+S_6A9DE3B9
+Bürger fordern ein Stadion.
+; Residents demand a Stadium.
+S_305D9AFA
+Die Industrie braucht einen Seehafen.
+; Industry requires a Sea Port.
+S_6312F524
+Der Handel braucht einen Flughafen.
+; Commerce requires an Airport.
+S_6D439451
+Umweltverschmutzung sehr hoch.
+; Pollution very high.
+S_2EB414B5
+Kriminalität sehr hoch.
+; Crime very high.
+S_2738290C
+Häufige Staus gemeldet.
+; Frequent traffic jams reported.
+S_47F0F5FC
+Bürger fordern eine Feuerwehr.
+; Citizens demand a Fire Department.
+S_01C35DC2
+Bürger fordern eine Polizei.
+; Citizens demand a Police Department.
+S_4BDFA9D5
+Stromausfälle! Stromkarte prüfen.
+; Blackouts reported. Check power map.
+S_4F618A6B
+Bürger verärgert. Steuersatz zu hoch.
+; Citizens upset. The tax rate is too high.
+S_20CFD210
+Straßen verfallen, es fehlt Geld.
+; Roads deteriorating, due to lack of funds.
+S_313DCB33
+Die Feuerwehr braucht Geld.
+; Fire departments need funding.
+S_5A8014F1
+Die Polizei braucht Geld.
+; Police departments need funding.
+S_6DBA4EBF
+Feuer gemeldet !
+; Fire reported !
+S_3F9BA86E
+Ein Monster wurde gesichtet !!
+; A Monster has been sighted !!
+S_0CDD7E49
+Tornado gemeldet !!
+; Tornado reported !!
+S_6DB87923
+Schweres Erdbeben gemeldet !!!
+; Major earthquake reported !!!
+S_0653A4C3
+Ein Flugzeug ist abgestürzt !
+; A plane has crashed !
+S_4A21E11D
+Schiffbruch gemeldet !
+; Shipwreck reported !
+S_56759027
+Ein Zug ist verunglückt !
+; A train crashed !
+S_1BDCCA48
+Ein Hubschrauber ist abgestürzt !
+; A helicopter crashed !
+S_6963B1DC
+Arbeitslosigkeit ist hoch.
+; Unemployment rate is high.
+S_609849F8
+IHRE STADT IST PLEITE!
+; YOUR CITY HAS GONE BROKE!
+S_37287F71
+Brandbomben gemeldet !
+; Firebombing reported !
+S_000B0C6B
+Mehr Parks nötig.
+; Need more parks.
+S_3C80B511
+Explosion entdeckt !
+; Explosion detected !
+S_7F16267E
+Nicht genug Geld dafür.
+; Insufficient funds to build that.
+S_11D3A03B
+Die Fläche muss zuerst planiert werden.
+; Area must be bulldozed first.
+S_4F9C64FC
+Die Bevölkerung hat 2.000 erreicht.
+; Population has reached 2,000.
+S_29F3CAC1
+Die Bevölkerung hat 10.000 erreicht.
+; Population has reached 10,000.
+S_2D2086CD
+Die Bevölkerung hat 50.000 erreicht.
+; Population has reached 50,000.
+S_72A45E4B
+Die Bevölkerung hat 100.000 erreicht.
+; Population has reached 100,000.
+S_4350A50F
+Die Bevölkerung hat 500.000 erreicht.
+; Population has reached 500,000.
+S_204BE92D
+Spannungsabfall, baue ein weiteres Kraftwerk.
+; Brownouts, build another Power Plant.
+S_3AE6EF66
+Starker Verkehr gemeldet.
+; Heavy Traffic reported.
+S_712717E6
+Überschwemmung gemeldet !!
+; Flooding reported !!
+S_348FC97E
+Es kam zu einer Kernschmelze !!!
+; A Nuclear Meltdown has occurred !!!
+S_117A6455
+Auf den Straßen wird randaliert !!
+; They're rioting in the streets !!
+S_4603BB00
+Ende der Demo !!
+; End of Demo !!
+S_374D36F7
+Kein Sound-Server!
+; No Sound Server!
+S_1071EDFB
+Keine Mehrspieler-Lizenz !!
+; No Multi Player License !!
+S_160C99A0
+Neue Stadt begonnen.
+; Started a New City.
+S_6533A624
+Gespeicherte Stadt geladen.
+; Restored a Saved City.
+S_7D0C5087
+x
+; x
+S_0794391D
+Wohnzone
+; Residential Zone
+S_27DF5593
+Gewerbezone
+; Commercial Zone
+S_543D38D8
+Industriezone
+; Industrial Zone
+S_32207261
+Stromleitung
+; Wire Power
+S_53F04732
+DULLSVILLE, USA  1900
+; DULLSVILLE, USA  1900
+S_6641B4B7
+In den letzten hundert Jahren hat sich hier kaum etwas verändert, und die Einwohner langweilen sich allmählich.  Sie glauben, Dullsville könnte mit dem richtigen Anführer die nächste große Stadt werden. \\n\\nIhre Aufgabe ist es, neues Wachstum und neue Entwicklung anzuziehen und Dullsville innerhalb von 30 Jahren in eine Metropole zu verwandeln.
+; Things haven't changed much around here in the last hundred years or so and the residents are beginning to get bored.  They think Dullsville could be the next great city with the right leader. \\n\\nIt is your job to attract new growth and development, turning Dullsville into a Metropolis within 30 years.
+S_722EBD53
+SAN FRANCISCO, KALIF.  1906
+; SAN FRANCISCO, CA.  1906
+S_5AA5AFA0
+Die Schäden durch das Erdbeben waren gering im Vergleich zu denen der darauffolgenden Brände, die tagelang nicht unter Kontrolle zu bringen waren.  1500 Menschen starben.\\n\\nZuerst müssen Sie die Brände unter Kontrolle bringen.  Dann die Trümmer räumen und mit dem Wiederaufbau beginnen.  Sie haben 5 Jahre.
+; Damage from the earthquake was minor compared to that of the ensuing fires, which took days to control.  1500 people died.\\n\\nControlling the fires should be your initial concern.  Then clear the rubble and start rebuilding.  You have 5 years.
+S_6011CC46
+HAMBURG, DEUTSCHLAND  1944
+; HAMBURG, GERMANY  1944
+S_4F3355EC
+Die alliierten Brandbombenangriffe auf deutsche Städte im Zweiten Weltkrieg richteten gewaltige Schäden an und forderten viele Menschenleben.  Die Menschen in den Innenstädten waren am meisten gefährdet.\\n\\nSie müssen die Feuerstürme während der Bombardierung unter Kontrolle bringen und die Stadt nach dem Krieg wieder aufbauen.  Sie haben 5 Jahre.
+; Allied fire-bombing of German cities in WWII caused tremendous damage and loss of life.  People living in the inner cities were at greatest risk.\\n\\nYou must control the firestorms during the bombing and then rebuild the city after the war.  You have 5 years.
+S_37DB5912
+BERN, SCHWEIZ  1965
+; BERN, SWITZERLAND  1965
+S_27BFD829
+Die Straßen werden jeden Tag voller, und die Einwohner sind verärgert.  Sie verlangen, dass Sie etwas dagegen unternehmen.\\n\\nManche schlagen ein öffentliches Nahverkehrssystem als Lösung vor, doch das würde eine größere Umwidmung der Flächen in der Innenstadt erfordern.  Sie haben 10 Jahre.
+; The roads here are becoming more congested every day, and the residents are upset.  They demand that you do something about it.\\n\\nSome have suggested a mass transit system as the answer, but this would require major rezoning in the downtown area.  You have 10 years.
+S_126E86C5
+TOKIO, JAPAN  1957
+; TOKYO, JAPAN  1957
+S_17E86764
+Ein riesiges Reptilwesen wurde auf dem Weg zur Bucht von Tokio gesichtet.  Es scheint von der starken Umweltverschmutzung durch die Industrie angezogen zu werden.\\n\\nBringen Sie die Brände unter Kontrolle und bauen Sie dann das Industriegebiet wieder auf.  Sie haben 5 Jahre.
+; A large reptilian creature has been spotted heading for Tokyo bay.  It seems to be attracted to the heavy levels of industrial pollution there.\\n\\nTry to control the fires, then rebuild the industrial center.  You have 5 years.
+S_20C93C53
+DETROIT, MICH.  1972
+; DETROIT, MI.  1972
+S_37F7E716
+Bis 1970 stürzten die Konkurrenz aus Übersee und andere wirtschaftliche Faktoren die einstige "Automobilhauptstadt der Welt" in eine Rezession.  Sinkende Bodenpreise und Arbeitslosigkeit ließen die Kriminalität in der Innenstadt dann auf chronische Werte steigen.\\n\\nSie haben 10 Jahre, um die Kriminalität zu senken und die industrielle Basis der Stadt wieder aufzubauen.
+; By 1970, competition from overseas and other economic factors pushed the once "automobile capital of the world" into recession.  Plummeting land values and unemployment then increased crime in the inner-city to chronic levels.\\n\\nYou have 10 years to reduce crime and rebuild the industrial base of the city.
+S_763F3D67
+BOSTON, MASS.  2010
+; BOSTON, MA.  2010
+S_2F8D751F
+In einem der neuen Atomreaktoren in der Innenstadt steht eine schwere Kernschmelze bevor.  Die Umgebung des Reaktors wird stark verstrahlt werden, sodass Sie die Stadt um ihn herum neu ordnen müssen.\\n\\nSie haben 5 Jahre, um die Lage in den Griff zu bekommen.
+; A major meltdown is about to occur at one of the new downtown nuclear reactors.  The area in the vicinity of the reactor will be severly contaminated by radiation, forcing you to restructure the city around it.\\n\\nYou have 5 years to get the situation under control.
+S_0C360535
+RIO DE JANEIRO, BRASILIEN  2047
+; RIO DE JANEIRO, BRAZIL  2047
+S_5F055F8E
+Mitte des 21. Jahrhunderts ließ der Treibhauseffekt die globalen Temperaturen um 6 Grad Fahrenheit steigen.  Die Polkappen schmolzen, und der Meeresspiegel stieg weltweit.  Küstengebiete wurden durch Flut und Erosion verwüstet.\\n\\nSie haben 10 Jahre, um diesen Sumpf wieder in eine Stadt zu verwandeln.
+; In the mid-21st century, the greenhouse effect raised global temperatures 6 degrees F.  Polar icecaps melted and raised sea levels worldwide.  Coastal areas were devastated by flood and erosion.\\n\\nYou have 10 years to turn this swamp back into a city again.
+S_398BA0FA
+UMWELTALARM!
+; POLLUTION ALERT!
+S_5B3EABAE
+Die Verschmutzung in Ihrer Stadt hat die von der Micropolis-Umweltbehörde festgelegten Höchstwerte überschritten.  Es drohen schwere ökologische Folgen.\\n\\nEntweder Sie räumen auf, oder Sie eröffnen im Rathaus einen Gasmasken-Verkauf.
+; Pollution in your city has exceeded the maximum allowable amounts established by the Micropolis Pollution Agency.  You are running the risk of grave ecological consequences.\\n\\nEither clean up your act or open a gas mask concession at city hall.
+S_0B024F26
+KRIMINALITÄTSALARM!
+; CRIME ALERT!
+S_73C89A16
+Die Kriminalität in Ihrer Stadt ist außer Kontrolle.  Wütende Horden plündern und verwüsten die Innenstadt.  Der Präsident schickt bald die Nationalgarde, wenn Sie das Problem nicht in den Griff bekommen.
+; Crime in your city is our of hand.  Angry mobs are looting and vandalizing the central city.  The president will send in the national guard soon if you cannot control the problem.
+S_42B3E1AD
+VERKEHRSWARNUNG!
+; TRAFFIC WARNING!
+S_0CDD674E
+Der Verkehr in dieser Stadt ist schrecklich.  Der Stau breitet sich aus.  Die Pendler werden kämpferisch.\\n\\nBauen Sie entweder mehr Straßen und Schienen oder besorgen Sie sich eine kugelsichere Limousine.
+; Traffic in this city is horrible.  The city gridlock is expanding.  The commuters are getting militant.\\n\\nEither build more roads and rails or get a bulletproof limo.
+S_78159EF7
+BRAND GEMELDET!
+; FIRE REPORTED!
+S_27386E80
+Es wurde ein Brand gemeldet!
+; A fire has been reported!
+S_0F6A8C2E
+MONSTERANGRIFF!
+; MONSTER ATTACK!
+S_32BE5CF8
+Ein riesiges Reptilwesen wurde im Wasser gesichtet.  Es scheint von stark verschmutzten Gebieten angezogen zu werden.  Wo es hingeht, hinterlässt es eine Spur der Verwüstung.  \\nSie können nur warten, bis es verschwindet, und dann aus den Trümmern neu aufbauen.
+; A large reptilian creature has been spotted in the water.  It seems to be attracted to areas of high pollution.  There is a trail of destruction wherever it goes.  \\\\nAll you can do is wait till he leaves, then rebuild from the rubble.
+S_1F30D537
+TORNADOALARM!
+; TORNADO ALERT!
+S_21902FEF
+Es wurde ein Tornado gemeldet!  Sie können nichts tun, um ihn aufzuhalten. Bereiten Sie sich besser darauf vor, nach der Katastrophe aufzuräumen!
+; A tornado has been reported!  There's nothing you can do to stop it, so you'd better prepare to clean up after the disaster!
+S_5ED5D473
+ERDBEBEN!
+; EARTHQUAKE!
+S_66EE7996
+Es hat ein schweres Erdbeben gegeben!  Löschen Sie die Brände so schnell wie möglich, bevor sie sich ausbreiten, schließen Sie dann das Stromnetz wieder an und bauen Sie die Stadt neu auf.
+; A major earthquake has occurred!  Put out the fires as quickly as possible, before they spread, then reconnect the power grid and rebuild the city.
+S_309948F9
+FLUGZEUGABSTURZ!
+; PLANE CRASH!
+S_533C8FC3
+Ein Flugzeug ist abgestürzt!
+; A plane has crashed!
+S_471BE302
+SCHIFFBRUCH!
+; SHIPWRECK!
+S_49E7A088
+Ein Schiff ist gesunken!
+; A ship has wrecked!
+S_75940695
+ZUGUNGLÜCK!
+; TRAIN CRASH!
+S_26531FFB
+Ein Zug ist verunglückt!
+; A train has crashed!
+S_647F4696
+HUBSCHRAUBERABSTURZ!
+; HELICOPTER CRASH!
+S_574FFA5E
+Ein Hubschrauber ist abgestürzt!
+; A helicopter has crashed!
+S_2C918D1D
+BRANDBOMBEN GEMELDET!
+; FIREBOMBING REPORTED!
+S_1090DE69
+Brandbomben fallen!!
+; Firebombs are falling!!
+S_768ECA85
+KLEINSTADT
+; TOWN
+S_1A397EEF
+Glückwunsch, Ihr Dorf ist zur Kleinstadt gewachsen.  Sie haben jetzt 2.000 Einwohner.
+; Congratulations, your village has grown to town status.  You now have 2,000 citizens.
+S_4BB48702
+STADT
+; CITY
+S_04DEAB5E
+Ihre Kleinstadt ist zu einer richtigen Stadt gewachsen, mit derzeit 10.000 Einwohnern.  Weiter so!
+; Your town has grown into a full sized city, with a current population of 10,000.  Keep up the good work!
+S_76F3CECB
+HAUPTSTADT
+; CAPITAL
+S_2EA73B90
+Ihre Stadt ist zur Hauptstadt geworden.  Die aktuelle Einwohnerzahl beträgt 50.000.  Ihre politische Zukunft sieht rosig aus.
+; Your city has become a capital.  The current population here is 50,000.  Your political future looks bright.
+S_014BFB2D
+METROPOLE
+; METROPOLIS
+S_5513F61C
+Ihre Hauptstadt hat jetzt den Status einer Metropole erreicht.  Die aktuelle Einwohnerzahl beträgt 100.000.  Mit Ihrem Verwaltungsgeschick sollten Sie ernsthaft erwägen, für das Amt des Gouverneurs zu kandidieren.
+; Your capital city has now achieved the status of metropolis.  The current population is 100,000.  With your management skills, you should seriously consider running for governor.
+S_1E25D811
+MEGAPOLIS
+; MEGALOPOLIS
+S_13B78ED0
+Glückwunsch, Sie haben die höchste Stufe der Stadtentwicklung erreicht, die Megapolis.\\n\\nWenn Sie es bis hierher schaffen, schicken Sie uns eine E-Mail an micropolis@laptop.org oder eine Kopie Ihrer Stadt.  Vielleicht machen wir etwas Interessantes damit.
+; Congratulation, you have reached the highest category of urban development, the megalopolis.\\n\\nIf you manage to reach this level, send us email at micropolis@laptop.org or send us a copy of your city.  We might do something interesting with it.
+S_2732A84F
+MEGALINIUM
+; MEGALINIUM
+S_4F1B8136
+Glückwunsch, Sie haben das Ende der Zeit erreicht!\\n\\nWegen der ringförmigen Struktur des Micropolis-Raum-Zeit-Kontinuums ist Ihre Stadt in die Zeit zurück ins Jahr 1900 gesprungen!
+; Congratulation, you have reached the end of time!\\n\\nBecause of the toroidal nature of the the Micropolis Space/Time Continuum, your city has wrapped back in time to 1900!
+S_1579E3E8
+STARKER VERKEHR!
+; HEAVY TRAFFIC!
+S_565252E4
+Himmelsbeobachter Eins\\nmeldet starken Verkehr!
+; Sky Watch One\\nreporting heavy traffic!
+S_1BC9A543
+ÜBERSCHWEMMUNG GEMELDET!
+; FLOODING REPORTED!
+S_6B798F7B
+Am Wasserrand wurden Überschwemmungen gemeldet!
+; Flooding has been been reported along the water's edge!
+S_6336D19C
+KERNSCHMELZE!
+; NUCLEAR MELTDOWN!
+S_792A79CA
+In Ihrem Kraftwerk ist es zu einer Kernschmelze gekommen.  Meiden Sie das Gebiet, bis die radioaktiven Isotope zerfallen sind.\\n\\nViele Generationen werden sich mit diesem Problem befassen müssen, also halten Sie besser nicht den Atem an.
+; A nuclear meltdown has occured at your power plant.  You are advised to avoid the area until the radioactive isotopes decay.\\n\\nMany generations will confront this problem before it goes away, so don't hold your breath.
+S_7020D30F
+KRAWALLE!
+; RIOTS!
+S_048DCBA1
+Die Bürger randalieren auf den Straßen, zünden Autos und Häuser an und bombardieren Regierungsgebäude und Geschäfte!\\n\\nDie gesamte Medienberichterstattung ist abgeschaltet, während die faschistischen Schläger die armen Bürger niederknüppeln.
+; The citizens are rioting in the streets, setting cars and houses on fire, and bombing government buildings and businesses!\\n\\nAll media coverage is blacked out, while the fascist pigs beat the poor citizens into submission.
+S_5DB8F679
+Neue Stadt beginnen
+; Start a New City
+S_4176D68D
+Bauen Sie Ihre eigene Stadt von Grund auf, ausgehend von dieser Karte unbewohnten Landes.
+; Build your very own city from the ground up, starting with this map of uninhabited land.
+S_1FB03C15
+SIE SIND EIN GEWINNER!
+; YOU'RE A WINNER!
+S_16D922C2
+Ihr Geschick als Bürgermeister und Ihre Stadtplanung haben Ihnen den SCHLÜSSEL ZUR STADT eingebracht.  Die Einwohner werden Denkmäler zu Ihren Ehren errichten und ihre Erstgeborenen nach Ihnen benennen.  Warum nicht für das Amt des Gouverneurs kandidieren?
+; Your mayorial skill and city planning expertise have earned you the KEY TO THE CITY.  Local residents will erect monuments to your glory and name their first-born children after you.  Why not run for governor?
+S_144E7F47
+AMTSENTHEBUNGSVERFAHREN!
+; IMPEACHMENT NOTICE!
+S_745E0F74
+Die gesamte Bevölkerung dieser Stadt hat endlich genug von Ihrer stümperhaften Planung und unfähigen Verwaltung.  Ein wütender Mob - angeführt von Ihrer Mutter - wurde in der Nähe des Rathauses gesichtet.\\n\\nSie sollten ernsthaft einen längeren Urlaub in Betracht ziehen -- JETZT.  (Oder lesen Sie das Handbuch und versuchen Sie es noch einmal.)
+; The entire population of this city has finally had enough of your inept planning and incompetant management.  An angry mob -- led by your mother -- has been spotted in the vicinity of city hall.\\n\\nYou should seriously consider taking an extended vacation -- NOW.  (Or read the manual and try again.)
+S_50D572C3
+DORF
+; VILLAGE
+S_04BC1155
+KRIMINALITÄT
+; CRIME
+S_16F77339
+UMWELTVERSCHMUTZUNG
+; POLLUTION
+S_41C1120E
+WOHNUNGSKOSTEN
+; HOUSING COSTS
+S_0A955ABA
+STEUERN
+; TAXES
+S_605FC726
+VERKEHR
+; TRAFFIC
+S_68ABE6BC
+ARBEITSLOSIGKEIT
+; UNEMPLOYMENT
+S_29BDEA3E
+BRÄNDE
+; FIRES
+S_46F2CEAE
+Jan
+; Jan
+S_278D4B82
+Feb
+; Feb
+S_42A7ED2B
+Mär
+; Mar
+S_03F51DF2
+Apr
+; Apr
+S_3BA7E226
+Mai
+; May
+S_46C131E2
+Jun
+; Jun
+S_44C12EBC
+Jul
+; Jul
+S_20EE8FD4
+Aug
+; Aug
+S_2CB1A4EF
+Sep
+; Sep
+S_11D1F3E9
+Okt
+; Oct
+S_0A3DC404
+Nov
+; Nov
+S_275E7A73
+Dez
+; Dec

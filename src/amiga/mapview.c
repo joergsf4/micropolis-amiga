@@ -10,15 +10,16 @@
 #include <proto/dos.h>
 #include <proto/exec.h>
 #include <exec/memory.h>
+#include "l10n.h"
 #include "mapview.h"
 
 int map_visible;
 int map_mode;
 
 const char *const map_names[MAP_MODES] = {
-    "All", "Residential", "Commercial", "Industrial", "Power grid", "Roads and rails",
-    "Population density", "Growth rate", "Traffic", "Pollution", "Crime", "Land value",
-    "Fire coverage", "Police coverage"
+    N_("All"), N_("Residential"), N_("Commercial"), N_("Industrial"), N_("Power grid"), N_("Roads and rails"),
+    N_("Population density"), N_("Growth rate"), N_("Traffic"), N_("Pollution"), N_("Crime"), N_("Land value"),
+    N_("Fire coverage"), N_("Police coverage")
 };
 
 static UBYTE *smalltiles;          /* 960 tiles * 4 x 3 palette indices (first 3 of each row used) */

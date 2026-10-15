@@ -1,0 +1,29 @@
+# texts that come from the simulation core (src/core is the original code and stays unchanged); one per line
+VILLAGE
+TOWN
+CITY
+CAPITAL
+METROPOLIS
+MEGALOPOLIS
+Easy
+Medium
+Hard
+CRIME
+POLLUTION
+HOUSING COSTS
+TAXES
+TRAFFIC
+UNEMPLOYMENT
+FIRES
+Jan
+Feb
+Mar
+Apr
+May
+Jun
+Jul
+Aug
+Sep
+Oct
+Nov
+Dec

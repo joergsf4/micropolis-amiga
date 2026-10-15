@@ -11,6 +11,7 @@
 #include <string.h>
 #include <proto/dos.h>
 #include <proto/exec.h>
+#include "l10n.h"
 #include "gfx.h"
 #include <exec/memory.h>
 #include "notice_ui.h"
@@ -89,7 +90,7 @@ void notice_show(int id)
     for (int i = 0; i < nnotices; i++) {
         if (notices[i].id == id) {
             cur = &notices[i];
-            wrap(cur->body);
+            wrap(T(cur->body));
             notice_visible = 1;
             return;
         }
@@ -128,11 +129,11 @@ void notice_text(void)
 {
     if (!notice_visible || !cur) return;
     gfx_colors(PEN_TEXT, PEN_BTN);
-    gfx_print(NOTICE_X + 12, NOTICE_Y + 20, cur->title);
+    gfx_print(NOTICE_X + 12, NOTICE_Y + 20, T(cur->title));
     gfx_colors(PEN_TEXT, PEN_BAR);
     for (int i = 0; i < nlines; i++) gfx_print(NOTICE_X + 12, NOTICE_Y + 46 + i * 14, lines[i]);
     gfx_colors(PEN_TEXT, PEN_SEL);
-    gfx_print(NOTICE_X + NOTICE_W / 2 - 34, NOTICE_Y + NOTICE_H - 17, "Continue");
+    gfx_print_c(NOTICE_X + NOTICE_W / 2, NOTICE_Y + NOTICE_H - 17, T("Continue"));
 }
 
 int notice_click(int x, int y)

@@ -7,6 +7,7 @@
 #undef GetSprite
 #include <string.h>
 #include <stdio.h>
+#include "l10n.h"
 #include "gfx.h"
 #include "graph_ui.h"
 
@@ -14,7 +15,7 @@ int graph_visible;
 
 static int range = 10;                     /* 10 or 120 years */
 static int mask = 0x3f;                    /* shown series */
-static const char *const names[6] = { "Residential", "Commercial", "Industrial", "Money", "Crime", "Pollution" };
+static const char *const names[6] = { N_("Residential"), N_("Commercial"), N_("Industrial"), N_("Money"), N_("Crime"), N_("Pollution") };
 static const UBYTE pens[6] = { PEN_V_LGREEN, PEN_V_LBLUE, PEN_V_YELLOW, PEN_TEXT, PEN_V_RED, PEN_V_ORANGE };
 
 #define PX (GRAPH_X + 20)
@@ -47,7 +48,7 @@ void graph_draw(UBYTE *fb, int stride)
     rect(fb, stride, GRAPH_X + 2, GRAPH_Y + 2, GRAPH_W - 4, GRAPH_H - 4, PEN_BAR);
     rect(fb, stride, GRAPH_X + 2, GRAPH_Y + 2, GRAPH_W - 4, 26, PEN_BTN);
     gfx_colors(PEN_TEXT, PEN_BTN);
-    sprintf(b, "History graphs - last %d years", range);
+    sprintf(b, T("History graphs - last %d years"), range);
     gfx_print(GRAPH_X + 12, GRAPH_Y + 20, b);
     /* plot area with grid */
     rect(fb, stride, PX - 1, PY - 1, PW + 2, PH + 2, PEN_TEXT);
@@ -65,17 +66,17 @@ void graph_draw(UBYTE *fb, int stride)
     /* range buttons and series toggles */
     rect(fb, stride, GRAPH_X + 20, GRAPH_Y + GRAPH_H - 82, 70, 20, range == 10 ? PEN_SEL : PEN_BTN);
     rect(fb, stride, GRAPH_X + 98, GRAPH_Y + GRAPH_H - 82, 70, 20, range == 120 ? PEN_SEL : PEN_BTN);
-    gfx_colors(PEN_TEXT, range == 10 ? PEN_SEL : PEN_BTN);  gfx_print(GRAPH_X + 30, GRAPH_Y + GRAPH_H - 67, "10 yrs");
-    gfx_colors(PEN_TEXT, range == 120 ? PEN_SEL : PEN_BTN); gfx_print(GRAPH_X + 104, GRAPH_Y + GRAPH_H - 67, "120 yrs");
+    gfx_colors(PEN_TEXT, range == 10 ? PEN_SEL : PEN_BTN);  gfx_print_c(GRAPH_X + 55, GRAPH_Y + GRAPH_H - 67, T("10 yrs"));
+    gfx_colors(PEN_TEXT, range == 120 ? PEN_SEL : PEN_BTN); gfx_print_c(GRAPH_X + 133, GRAPH_Y + GRAPH_H - 67, T("120 yrs"));
     for (int s = 0; s < 6; s++) {
         int x = GRAPH_X + 20 + (s % 3) * 130, y = GRAPH_Y + GRAPH_H - 50 + (s / 3) * 20;
         rect(fb, stride, x, y, 12, 12, (mask & (1 << s)) ? pens[s] : PEN_BTN);
         gfx_colors(PEN_TEXT, PEN_BAR);
-        gfx_print(x + 18, y + 10, names[s]);
+        gfx_print(x + 18, y + 10, T(names[s]));
     }
     rect(fb, stride, GRAPH_X + GRAPH_W - 94, GRAPH_Y + GRAPH_H - 82, 76, 20, PEN_SEL);
     gfx_colors(PEN_TEXT, PEN_SEL);
-    gfx_print(GRAPH_X + GRAPH_W - 84, GRAPH_Y + GRAPH_H - 67, "Close");
+    gfx_print_c(GRAPH_X + GRAPH_W - 56, GRAPH_Y + GRAPH_H - 67, T("Close"));
 }
 
 void graph_close(void) { graph_visible = 0; }

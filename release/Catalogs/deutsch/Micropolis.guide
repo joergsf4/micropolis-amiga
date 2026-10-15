@@ -1,0 +1,151 @@
+@database Micropolis.guide
+@$VER: Micropolis.guide 0.8
+@author "Micropolis für AmigaOS"
+@(c) "GPL-3, siehe COPYING"
+@index INDEX
+@wordwrap
+
+@node MAIN "Micropolis - Hilfe"
+
+  @{b}Micropolis für AmigaOS@{ub}
+
+  Bauen und leiten Sie eine Stadt. Die Simulation ist der originale
+  Micropolis-Code (SimCity); die Benutzeroberfläche ist eine native
+  Intuition/RTG-Oberfläche.
+
+  @{" Erste Schritte       " link START}
+  @{" Bauwerkzeuge         " link TOOLS}
+  @{" Tastatur und Maus    " link KEYS}
+  @{" Fenster              " link WINDOWS}
+  @{" Menüs                " link MENUS}
+  @{" Die R-C-I-Balken     " link DEMAND}
+  @{" Szenarien            " link SCENARIOS}
+  @{" Bildschirmmodus und Einstellungen " link SETTINGS}
+  @{" Cheat-Wörter         " link CHEATS}
+  @{" Index                " link INDEX}
+@endnode
+
+@node START "Erste Schritte"
+@toc MAIN
+
+  1. Wählen Sie links ein Werkzeug (zu Beginn ist die Abfrage aktiv).
+  2. Klicken oder ziehen Sie auf der Karte. Der weiße Rahmen zeigt, was
+     gebaut wird.
+  3. Zonen (Wohnen, Gewerbe, Industrie) wachsen nur mit Strom
+     (Kraftwerk plus Leitungen) und Straßen. Behalten Sie die R-C-I-Balken
+     im Auge.
+  4. Öffnen Sie den Haushalt (Menü Fenster/Haushalt) für Steuern und Etats.
+
+  Tempo: Tasten 0 (Pause) bis 3 (schnell), oder das Menü Tempo.
+@endnode
+
+@node TOOLS "Bauwerkzeuge"
+@toc MAIN
+
+  Fahren Sie mit der Maus über ein Symbol: Name und Preis erscheinen oben.
+
+  Abfrage        Zonenstatus (Dichte, Bodenwert, Kriminalität, Verschmutzung)
+  Planierraupe   entfernt alles, Preis 1
+  Straße 10 pro Feld   Schiene 20 pro Feld   Stromleitung 5 pro Feld
+  Park 10        Wohnen/Gewerbe/Industrie je 100 (Zonen 3x3)
+  Feuerwache 500   Polizeiwache 500
+  Stadion 5000   Kohlekraftwerk 3000   Kernkraftwerk 5000
+  Seehafen 3000  Flughafen 10000
+
+  Kreide    zeichnet eine Notiz auf die Karte (weiße Linie); Notizen werden
+            nicht mit der Stadt gespeichert
+  Radierer  entfernt die berührten Kreidelinien
+
+  Straßen und Leitungen über Wasser werden als Brücken gebaut und kosten mehr.
+  Auto-Abriss (Menü Optionen) räumt Trümmer automatisch weg.
+@endnode
+
+@node KEYS "Tastatur und Maus"
+@toc MAIN
+
+  Linke Maustaste    Werkzeug benutzen / Knöpfe anklicken
+  Rechte Maustaste   Menüs
+  W A S D, Mausrad, Maus am Bildschirmrand   scrollen
+  0 1 2 3            Pause, langsam, mittel, schnell
+  b r p t x z        Werkzeugkürzel wie im Original (Planierraupe,
+                     Straße, Park, Leitung, Schiene, Abfrage)
+  Esc                schließt das aktive Fenster; beendet das Spiel, wenn
+                     keines offen ist
+  Help               diese Hilfe
+
+  In der Übersichtskarte: klicken oder ziehen, um die Stadt zu scrollen.
+@endnode
+
+@node WINDOWS "Fenster"
+@toc MAIN
+
+  Meldungen, Haushalt, Bewertung, Diagramme, die Abfragebox und die
+  Übersichtskarte sind normale Amiga-Fenster auf dem Spielbildschirm:
+  Am Titelbalken verschieben, mit dem Schließfeld schließen (das Schließfeld
+  des Haushalts bedeutet Weiter).
+
+  Den Titelbalken des Bildschirms können Sie nach unten ziehen, um die
+  Workbench zu sehen.
+@endnode
+
+@node MENUS "Menüs"
+@toc MAIN
+
+  Projekt      neue Stadt, laden, speichern, Über, Hilfe, beenden
+  Szenarien    historische Städte mit Geschichte und Ziel
+  Tempo        Pause / langsam / mittel / schnell
+  Optionen     Auto-Abriss, Auto-Haushalt, Katastrophen, Ton, Auto-Sprung,
+               Animation, Meldungen, Meldungsfenster, Bildschirmmodus fragen
+  Stufe        Leicht / Mittel / Schwer (Startgeld einer neuen Stadt)
+  Sprache      Automatisch (Systemeinstellung) / English / Deutsch / Polski
+               (gilt ab dem nächsten Start)
+  Fenster      Haushalt, Bewertung, Diagramme
+  Karte        Ansichten: Strom, Verkehr, Verschmutzung, Kriminalität, Bodenwert ...
+  Katastrophen Feuer, Überschwemmung, Tornado, Erdbeben, Monster, Kernschmelze
+@endnode
+
+@node DEMAND "Die R-C-I-Balken"
+@toc MAIN
+
+  Die drei Balken oben rechts zeigen den Bedarf an Wohn- (R), Gewerbe- (C)
+  und Industriezonen (I). Nach oben heißt: Es wird mehr gewünscht. Nach
+  unten heißt: Es gibt zu viel davon.
+@endnode
+
+@node SCENARIOS "Szenarien"
+@toc MAIN
+
+  Dullsville 1900, San Francisco 1906 (Erdbeben), Hamburg 1944
+  (Brandbomben), Bern 1965 (Verkehr), Tokio 1957 (Monster), Detroit 1972
+  (Kriminalität), Boston 2010 (Kernschmelze), Rio de Janeiro 2047
+  (Überschwemmung). Jedes hat ein Zeitlimit und ein Ziel; die Geschichte
+  erscheint beim Start.
+@endnode
+
+@node SETTINGS "Bildschirmmodus und Einstellungen"
+@toc MAIN
+
+  Beim Start listet ein Requester die nutzbaren RTG-Modi (640x480 bis
+  800x600) auf. Sie können "Immer verwenden" wählen; Optionen/Bildschirmmodus
+  beim Start fragen schaltet die Frage wieder ein.
+
+  Die Einstellungen stehen in ENVARC:Micropolis.prefs. ToolTypes des Icons:
+  SIZE=800x600 (feste Größe, keine Frage), CITY=<Datei>,
+  LANGUAGE=deutsch (oder english, polski; auf der Kommandozeile lang=deutsch).
+@endnode
+
+@node CHEATS "Cheat-Wörter"
+@toc MAIN
+
+  Wie im Original haben einige im Spielfenster getippte Wörter Wirkung
+  (zum Beispiel "fund"). Sie sind zum Spaß gedacht; benutzen Sie sie auf
+  eigene Gefahr.
+@endnode
+
+@node INDEX "Index"
+@toc MAIN
+
+  @{"Haushalt" link MENUS}   @{"Cheats" link CHEATS}   @{"Tasten" link KEYS}
+  @{"Szenarien" link SCENARIOS}   @{"Bildschirmmodus" link SETTINGS}
+  @{"Werkzeuge" link TOOLS}   @{"Fenster" link WINDOWS}
+@endnode

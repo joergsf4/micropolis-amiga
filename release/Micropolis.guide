@@ -88,6 +88,7 @@
   Options    auto bulldoze, auto budget, disasters, sound, auto goto,
              animation, messages, message windows, ask screen mode
   Level      Easy / Medium / Hard (start funds of a new city)
+  Language   Automatic (system setting) / English / Deutsch / Polski (next start)
   Windows    budget, evaluation, graphs, map
   Map        overlays: power, traffic, pollution, crime, land value ...
   Disasters  fire, flood, tornado, earthquake, monster, meltdown
@@ -119,7 +120,8 @@
   mode at start turns the question on again.
 
   Settings are stored in ENVARC:Micropolis.prefs. ToolTypes of the icon:
-  SIZE=800x600 (fixed size, no question), CITY=<file>.
+  SIZE=800x600 (fixed size, no question), CITY=<file>, LANGUAGE=deutsch (or
+  english, polski; also lang=deutsch on the command line).
 @endnode
 
 @node CHEATS "Cheat words"

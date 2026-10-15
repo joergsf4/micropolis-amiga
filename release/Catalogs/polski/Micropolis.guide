@@ -1,0 +1,145 @@
+@database Micropolis.guide
+@$VER: Micropolis.guide 0.8
+@author "Micropolis dla AmigaOS"
+@(c) "GPL-3, patrz COPYING"
+@index INDEX
+@wordwrap
+
+@node MAIN "Micropolis - Pomoc"
+
+  @{b}Micropolis dla AmigaOS@{ub}
+
+  Buduj miasto i nim zarzadzaj. Symulacja to oryginalny kod Micropolis
+  (SimCity); interfejs jest natywny, oparty na Intuition/RTG.
+
+  @{" Pierwsze kroki       " link START}
+  @{" Narzedzia budowy     " link TOOLS}
+  @{" Klawiatura i mysz    " link KEYS}
+  @{" Okna                 " link WINDOWS}
+  @{" Menu                 " link MENUS}
+  @{" Paski R C I          " link DEMAND}
+  @{" Scenariusze          " link SCENARIOS}
+  @{" Tryb ekranu i ustawienia " link SETTINGS}
+  @{" Slowa-cheaty         " link CHEATS}
+  @{" Indeks               " link INDEX}
+@endnode
+
+@node START "Pierwsze kroki"
+@toc MAIN
+
+  1. Wybierz narzedzie po lewej (na poczatku aktywne jest Zapytanie).
+  2. Kliknij lub przeciagnij na mapie. Biala ramka pokazuje, co zostanie
+     zbudowane.
+  3. Strefy (mieszkalne, handlowe, przemyslowe) rosna tylko z pradem
+     (elektrownia i linie) oraz drogami. Obserwuj paski R C I.
+  4. Otworz budzet (menu Okna/Budzet), aby ustawic podatki i fundusze.
+
+  Tempo: klawisze 0 (pauza) do 3 (szybko) lub menu Tempo.
+@endnode
+
+@node TOOLS "Narzedzia budowy"
+@toc MAIN
+
+  Najedz myszka na ikone: nazwa i cena pojawia sie u gory.
+
+  Zapytanie   stan strefy (gestosc, wartosc, przestepczosc, zanieczyszczenie)
+  Spychacz    usuwa wszystko, cena 1
+  Droga 10 za pole   Tory 20 za pole   Linia energ. 5 za pole
+  Park 10     Strefy mieszkalne/handlowe/przemyslowe po 100 (3x3)
+  Straz pozarna 500   Komisariat 500
+  Stadion 5000   Elektrownia weglowa 3000   Elektrownia jadrowa 5000
+  Port morski 3000   Lotnisko 10000
+
+  Kreda       rysuje notatke na mapie (biala linia); notatki nie sa
+              zapisywane z miastem
+  Gumka       usuwa dotkniete linie kredy
+
+  Drogi i linie nad woda buduje sie jako mosty i kosztuja wiecej.
+  Auto-burzenie (menu Opcje) usuwa gruz automatycznie.
+@endnode
+
+@node KEYS "Klawiatura i mysz"
+@toc MAIN
+
+  Lewy przycisk myszy    uzyj narzedzia / kliknij przycisk
+  Prawy przycisk myszy   menu
+  W A S D, kolko myszy, mysz przy krawedzi ekranu   przewijanie
+  0 1 2 3                pauza, wolno, srednio, szybko
+  b r p t x z            skroty narzedzi jak w oryginale (spychacz,
+                         droga, park, linia, tory, zapytanie)
+  Esc                    zamyka aktywne okno; konczy gre, gdy zadne nie
+                         jest otwarte
+  Help                   ta pomoc
+
+  Na mapie przegladowej: kliknij lub przeciagnij, aby przewinac miasto.
+@endnode
+
+@node WINDOWS "Okna"
+@toc MAIN
+
+  Komunikaty, budzet, ocena, wykresy, okno zapytania i mapa przegladowa
+  to zwykle okna Amigi na ekranie gry: przesuwaj je za pasek tytulu,
+  zamykaj gadzetem zamkniecia (gadzet zamkniecia budzetu oznacza Dalej).
+
+  Pasek tytulu ekranu mozna przeciagnac w dol, aby zobaczyc Workbench.
+@endnode
+
+@node MENUS "Menu"
+@toc MAIN
+
+  Projekt      nowe miasto, wczytaj, zapisz, O programie, Pomoc, zakoncz
+  Scenariusze  historyczne miasta z opowiescia i celem
+  Tempo        pauza / wolno / srednio / szybko
+  Opcje        auto-burzenie, auto-budzet, katastrofy, dzwiek, auto-skok,
+               animacja, komunikaty, okna komunikatow, pytaj o tryb ekranu
+  Poziom       Latwy / Sredni / Trudny (srodki na start nowego miasta)
+  Jezyk        Automatycznie (ustawienie systemu) / English / Deutsch / Polski
+               (od nastepnego uruchomienia)
+  Okna         budzet, ocena, wykresy
+  Mapa         widoki: energia, ruch, zanieczyszczenie, przestepczosc ...
+  Katastrofy   pozar, powodz, tornado, trzesienie ziemi, potwor, awaria reaktora
+@endnode
+
+@node DEMAND "Paski R C I"
+@toc MAIN
+
+  Trzy paski w prawym gornym rogu pokazuja zapotrzebowanie na strefy
+  mieszkalne (R), handlowe (C) i przemyslowe (I). W gore znaczy, ze
+  mieszkancy chca wiecej, w dol, ze jest ich za duzo.
+@endnode
+
+@node SCENARIOS "Scenariusze"
+@toc MAIN
+
+  Dullsville 1900, San Francisco 1906 (trzesienie ziemi), Hamburg 1944
+  (bomby zapalajace), Berno 1965 (ruch), Tokio 1957 (potwor), Detroit 1972
+  (przestepczosc), Boston 2010 (awaria reaktora), Rio de Janeiro 2047
+  (powodz). Kazdy ma limit czasu i cel; opowiesc pojawia sie na starcie.
+@endnode
+
+@node SETTINGS "Tryb ekranu i ustawienia"
+@toc MAIN
+
+  Na starcie requester pokazuje uzyteczne tryby RTG (od 640x480 do
+  800x600). Mozna wybrac "Zawsze uzywac"; Opcje/Pytaj o tryb ekranu przy
+  starcie wlacza pytanie ponownie.
+
+  Ustawienia sa w ENVARC:Micropolis.prefs. ToolTypes ikony:
+  SIZE=800x600 (staly rozmiar, bez pytania), CITY=<plik>,
+  LANGUAGE=polski (albo english, deutsch; w wierszu polecen lang=polski).
+@endnode
+
+@node CHEATS "Slowa-cheaty"
+@toc MAIN
+
+  Tak jak w oryginale, kilka slow wpisanych w oknie gry ma dzialanie
+  (na przyklad "fund"). Sa dla zabawy; uzywasz ich na wlasne ryzyko.
+@endnode
+
+@node INDEX "Indeks"
+@toc MAIN
+
+  @{"Budzet" link MENUS}   @{"Cheaty" link CHEATS}   @{"Klawisze" link KEYS}
+  @{"Scenariusze" link SCENARIOS}   @{"Tryb ekranu" link SETTINGS}
+  @{"Narzedzia" link TOOLS}   @{"Okna" link WINDOWS}
+@endnode

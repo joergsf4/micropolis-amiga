@@ -9,7 +9,7 @@ UP       = upstream
 CORE_SRC = $(wildcard src/core/*.c)
 CORE_OBJ = $(patsubst src/%.c,out/obj/%.o,$(CORE_SRC))
 
-all: out/micropolis out/headless out/rtgtest out/listmodes out/tonetest data
+all: out/micropolis out/headless out/rtgtest out/listmodes out/tonetest data catalogs
 	mkdir -p $(DEST)
 	cp out/micropolis out/headless out/rtgtest out/listmodes out/tonetest $(DEST)/
 	# icons like in the release (the drawer icon lives next to the drawer)
@@ -30,7 +30,7 @@ out/obj/amiga/%.o: src/amiga/%.c $(wildcard src/core/*.h src/amiga/*.h) out/buil
 out/headless: $(CORE_OBJ) out/obj/amiga/ui_core.o out/obj/amiga/stack.o out/obj/amiga/mapview.o out/obj/amiga/headless.o
 	$(CC) $(ARCH) -o $@ $^ -lm
 
-out/micropolis: $(CORE_OBJ) out/obj/amiga/ui_core.o out/obj/amiga/stack.o out/obj/amiga/gfx.o out/obj/amiga/sound.o out/obj/amiga/budget_ui.o out/obj/amiga/notice_ui.o out/obj/amiga/eval_ui.o out/obj/amiga/graph_ui.o out/obj/amiga/mapview.o out/obj/amiga/main.o
+out/micropolis: $(CORE_OBJ) out/obj/amiga/ui_core.o out/obj/amiga/stack.o out/obj/amiga/gfx.o out/obj/amiga/l10n.o out/obj/amiga/sound.o out/obj/amiga/budget_ui.o out/obj/amiga/notice_ui.o out/obj/amiga/eval_ui.o out/obj/amiga/graph_ui.o out/obj/amiga/mapview.o out/obj/amiga/main.o
 	$(CC) $(ARCH) -o $@ $^ -lm
 
 out/listmodes: src/amiga/listmodes.c
@@ -55,3 +55,14 @@ data:
 
 clean:
 	rm -rf out
+
+# translations: l10n/<language>.ct + l10n/Micropolis.cd -> Catalogs/<language>/Micropolis.catalog (FlexCat)
+catalogs:
+	@for f in l10n/*.ct; do \
+	  lang=$$(sed -n 's/^## language //p' $$f | head -1); \
+	  mkdir -p $(DEST)/Catalogs/$$lang; \
+	  flexcat l10n/Micropolis.cd $$f CATALOG $(DEST)/Catalogs/$$lang/Micropolis.catalog || exit 1; \
+	  [ -f release/Catalogs/$$lang/Micropolis.guide ] && cp release/Catalogs/$$lang/Micropolis.guide $(DEST)/Catalogs/$$lang/; \
+	  echo "catalog $$lang"; \
+	done
+.PHONY: catalogs

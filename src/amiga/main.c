@@ -12,6 +12,7 @@
 #include "graph_ui.h"
 #include "gfx.h"
 #include "sound.h"
+#include "l10n.h"
 #undef GetSprite
 #include <stdio.h>
 #include <stdarg.h>
@@ -99,6 +100,8 @@ static int speak_tools;                          /* spoken tool names when a too
 static const char *const opt_key[N_OPT] = { "AUTOBULLDOZE", "AUTOBUDGET", "DISASTERS", "SOUND", "AUTOGOTO", "ANIMATION", "MESSAGES", "MESSAGEWINDOWS", "SPEAKTOOLS", "STARTMENU", "CLASSICICONS" };
 static int pref_opt[N_OPT] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };     /* -1 = not saved yet: keep the default */
 static int pref_speed = -1;
+static char pref_lang[24];                       /* "" = the system's preferred language, else "english" "deutsch" "polski" */
+static char arg_lang[24];                        /* lang= argument or LANGUAGE tooltype: wins over the preferences */
 #define N_WINPOS 6                              /* NPANELS */
 static int pref_wx[N_WINPOS] = { -1, -1, -1, -1, -1, -1 }, pref_wy[N_WINPOS] = { -1, -1, -1, -1, -1, -1 };   /* remembered window positions */
 static int opt_get(int o)
@@ -131,6 +134,7 @@ static void prefs_load(void)
             else if (sscanf(line, "MODE=%lx", &m) == 1) pref_mode = (ULONG)m;
             else if (!strncmp(line, "SIZE=", 5)) sscanf(line + 5, "%dx%d", &pref_w, &pref_h);
             else if (!strncmp(line, "DEPTH=", 6)) pref_depth = atoi(line + 6);
+            else if (!strncmp(line, "LANGUAGE=", 9)) { strncpy(pref_lang, line + 9, sizeof pref_lang - 1); pref_lang[strcspn(pref_lang, "\r\n")] = 0; }
             else if (!strncmp(line, "SPEED=", 6)) { pref_speed = atoi(line + 6); if (pref_speed < 0 || pref_speed > 3) pref_speed = -1; }
             else if (!strncmp(line, "WIN", 3) && line[3] >= '0' && line[3] < '0' + N_WINPOS && line[4] == '=') {
                 int x, y;
@@ -157,6 +161,7 @@ static void prefs_save(void)
         fprintf(f, "ASK=%d\nMODE=%lx\nSIZE=%dx%d\nDEPTH=%d\nLEVEL=%d\n", pref_ask, (unsigned long)pref_mode, pref_w, pref_h, pref_depth, pref_level);
         for (int o = 0; o < N_OPT; o++) fprintf(f, "%s=%d\n", opt_key[o], pref_opt[o] >= 0 ? pref_opt[o] : opt_get(o));
         fprintf(f, "SPEED=%d\n", pref_speed >= 0 ? pref_speed : 3);
+        fprintf(f, "LANGUAGE=%s\n", pref_lang);
         for (int i = 0; i < N_WINPOS; i++) if (pref_wx[i] >= 0) fprintf(f, "WIN%d=%d,%d\n", i, pref_wx[i], pref_wy[i]);
         fclose(f);
     }
@@ -198,13 +203,13 @@ static UBYTE *toolicons2;              /* toolicons2.bin: uniform 32x32 set (col
 static int toolicons2_n, toolicons2_t;
 static UBYTE *toolicons;               /* toolicons.bin: the original's tool palette pictures (normal and highlighted) */
 static const struct { const char *name; int cost; short x, y; } tooldef[NTOOLS] = {   /* indexed by tool state; positions as in the original palette */
-    { "Residential", 100, 13, 58 },  { "Commercial", 100, 51, 58 },   { "Industrial", 100, 89, 58 },
-    { "Fire Station", 500, 13, 112 }, { "Query", 0, 51, 112 },        { "Police Station", 500, 89, 112 },
-    { "Wire", 5, 32, 150 },          { "Bulldozer", 1, 70, 150 },
-    { "Rail", 20, 10, 188 },         { "Road", 10, 70, 188 },
-    { "Chalk", 0, 32, 216 },         { "Eraser", 0, 70, 216 },
-    { "Stadium", 5000, 5, 254 },     { "Park", 10, 51, 254 },         { "Seaport", 3000, 89, 254 },
-    { "Coal Power", 3000, 5, 300 },  { "Nuclear Power", 5000, 89, 300 }, { "Airport", 10000, 39, 346 },
+    { N_("Residential"), 100, 13, 58 },  { N_("Commercial"), 100, 51, 58 },   { N_("Industrial"), 100, 89, 58 },
+    { N_("Fire Station"), 500, 13, 112 }, { N_("Query"), 0, 51, 112 },        { N_("Police Station"), 500, 89, 112 },
+    { N_("Wire"), 5, 32, 150 },          { N_("Bulldozer"), 1, 70, 150 },
+    { N_("Rail"), 20, 10, 188 },         { N_("Road"), 10, 70, 188 },
+    { N_("Chalk"), 0, 32, 216 },         { N_("Eraser"), 0, 70, 216 },
+    { N_("Stadium"), 5000, 5, 254 },     { N_("Park"), 10, 51, 254 },         { N_("Seaport"), 3000, 89, 254 },
+    { N_("Coal Power"), 3000, 5, 300 },  { N_("Nuclear Power"), 5000, 89, 300 }, { N_("Airport"), 10000, 39, 346 },
 };
 
 /* ---------- notifications from the simulation core (see ui_core.c) ---------- */
@@ -221,8 +226,19 @@ static void copy_braced(char *dst, size_t n, const char *s)
 
 int ui_eval(const char *cmd)
 {
-    if (!strncmp(cmd, "UISetDate ", 10))         { copy_braced(status_date, sizeof status_date, cmd); dirty = 1; }
-    else if (!strncmp(cmd, "UISetFunds ", 11))   { copy_braced(status_funds, sizeof status_funds, cmd); dirty = 1; }
+    if (!strncmp(cmd, "UISetDate ", 10))         {
+        copy_braced(status_date, sizeof status_date, cmd); dirty = 1;
+        if (strlen(status_date) > 3) {                                    /* "Jan 2003": the month names are translated */
+            char mon[4], rest[32];
+            memcpy(mon, status_date, 3); mon[3] = 0;
+            strcpy(rest, status_date + 3);
+            sprintf(status_date, "%.5s%s", T(mon), rest);
+        }
+    }
+    else if (!strncmp(cmd, "UISetFunds ", 11))   {
+        copy_braced(status_funds, sizeof status_funds, cmd); dirty = 1;
+        if (!strncmp(status_funds, "Funds:", 6)) { char rest[48]; strcpy(rest, status_funds + 6); snprintf(status_funds, sizeof status_funds, "%s%s", T("Funds:"), rest); }   /* "Funds: $1,000" */
+    }
     else if (!strncmp(cmd, "UIShowZoneStatus ", 17)) {
         const char *q = cmd;
         for (int i = 0; i < 6; i++) {
@@ -259,7 +275,7 @@ int ui_eval(const char *cmd)
     else if (!strncmp(cmd, "UIDidSaveCity", 13))   { save_state = 1; }
     else if (!strncmp(cmd, "UIDidntSaveCity ", 16)) { save_state = 2; copy_braced(save_msg, sizeof save_msg, cmd); }
     else if (!strncmp(cmd, "UISetSpeed ", 11))      { if (sound_ui_ready && UserSoundOn) sound_play("boing"); }
-    else if (!strncmp(cmd, "UISetMessage ", 13)) { if (DoMessages) copy_braced(status_msg, sizeof status_msg, cmd); dirty = 1; }
+    else if (!strncmp(cmd, "UISetMessage ", 13)) { if (DoMessages) { char m[200]; m[0] = 0; copy_braced(m, sizeof m, cmd); strncpy(status_msg, T(m), sizeof status_msg - 1); status_msg[sizeof status_msg - 1] = 0; } dirty = 1; }
     return 0;
 }
 void ui_invalidate(int what) { dirty = 1; }
@@ -457,9 +473,9 @@ static void draw_toolbar(void)
         if (t >= 0 && t < NTOOLS) {
             gfx_target(fb, SCR_W);
             gfx_colors(tool_hover >= 0 ? PEN_V_YELLOW : PEN_TEXT, PEN_BAR);
-            sprintf(line, "%-17.17s", tooldef[t].name);
+            sprintf(line, "%-17.17s", T(tooldef[t].name));
             gfx_print(6, BAR_H + 22, line);
-            if (tooldef[t].cost) sprintf(line, "Cost: $%-8d", tooldef[t].cost); else strcpy(line, "                ");
+            if (tooldef[t].cost) sprintf(line, T("Cost: $%d"), tooldef[t].cost); else strcpy(line, "                ");
             gfx_print(6, BAR_H + 40, line);
         }
     }
@@ -577,24 +593,23 @@ static void draw_graph(void)  { gfx_target(scratch, SCRATCH_STRIDE); graph_draw(
 static void draw_map(void)    { map_blit(scratch, SCRATCH_STRIDE, 1, 1, view_x, view_y, VIEW_COLS, VIEW_ROWS); }
 static void draw_query(void)
 {
-    static const char *const label[6] = { "Zone", "Density", "Value", "Crime", "Pollution", "Growth" };
-    char b[48];
+    static const char *const label[6] = { N_("Zone"), N_("Density"), N_("Value"), N_("Crime"), N_("Pollution"), N_("Growth") };
     for (int y = 0; y < QUERY_H; y++) memset(scratch + (QUERY_Y + y) * SCRATCH_STRIDE + QUERY_X, PEN_BAR, QUERY_W);
     gfx_target(scratch, SCRATCH_STRIDE);
     gfx_colors(PEN_TEXT, PEN_BAR);
-    gfx_print(QUERY_X + 8, QUERY_Y + 18, "Query zone status");
-    for (int i = 0; i < 6; i++) { sprintf(b, "%-10s %s", label[i], query_f[i]); gfx_print(QUERY_X + 8, QUERY_Y + 36 + i * 13, b); }
+    gfx_print(QUERY_X + 8, QUERY_Y + 18, T("Query zone status"));
+    for (int i = 0; i < 6; i++) { gfx_print(QUERY_X + 8, QUERY_Y + 36 + i * 13, T(label[i])); gfx_print(QUERY_X + 8 + 88, QUERY_Y + 36 + i * 13, T(query_f[i])); }
 }
 static void close_query(void) { query_visible = 0; }
 static void close_notice(void) { notice_close(); }
 static void close_map(void) { map_visible = 0; }
 static struct panel panels[NPANELS] = {
-    { "Message",             &notice_visible, &notice_dirty, NOTICE_X, NOTICE_Y, NOTICE_W, NOTICE_H, draw_notice, notice_click, close_notice, 0, 0, NULL },
-    { "Budget",              &budget_visible, &budget_dirty, BUDGET_X, BUDGET_Y, BUDGET_W, BUDGET_H, draw_budget, budget_click, budget_key_close, 0, 0, NULL },
+    { N_("Message"),             &notice_visible, &notice_dirty, NOTICE_X, NOTICE_Y, NOTICE_W, NOTICE_H, draw_notice, notice_click, close_notice, 0, 0, NULL },
+    { N_("Budget"),              &budget_visible, &budget_dirty, BUDGET_X, BUDGET_Y, BUDGET_W, BUDGET_H, draw_budget, budget_click, budget_key_close, 0, 0, NULL },
     { "City Evaluation",     &eval_visible,   &eval_dirty,   EVAL_X, EVAL_Y, EVAL_W, EVAL_H, draw_eval, eval_click, eval_close, 0, 0, NULL },
-    { "History",             &graph_visible,  &graph_dirty,  GRAPH_X, GRAPH_Y, GRAPH_W, GRAPH_H, draw_graph, graph_click, graph_close, 0, 0, NULL },
-    { "Query",               &query_visible,  &query_dirty,  QUERY_X, QUERY_Y, QUERY_W, QUERY_H, draw_query, NULL, close_query, 1, 0, NULL },
-    { "Overview map",        &map_visible,    &map_panel_dirty, 0, 0, MAPWIN_W, MAPWIN_H, draw_map, NULL, close_map, 2, 1, NULL },
+    { N_("History"),             &graph_visible,  &graph_dirty,  GRAPH_X, GRAPH_Y, GRAPH_W, GRAPH_H, draw_graph, graph_click, graph_close, 0, 0, NULL },
+    { N_("Query"),               &query_visible,  &query_dirty,  QUERY_X, QUERY_Y, QUERY_W, QUERY_H, draw_query, NULL, close_query, 1, 0, NULL },
+    { N_("Overview map"),        &map_visible,    &map_panel_dirty, 0, 0, MAPWIN_W, MAPWIN_H, draw_map, NULL, close_map, 2, 1, NULL },
 };
 
 static void open_info_panel(int which)       /* menu / key: show or hide a window */
@@ -685,7 +700,7 @@ static void panel_open(int i)
     if (x < 0) x = 0;
     if (y < bar) y = bar;
     p->win = OpenWindowTags(NULL, WA_CustomScreen, (ULONG)g_scr, WA_Left, x, WA_Top, y,
-                            WA_InnerWidth, p->w, WA_InnerHeight, p->h, WA_Title, (ULONG)p->title,
+                            WA_InnerWidth, p->w, WA_InnerHeight, p->h, WA_Title, (ULONG)T(p->title),
                             WA_DragBar, TRUE, WA_DepthGadget, TRUE, WA_CloseGadget, TRUE, WA_Activate, TRUE,
                             WA_SimpleRefresh, TRUE, WA_ReportMouse, p->wants_move ? TRUE : FALSE,
                             WA_IDCMP, 0, TAG_DONE);
@@ -857,8 +872,8 @@ static void render_frame(struct Window *win)
     {   /* status lines (top left) */
         char line[200];
         gfx_colors(PEN_TEXT, PEN_BAR);
-        sprintf(line, " %-9s %-21s Pop %-7ld Speed %d%s", status_date, status_funds, (long)CityPop, (int)SimSpeed,
-                SimSpeed ? "" : " (Pause)");
+        sprintf(line, " %-9s %-21s %s %-7ld %s %d%s", status_date, status_funds, T("Pop"), (long)CityPop, T("Speed"), (int)SimSpeed,
+                SimSpeed ? "" : T(" (Pause)"));
         if (strcmp(line, last_line1)) { gfx_print(4, 12, line); strcpy(last_line1, line); status_dirty = 1; }
         sprintf(line, " %-58.58s", status_msg);
         if (strcmp(line, last_line2)) { gfx_print(4, 27, line); strcpy(last_line2, line); status_dirty = 1; }
@@ -905,11 +920,11 @@ static void render_frame(struct Window *win)
 /* ---------- menus and commands ---------- */
 enum { CMD_NEW = 1, CMD_LOAD, CMD_SAVE, CMD_SAVEAS, CMD_QUIT,
        CMD_PAUSE = 10, CMD_SLOW, CMD_MEDIUM, CMD_FAST,
-       CMD_AUTOBULLDOZE = 20, CMD_AUTOBUDGET, CMD_DISASTERS, CMD_SOUND, CMD_ASKMODE, CMD_AUTOGO, CMD_ANIM, CMD_MSGS, CMD_NOTICES, CMD_OVERLAY, CMD_LEVEL = 60, CMD_SPEAK = 65, CMD_STARTMENU = 66, CMD_CLASSIC = 67,
+       CMD_AUTOBULLDOZE = 20, CMD_AUTOBUDGET, CMD_DISASTERS, CMD_SOUND, CMD_ASKMODE, CMD_AUTOGO, CMD_ANIM, CMD_MSGS, CMD_NOTICES, CMD_OVERLAY, CMD_LEVEL = 60, CMD_SPEAK = 65, CMD_STARTMENU = 66, CMD_CLASSIC = 67, CMD_LANG = 70,
        CMD_ABOUT = 44, CMD_HELP = 45, CMD_SCEN = 200, CMD_BUDGET = 40, CMD_MAP = 41, CMD_EVAL = 42, CMD_GRAPHS = 43, CMD_MAPMODE = 100,
        CMD_FIRE = 30, CMD_FLOOD, CMD_TORNADO, CMD_QUAKE, CMD_MONSTER, CMD_MELTDOWN };
 
-static struct NewMenu newmenu[64];                      /* the menus have about 48 entries */
+static struct NewMenu newmenu[80];                      /* the menus have about 48 entries */
 static int nmenu;
 static unsigned mi_excl;                       /* mutual-exclude mask for the next item (GadTools: bit n = item n of the same menu) */
 static void mi(UBYTE type, const char *label, const char *key, UWORD flags, int id)
@@ -925,59 +940,65 @@ static struct Menu *make_menus(struct Screen *scr, APTR *vi_out)
     APTR vi = GetVisualInfoA(scr, NULL);
     struct Menu *menu;
     nmenu = 0;
-    mi(NM_TITLE, "Project", NULL, 0, 0);
-    mi(NM_ITEM, "Help...", NULL, 0, CMD_HELP);
-    mi(NM_ITEM, "About Micropolis...", NULL, 0, CMD_ABOUT);
+    mi(NM_TITLE, T("Project"), NULL, 0, 0);
+    mi(NM_ITEM, T("Help..."), NULL, 0, CMD_HELP);
+    mi(NM_ITEM, T("About Micropolis..."), NULL, 0, CMD_ABOUT);
     mi(NM_ITEM, (const char *)NM_BARLABEL, NULL, 0, 0);
-    mi(NM_ITEM, "New City", "N", 0, CMD_NEW);
-    mi(NM_ITEM, "Load City...", "L", 0, CMD_LOAD);
-    mi(NM_ITEM, "Save City", "S", 0, CMD_SAVE);
-    mi(NM_ITEM, "Save City As...", NULL, 0, CMD_SAVEAS);
+    mi(NM_ITEM, T("New City"), "N", 0, CMD_NEW);
+    mi(NM_ITEM, T("Load City..."), "L", 0, CMD_LOAD);
+    mi(NM_ITEM, T("Save City"), "S", 0, CMD_SAVE);
+    mi(NM_ITEM, T("Save City As..."), NULL, 0, CMD_SAVEAS);
     mi(NM_ITEM, (const char *)NM_BARLABEL, NULL, 0, 0);
-    mi(NM_ITEM, "Quit", "Q", 0, CMD_QUIT);
-    mi(NM_TITLE, "Scenarios", NULL, 0, 0);
-    {   static const char *const scen[8] = { "Dullsville 1900", "San Francisco 1906", "Hamburg 1944", "Bern 1965",
-                                              "Tokyo 1957", "Detroit 1972", "Boston 2010", "Rio de Janeiro 2047" };
-        for (int i = 0; i < 8; i++) mi(NM_ITEM, scen[i], NULL, 0, CMD_SCEN + i + 1);
+    mi(NM_ITEM, T("Quit"), "Q", 0, CMD_QUIT);
+    mi(NM_TITLE, T("Scenarios"), NULL, 0, 0);
+    {   static const char *const scen[8] = { N_("Dullsville 1900"), N_("San Francisco 1906"), N_("Hamburg 1944"), N_("Bern 1965"),
+                                              N_("Tokyo 1957"), N_("Detroit 1972"), N_("Boston 2010"), N_("Rio de Janeiro 2047") };
+        for (int i = 0; i < 8; i++) mi(NM_ITEM, T(scen[i]), NULL, 0, CMD_SCEN + i + 1);
     }
-    mi(NM_TITLE, "Speed", NULL, 0, 0);
-    mi(NM_ITEM, "Pause", "0", 0, CMD_PAUSE);
-    mi(NM_ITEM, "Slow", "1", 0, CMD_SLOW);
-    mi(NM_ITEM, "Medium", "2", 0, CMD_MEDIUM);
-    mi(NM_ITEM, "Fast", "3", 0, CMD_FAST);
-    mi(NM_TITLE, "Options", NULL, 0, 0);
-    mi(NM_ITEM, "Auto Bulldoze", NULL, CHECKIT | MENUTOGGLE | (autoBulldoze ? CHECKED : 0), CMD_AUTOBULLDOZE);
-    mi(NM_ITEM, "Auto Budget", NULL, CHECKIT | MENUTOGGLE | (autoBudget ? CHECKED : 0), CMD_AUTOBUDGET);
-    mi(NM_ITEM, "Disasters", NULL, CHECKIT | MENUTOGGLE | (NoDisasters ? 0 : CHECKED), CMD_DISASTERS);
-    mi(NM_ITEM, "Sound", NULL, CHECKIT | MENUTOGGLE | (UserSoundOn ? CHECKED : 0), CMD_SOUND);
-    mi(NM_ITEM, "Auto Goto (jump to events)", NULL, CHECKIT | MENUTOGGLE | (autoGo ? CHECKED : 0), CMD_AUTOGO);
-    mi(NM_ITEM, "Animation", NULL, CHECKIT | MENUTOGGLE | (DoAnimation ? CHECKED : 0), CMD_ANIM);
-    mi(NM_ITEM, "Messages", NULL, CHECKIT | MENUTOGGLE | (DoMessages ? CHECKED : 0), CMD_MSGS);
-    mi(NM_ITEM, "Speak tool names", NULL, CHECKIT | MENUTOGGLE | (speak_tools ? CHECKED : 0), CMD_SPEAK);
-    mi(NM_ITEM, "Start menu at launch", NULL, CHECKIT | MENUTOGGLE | (start_menu ? CHECKED : 0), CMD_STARTMENU);
-    mi(NM_ITEM, "Classic tool icons", NULL, CHECKIT | MENUTOGGLE | (classic_icons ? CHECKED : 0), CMD_CLASSIC);
-    mi(NM_ITEM, "Message windows", NULL, CHECKIT | MENUTOGGLE | (DoNotices ? CHECKED : 0), CMD_NOTICES);
-    mi(NM_ITEM, "Ask for screen mode at start", NULL, CHECKIT | MENUTOGGLE | (pref_ask ? CHECKED : 0), CMD_ASKMODE);
-    mi(NM_TITLE, "Level", NULL, 0, 0);
-    mi_excl = 6; mi(NM_ITEM, "Easy ($20,000 start)",   NULL, CHECKIT | (pref_level == 0 ? CHECKED : 0), CMD_LEVEL + 0);
-    mi_excl = 5; mi(NM_ITEM, "Medium ($10,000 start)", NULL, CHECKIT | (pref_level == 1 ? CHECKED : 0), CMD_LEVEL + 1);
-    mi_excl = 3; mi(NM_ITEM, "Hard ($5,000 start)",    NULL, CHECKIT | (pref_level == 2 ? CHECKED : 0), CMD_LEVEL + 2);
-    mi(NM_TITLE, "Windows", NULL, 0, 0);
-    mi(NM_ITEM, "Budget...", "B", 0, CMD_BUDGET);
-    mi(NM_ITEM, "Evaluation...", "E", 0, CMD_EVAL);
-    mi(NM_ITEM, "Graphs...", "G", 0, CMD_GRAPHS);
-    mi(NM_TITLE, "Map", NULL, 0, 0);
-    mi(NM_ITEM, "Map window on/off", "M", 0, CMD_MAP);
-    mi(NM_ITEM, "Next overlay", "C", 0, CMD_OVERLAY);
+    mi(NM_TITLE, T("Speed"), NULL, 0, 0);
+    mi(NM_ITEM, T("Pause"), "0", 0, CMD_PAUSE);
+    mi(NM_ITEM, T("Slow"), "1", 0, CMD_SLOW);
+    mi(NM_ITEM, T("Medium"), "2", 0, CMD_MEDIUM);
+    mi(NM_ITEM, T("Fast"), "3", 0, CMD_FAST);
+    mi(NM_TITLE, T("Options"), NULL, 0, 0);
+    mi(NM_ITEM, T("Auto Bulldoze"), NULL, CHECKIT | MENUTOGGLE | (autoBulldoze ? CHECKED : 0), CMD_AUTOBULLDOZE);
+    mi(NM_ITEM, T("Auto Budget"), NULL, CHECKIT | MENUTOGGLE | (autoBudget ? CHECKED : 0), CMD_AUTOBUDGET);
+    mi(NM_ITEM, T("Disasters"), NULL, CHECKIT | MENUTOGGLE | (NoDisasters ? 0 : CHECKED), CMD_DISASTERS);
+    mi(NM_ITEM, T("Sound"), NULL, CHECKIT | MENUTOGGLE | (UserSoundOn ? CHECKED : 0), CMD_SOUND);
+    mi(NM_ITEM, T("Auto Goto (jump to events)"), NULL, CHECKIT | MENUTOGGLE | (autoGo ? CHECKED : 0), CMD_AUTOGO);
+    mi(NM_ITEM, T("Animation"), NULL, CHECKIT | MENUTOGGLE | (DoAnimation ? CHECKED : 0), CMD_ANIM);
+    mi(NM_ITEM, T("Messages"), NULL, CHECKIT | MENUTOGGLE | (DoMessages ? CHECKED : 0), CMD_MSGS);
+    mi(NM_ITEM, T("Speak tool names"), NULL, CHECKIT | MENUTOGGLE | (speak_tools ? CHECKED : 0), CMD_SPEAK);
+    mi(NM_ITEM, T("Start menu at launch"), NULL, CHECKIT | MENUTOGGLE | (start_menu ? CHECKED : 0), CMD_STARTMENU);
+    mi(NM_ITEM, T("Classic tool icons"), NULL, CHECKIT | MENUTOGGLE | (classic_icons ? CHECKED : 0), CMD_CLASSIC);
+    mi(NM_ITEM, T("Message windows"), NULL, CHECKIT | MENUTOGGLE | (DoNotices ? CHECKED : 0), CMD_NOTICES);
+    mi(NM_ITEM, T("Ask for screen mode at start"), NULL, CHECKIT | MENUTOGGLE | (pref_ask ? CHECKED : 0), CMD_ASKMODE);
+    mi(NM_TITLE, T("Level"), NULL, 0, 0);
+    mi_excl = 6; mi(NM_ITEM, T("Easy ($20,000 start)"),   NULL, CHECKIT | (pref_level == 0 ? CHECKED : 0), CMD_LEVEL + 0);
+    mi_excl = 5; mi(NM_ITEM, T("Medium ($10,000 start)"), NULL, CHECKIT | (pref_level == 1 ? CHECKED : 0), CMD_LEVEL + 1);
+    mi_excl = 3; mi(NM_ITEM, T("Hard ($5,000 start)"),    NULL, CHECKIT | (pref_level == 2 ? CHECKED : 0), CMD_LEVEL + 2);
+    mi(NM_TITLE, T("Language"), NULL, 0, 0);
+    {   static const char *const code[4] = { "", "english", "deutsch", "polski" };
+        const char *label[4] = { T("Automatic (system setting)"), "English", "Deutsch", "Polski" };
+        static const int ex[4] = { 14, 13, 11, 7 };                  /* the other three items of the group */
+        for (int i = 0; i < 4; i++) { mi_excl = ex[i]; mi(NM_ITEM, label[i], NULL, CHECKIT | (strcmp(pref_lang, code[i]) == 0 ? CHECKED : 0), CMD_LANG + i); }
+    }
+    mi(NM_TITLE, T("Windows"), NULL, 0, 0);
+    mi(NM_ITEM, T("Budget..."), "B", 0, CMD_BUDGET);
+    mi(NM_ITEM, T("Evaluation..."), "E", 0, CMD_EVAL);
+    mi(NM_ITEM, T("Graphs..."), "G", 0, CMD_GRAPHS);
+    mi(NM_TITLE, T("Map"), NULL, 0, 0);
+    mi(NM_ITEM, T("Map window on/off"), "M", 0, CMD_MAP);
+    mi(NM_ITEM, T("Next overlay"), "C", 0, CMD_OVERLAY);
     mi(NM_ITEM, (const char *)NM_BARLABEL, NULL, 0, 0);
-    for (int i = 0; i < MAP_MODES; i++) mi(NM_ITEM, map_names[i], NULL, 0, CMD_MAPMODE + i);
-    mi(NM_TITLE, "Disasters", NULL, 0, 0);
-    mi(NM_ITEM, "Fire", NULL, 0, CMD_FIRE);
-    mi(NM_ITEM, "Flood", NULL, 0, CMD_FLOOD);
-    mi(NM_ITEM, "Tornado", NULL, 0, CMD_TORNADO);
-    mi(NM_ITEM, "Earthquake", NULL, 0, CMD_QUAKE);
-    mi(NM_ITEM, "Monster", NULL, 0, CMD_MONSTER);
-    mi(NM_ITEM, "Meltdown", NULL, 0, CMD_MELTDOWN);
+    for (int i = 0; i < MAP_MODES; i++) mi(NM_ITEM, T(map_names[i]), NULL, 0, CMD_MAPMODE + i);
+    mi(NM_TITLE, T("Disasters"), NULL, 0, 0);
+    mi(NM_ITEM, T("Fire"), NULL, 0, CMD_FIRE);
+    mi(NM_ITEM, T("Flood"), NULL, 0, CMD_FLOOD);
+    mi(NM_ITEM, T("Tornado"), NULL, 0, CMD_TORNADO);
+    mi(NM_ITEM, T("Earthquake"), NULL, 0, CMD_QUAKE);
+    mi(NM_ITEM, T("Monster"), NULL, 0, CMD_MONSTER);
+    mi(NM_ITEM, T("Meltdown"), NULL, 0, CMD_MELTDOWN);
     mi(NM_END, NULL, NULL, 0, 0);
     *vi_out = vi;
     if (!vi) return NULL;
@@ -992,7 +1013,7 @@ static int ask_file(struct Window *win, int save, char *out, size_t n)
     int ok = 0;
     if (!AslBase) return 0;
     struct FileRequester *fr = AllocAslRequestTags(ASL_FileRequest,
-        ASLFR_Window, (ULONG)win, ASLFR_TitleText, (ULONG)(save ? "Save City" : "Load City"),
+        ASLFR_Window, (ULONG)win, ASLFR_TitleText, (ULONG)(save ? T("Save City") : T("Load City")),
         ASLFR_InitialDrawer, (ULONG)"PROGDIR:cities", ASLFR_InitialPattern, (ULONG)"#?.cty",
         ASLFR_DoPatterns, TRUE, ASLFR_DoSaveMode, save, ASLFR_RejectIcons, TRUE, TAG_DONE);
     if (fr) {
@@ -1016,11 +1037,12 @@ static int scr_depth_shown, scr_mode_shown;       /* filled in at startup */
 
 static void show_about(void)
 {
-    char txt[800], cpu[40] = "68000", fpu[24] = "no FPU", modeline[60], snd[60];
+    char txt[800], cpu[40] = "68000", fpu[24] = "", modeline[60], snd[60];
     sound_status(snd);
-    if (!UserSoundOn) strcpy(snd, "Sound: switched off (Options menu)");
-    sprintf(modeline, "Screen 0x%08lx, %dx%d, %d bit", (unsigned long)scr_mode_shown, scr_w, scr_h, scr_depth_shown);
+    if (!UserSoundOn) strcpy(snd, T("Sound: switched off (Options menu)"));
+    sprintf(modeline, T("Screen 0x%08lx, %dx%d, %d bit"), (unsigned long)scr_mode_shown, scr_w, scr_h, scr_depth_shown);
     UWORD af = SysBase->AttnFlags;
+    strcpy(fpu, T("no FPU"));
     if (af & AFF_68010) strcpy(cpu, "68010");
     if (af & AFF_68020) strcpy(cpu, "68020");
     if (af & AFF_68030) strcpy(cpu, "68030");
@@ -1028,23 +1050,18 @@ static void show_about(void)
     if (af & 0x80) strcpy(cpu, "68060");                 /* AFF_68060 */
     if (af & (AFF_68881 | AFF_68882)) strcpy(fpu, (af & AFF_68882) ? "68882" : "68881");
     if (af & AFF_FPU40) strcpy(fpu, "FPU");
-    sprintf(txt,
-        "Micropolis for AmigaOS 3\n"
-        "Version %s (%s)\n"
-        "Build  %s  %s\n"
-        "\n"
-        "CPU %s, %s\n"
-        "%s\n"
-        "Memory: %ld KB Chip, %ld KB Fast free\n"
-        "%s\n"
-        "\n"
-        "Simulation and graphics from Micropolis, the open-source SimCity (GPL v3, (c) Electronic Arts). "
-        "Original design Will Wright, Unix version Don Hopkins.\n"
-        "github.com/joergsf4/micropolis-amiga",
-        VERSION, VER_DATE, BUILD_TIME, BUILD_REV, cpu, fpu,
-        modeline,
-        (long)(AvailMem(MEMF_CHIP) / 1024), (long)(AvailMem(MEMF_FAST) / 1024), snd);
-    notice_show_text("About Micropolis", txt);
+    {   char *q = txt;
+        q += sprintf(q, "%s\n", T("Micropolis for AmigaOS 3"));
+        q += sprintf(q, T("Version %s (%s)"), VERSION, VER_DATE); *q++ = '\n';
+        q += sprintf(q, T("Build  %s  %s"), BUILD_TIME, BUILD_REV); *q++ = '\n'; *q++ = '\n';
+        q += sprintf(q, T("CPU %s, %s"), cpu, fpu); *q++ = '\n';
+        q += sprintf(q, "%s\n", modeline);
+        q += sprintf(q, T("Memory: %ld KB Chip, %ld KB Fast free"), (long)(AvailMem(MEMF_CHIP) / 1024), (long)(AvailMem(MEMF_FAST) / 1024)); *q++ = '\n';
+        q += sprintf(q, "%s\n\n", snd);
+        q += sprintf(q, "%s\n", T("Simulation and graphics from Micropolis, the open-source SimCity (GPL v3, (c) Electronic Arts). Original design Will Wright, Unix version Don Hopkins."));
+        q += sprintf(q, "%s", T("Translations: see the catalogs in the Catalogs drawer."));
+    }
+    notice_show_text(T("About Micropolis"), txt);
     notice_dirty = 1;
 }
 
@@ -1063,12 +1080,21 @@ static void guide_poll(void)                                 /* AmigaGuide talks
 static void show_help(void)                                  /* AmigaGuide document next to the program */
 {
     struct NewAmigaGuide nag;
-    if (!AmigaGuideBase) { fail("amigaguide.library is not available."); return; }
+    if (!AmigaGuideBase) { fail(T("amigaguide.library is not available.")); return; }
     if (guide_handle) { CloseAmigaGuide(guide_handle); guide_handle = NULL; }
     memset(&nag, 0, sizeof nag);
     {   BPTR pd = GetProgramDir();                          /* the guide's process does not know our PROGDIR: */
         if (pd && NameFromLock(pd, (STRPTR)guide_path, sizeof guide_path - 20) && AddPart((STRPTR)guide_path, (STRPTR)"Micropolis.guide", sizeof guide_path)) ;
         else strcpy(guide_path, "PROGDIR:Micropolis.guide");
+    }
+    {   char loc[240];                                      /* a translated guide lives next to the catalog: Catalogs/<language>/Micropolis.guide */
+        BPTR l;
+        strcpy(loc, guide_path);
+        char *sl = strrchr(loc, '/'); if (!sl) sl = strrchr(loc, ':');
+        if (sl && strcmp(l10n_language(), "english")) {
+            sprintf(sl + 1, "Catalogs/%s/Micropolis.guide", l10n_language());
+            if ((l = Lock((CONST_STRPTR)loc, ACCESS_READ))) { UnLock(l); strcpy(guide_path, loc); }
+        }
     }
     nag.nag_Name = (STRPTR)guide_path;
     nag.nag_Screen = g_scr;
@@ -1076,7 +1102,7 @@ static void show_help(void)                                  /* AmigaGuide docum
     guide_handle = OpenAmigaGuideA(&nag, NULL);
     { char lb[300]; sprintf(lb, "help: path=%s scr=%p err=%ld", guide_path, (void *)g_scr, (long)IoErr()); logmsg(lb); }
     logmsg(guide_handle ? "help: guide opened" : "help: guide open failed");
-    if (!guide_handle) fail("Cannot open Micropolis.guide.");
+    if (!guide_handle) fail(T("Cannot open Micropolis.guide."));
 }
 
 static void save_city(struct Window *win, const char *path)
@@ -1085,20 +1111,21 @@ static void save_city(struct Window *win, const char *path)
     strncpy(name, path, sizeof name - 1); name[sizeof name - 1] = 0;     /* SaveCityAs takes ownership of its own copy and cuts the name it is given */
     save_state = 0;
     SaveCityAs(name);
-    if (save_state == 1) sprintf(status_msg, "Saved %s", path);
+    if (save_state == 1) sprintf(status_msg, T("Saved %s"), path);
     else {
-        sprintf(status_msg, "Could not save %s", path);
-        fail("Cannot save the city:\n%s", save_state == 2 ? save_msg : "unknown error");
+        sprintf(status_msg, T("Could not save %s"), path);
+        fail(T("Cannot save the city:\n%s"), save_state == 2 ? save_msg : T("unknown error"));
     }
 }
 
+static int easy(struct Window *win, const char *text, const char *gadgets);
 static int do_command(int id, struct Window *win, struct MenuItem *item)
 {
     char path[256];
     int checked = item && (item->Flags & CHECKED);
     if (id >= CMD_MAPMODE && id < CMD_MAPMODE + MAP_MODES) {
         map_mode = id - CMD_MAPMODE; map_visible = 1; map_dirty = 1; map_panel_dirty = 1;
-        sprintf(status_msg, "Map: %s", map_names[map_mode]);
+        sprintf(status_msg, T("Map: %s"), T(map_names[map_mode]));
         return 1;
     }
     if (id > CMD_SCEN && id <= CMD_SCEN + 8) {            /* scenario: load it and show its story, as the original does */
@@ -1107,11 +1134,18 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
         notice_show(id - CMD_SCEN); notice_dirty = 1;
         return 1;
     }
+    if (id >= CMD_LANG && id < CMD_LANG + 4) {              /* language: used from the next start */
+        static const char *const code[4] = { "", "english", "deutsch", "polski" };
+        strcpy(pref_lang, code[id - CMD_LANG]);
+        prefs_save();
+        easy(win, T("The language changes at the next start of Micropolis."), T("OK"));
+        return 1;
+    }
     if (id >= CMD_LEVEL && id < CMD_LEVEL + 3) {          /* difficulty: the start funds of the next new city, and the evaluation */
         pref_level = id - CMD_LEVEL;
         SetGameLevel((short)pref_level);
         prefs_save();
-        sprintf(status_msg, "Level: %s", pref_level == 0 ? "Easy" : pref_level == 1 ? "Medium" : "Hard");
+        sprintf(status_msg, T("Level: %s"), pref_level == 0 ? T("Easy") : pref_level == 1 ? T("Medium") : T("Hard"));
         return 1;
     }
     switch (id) {
@@ -1119,11 +1153,11 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
     case CMD_ABOUT: show_about(); break;
     case CMD_NEW:
         EraseOverlay(); GenerateNewCity(); SetGameLevelFunds((short)pref_level); setSpeed(3); recenter();
-        sprintf(status_msg, "New city generated."); break;
+        sprintf(status_msg, T("New city generated.")); break;
     case CMD_LOAD:
         if (ask_file(win, 0, path, sizeof path)) {
-            if (LoadCity(path)) { EraseOverlay(); recenter(); sprintf(status_msg, "Loaded %s", path); }
-            else sprintf(status_msg, "Could not load %s", path);
+            if (LoadCity(path)) { EraseOverlay(); recenter(); sprintf(status_msg, T("Loaded %s"), path); }
+            else sprintf(status_msg, T("Could not load %s"), path);
         }
         break;
     case CMD_SAVE:
@@ -1152,12 +1186,12 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
     case CMD_STARTMENU: start_menu = checked; break;
     case CMD_SPEAK: speak_tools = checked; break;
     case CMD_NOTICES: DoNotices = checked; MustUpdateOptions = 1; break;
-    case CMD_OVERLAY: map_mode = (map_mode + 1) % MAP_MODES; map_visible = 1; map_dirty = 1; map_panel_dirty = 1; sprintf(status_msg, "Map: %s", map_names[map_mode]); break;
+    case CMD_OVERLAY: map_mode = (map_mode + 1) % MAP_MODES; map_visible = 1; map_dirty = 1; map_panel_dirty = 1; sprintf(status_msg, T("Map: %s"), T(map_names[map_mode])); break;
     case CMD_ASKMODE:
         pref_ask = checked;
         if (!pref_ask) { pref_mode = (ULONG)scr_mode_shown; pref_w = scr_w; pref_h = scr_h; pref_depth = scr_depth_shown; }   /* keep using the current mode */
         prefs_save();
-        sprintf(status_msg, pref_ask ? "The screen mode will be asked at the next start." : "This screen mode is used from now on.");
+        sprintf(status_msg, pref_ask ? T("The screen mode will be asked at the next start.") : T("This screen mode is used from now on."));
         break;
     case CMD_BUDGET: DoBudgetFromMenu(); break;
     case CMD_EVAL: open_info_panel(P_EVAL); break;
@@ -1184,14 +1218,14 @@ static int easy(struct Window *win, const char *text, const char *gadgets)   /* 
 
 static int pick_scenario(struct Window *win)             /* 1..8, 0 = back */
 {
-    static const char *const nm[8] = { "Dullsville 1900", "San Francisco 1906", "Hamburg 1944", "Bern 1965", "Tokyo 1957", "Detroit 1972", "Boston 2010", "Rio de Janeiro 2047" };
+    static const char *const nm[8] = { N_("Dullsville 1900"), N_("San Francisco 1906"), N_("Hamburg 1944"), N_("Bern 1965"), N_("Tokyo 1957"), N_("Detroit 1972"), N_("Boston 2010"), N_("Rio de Janeiro 2047") };
     char g[160];
     for (int page = 0; ; page = (page + 1) % 3) {
         int r;
-        if (page == 0) sprintf(g, "%s|%s|%s|More...", nm[0], nm[1], nm[2]);
-        else if (page == 1) sprintf(g, "%s|%s|%s|More...", nm[3], nm[4], nm[5]);
-        else sprintf(g, "%s|%s|Back", nm[6], nm[7]);
-        r = easy(win, "Choose a scenario:", g);
+        if (page == 0) sprintf(g, "%s|%s|%s|%s", T(nm[0]), T(nm[1]), T(nm[2]), T("More..."));
+        else if (page == 1) sprintf(g, "%s|%s|%s|%s", T(nm[3]), T(nm[4]), T(nm[5]), T("More..."));
+        else sprintf(g, "%s|%s|%s", T(nm[6]), T(nm[7]), T("Back"));
+        r = easy(win, T("Choose a scenario:"), g);
         if (page < 2) { if (r >= 1 && r <= 3) return page * 3 + r; }
         else { if (r == 1) return 7; if (r == 2) return 8; return 0; }
     }
@@ -1201,9 +1235,9 @@ static void start_choice(struct Window *win)             /* what to start with *
 {
     char path[256];
     for (;;) {
-        int r = easy(win, "Welcome to Micropolis!\nWhat do you want to start with?", "New city|Load city...|Scenario...|Current city");
+        int r = easy(win, T("Welcome to Micropolis!\nWhat do you want to start with?"), T("New city|Load city...|Scenario...|Current city"));
         if (r == 1) { do_command(CMD_NEW, win, NULL); return; }
-        if (r == 2) { if (ask_file(win, 0, path, sizeof path) && LoadCity(path)) { EraseOverlay(); recenter(); sprintf(status_msg, "Loaded %s", path); return; } }
+        if (r == 2) { if (ask_file(win, 0, path, sizeof path) && LoadCity(path)) { EraseOverlay(); recenter(); sprintf(status_msg, T("Loaded %s"), path); return; } }
         else if (r == 3) { int sc = pick_scenario(win); if (sc) { do_command(CMD_SCEN + sc, win, NULL); return; } }
         else return;                                       /* Current city (the default one) */
     }
@@ -1230,7 +1264,7 @@ static void fail(const char *fmt, ...)
     if (IntuitionBase) {
         struct EasyStruct es;
         es.es_StructSize = sizeof(struct EasyStruct); es.es_Flags = 0;
-        es.es_Title = (CONST_STRPTR)"Micropolis"; es.es_TextFormat = (CONST_STRPTR)"%s"; es.es_GadgetFormat = (CONST_STRPTR)"OK";
+        es.es_Title = (CONST_STRPTR)"Micropolis"; es.es_TextFormat = (CONST_STRPTR)"%s"; es.es_GadgetFormat = (CONST_STRPTR)T("OK");
         {   ULONG args[1];
             args[0] = (ULONG)msg;
             EasyRequestArgs(NULL, &es, NULL, (APTR)args);
@@ -1258,6 +1292,7 @@ static void read_tooltypes(int argc, char **argv)
                 if ((v = FindToolType((CONST_STRPTR *)dobj->do_ToolTypes, (CONST_STRPTR)"CITY"))) { strncpy(tt_city, (char *)v, sizeof tt_city - 1); }
                 if (FindToolType((CONST_STRPTR *)dobj->do_ToolTypes, (CONST_STRPTR)"DEBUG")) tt_debug = 1;
                 if ((v = FindToolType((CONST_STRPTR *)dobj->do_ToolTypes, (CONST_STRPTR)"SIZE"))) { sscanf((char *)v, "%dx%d", &req_w, &req_h); size_forced = 1; }
+                if ((v = FindToolType((CONST_STRPTR *)dobj->do_ToolTypes, (CONST_STRPTR)"LANGUAGE"))) { strncpy(arg_lang, (char *)v, sizeof arg_lang - 1); }
                 if ((v = FindToolType((CONST_STRPTR *)dobj->do_ToolTypes, (CONST_STRPTR)"MODE")) && !strcasecmp((char *)v, "ASK")) ask_mode_flag = 1;
             }
             FreeDiskObject(dobj);
@@ -1268,6 +1303,7 @@ static void read_tooltypes(int argc, char **argv)
         else if (!strncasecmp(argv[i], "depth=", 6)) force_depth = atoi(argv[i] + 6);
         else if (!strncasecmp(argv[i], "size=", 5)) { sscanf(argv[i] + 5, "%dx%d", &req_w, &req_h); size_forced = 1; }
         else if (!strcasecmp(argv[i], "ask")) ask_mode_flag = 1;
+        else if (!strncasecmp(argv[i], "lang=", 5)) strncpy(arg_lang, argv[i] + 5, sizeof arg_lang - 1);
     }
 }
 
@@ -1311,7 +1347,7 @@ static ULONG ask_mode(int *w, int *h, int *depth)
     if (!AslBase) return INVALID_ID;
     filter_hook.h_Entry = (ULONG (*)())mode_filter;
     sr = (struct ScreenModeRequester *)AllocAslRequestTags(ASL_ScreenModeRequest,
-            ASLSM_TitleText, (ULONG)"Micropolis: choose an RTG screen mode (640x480 to 800x600)",
+            ASLSM_TitleText, (ULONG)T("Micropolis: choose an RTG screen mode (640x480 to 800x600)"),
             ASLSM_MinWidth, 640, ASLSM_MinHeight, 480, ASLSM_MinDepth, 8,
             ASLSM_InitialDisplayID, (pref_mode != 0xffffffffUL) ? pref_mode : 0,
             ASLSM_FilterFunc, (ULONG)&filter_hook, TAG_DONE);
@@ -1327,8 +1363,8 @@ static ULONG ask_mode(int *w, int *h, int *depth)
             }
             {   struct EasyStruct es;                              /* the list also holds the Amiga chipset modes */
                 es.es_StructSize = sizeof(struct EasyStruct); es.es_Flags = 0;
-                es.es_Title = (CONST_STRPTR)"Micropolis"; es.es_TextFormat = (CONST_STRPTR)"That is not a usable RTG mode.\nPlease choose one of the listed RTG modes\n(640x480 up to 800x600).";
-                es.es_GadgetFormat = (CONST_STRPTR)"Choose again";
+                es.es_Title = (CONST_STRPTR)"Micropolis"; es.es_TextFormat = (CONST_STRPTR)T("That is not a usable RTG mode.\nPlease choose one of the listed RTG modes\n(640x480 up to 800x600).");
+                es.es_GadgetFormat = (CONST_STRPTR)T("Choose again");
                 EasyRequestArgs(NULL, &es, NULL, NULL);
             }
         }
@@ -1372,7 +1408,7 @@ static int real_main(int argc, char **argv)
     read_tooltypes(argc, argv);
     prefs_load();
     debug_log = tt_debug;
-    if (argc > 1 && strcasecmp(argv[1], "debug") && strncasecmp(argv[1], "depth=", 6) && strncasecmp(argv[1], "size=", 5) && strcasecmp(argv[1], "ask")) {
+    if (argc > 1 && strcasecmp(argv[1], "debug") && strncasecmp(argv[1], "depth=", 6) && strncasecmp(argv[1], "size=", 5) && strcasecmp(argv[1], "ask") && strncasecmp(argv[1], "lang=", 5)) {
         city = argv[1];                                  /* given on the command line: relative to the current directory */
     } else {                                             /* default / CITY tooltype: relative to the program's drawer */
         const char *c = tt_city[0] ? tt_city : "cities/haight.cty";
@@ -1381,6 +1417,7 @@ static int real_main(int argc, char **argv)
         city = city_buf;
     }
     test_mode = argc > 2 && !strcmp(argv[2], "test");
+    l10n_init(arg_lang[0] ? arg_lang : pref_lang);
     CyberGfxBase = OpenLibrary((CONST_STRPTR)"cybergraphics.library", 40);
     GadToolsBase = OpenLibrary((CONST_STRPTR)"gadtools.library", 37);
     AslBase = OpenLibrary((CONST_STRPTR)"asl.library", 37);
@@ -1390,12 +1427,12 @@ static int real_main(int argc, char **argv)
       sprintf(b, "stack: %ld bytes", (long)((char *)t->tc_SPUpper - (char *)t->tc_SPLower)); logmsg(b); }
     logmsg("start");
     if (!CyberGfxBase && !test_mode) {
-        fail("cybergraphics.library (version 40) not found.\nMicropolis needs an RTG graphics card with\nPicasso96 or CyberGraphX installed and running.");
+        fail(T("cybergraphics.library (version 40) not found.\nMicropolis needs an RTG graphics card with\nPicasso96 or CyberGraphX installed and running."));
         goto out;
     }
     logmsg("libs ok");
     if (!load_assets()) {
-        fail("Cannot find the program data (res drawer).\nPlease keep the Micropolis program, its res and\ncities drawers together in one drawer.");
+        fail(T("Cannot find the program data (res drawer).\nPlease keep the Micropolis program, its res and\ncities drawers together in one drawer."));
         goto out;
     }
 
@@ -1405,7 +1442,7 @@ static int real_main(int argc, char **argv)
     logmsg("sim made");
     sim_init();
     logmsg("sim_init done");
-    if (!LoadCity((char *)city)) { fail("Cannot load the city file '%s'.", city); goto out; }
+    if (!LoadCity((char *)city)) { fail(T("Cannot load the city file '%s'."), city); goto out; }
     logmsg("city loaded");
     sprintf(status_msg, "Micropolis %s (%s)", VERSION, BUILD_REV);
     view_x = WORLD_X / 2 - VIEW_COLS / 2;
@@ -1435,8 +1472,8 @@ static int real_main(int argc, char **argv)
                 ULONG args[3];
                 req_w = w; req_h = h; depth = d;
                 es.es_StructSize = sizeof(struct EasyStruct); es.es_Flags = 0;
-                es.es_Title = (CONST_STRPTR)"Micropolis"; es.es_TextFormat = (CONST_STRPTR)"Always use this screen mode (%ldx%ld, %ld bit)?\nOptions > \"Ask for screen mode at start\" turns the question on again.";
-                es.es_GadgetFormat = (CONST_STRPTR)"Always use it|Ask me next time";
+                es.es_Title = (CONST_STRPTR)"Micropolis"; es.es_TextFormat = (CONST_STRPTR)T("Always use this screen mode (%ldx%ld, %ld bit)?\nOptions > \"Ask for screen mode at start\" turns the question on again.");
+                es.es_GadgetFormat = (CONST_STRPTR)T("Always use it|Ask me next time");
                 args[0] = (ULONG)w; args[1] = (ULONG)h; args[2] = (ULONG)d;
                 pref_ask = EasyRequestArgs(NULL, &es, NULL, (APTR)args) ? 0 : 1;
                 pref_mode = id; pref_w = w; pref_h = h; pref_depth = d;
@@ -1445,7 +1482,7 @@ static int real_main(int argc, char **argv)
         }
     }
     if (id == INVALID_ID) {
-        fail("No suitable RTG screen mode found.\nMicropolis needs a mode of at least 640x480 pixels\nwith 8, 15, 16, 24 or 32 bit colour.");
+        fail(T("No suitable RTG screen mode found.\nMicropolis needs a mode of at least 640x480 pixels\nwith 8, 15, 16, 24 or 32 bit colour."));
         goto out;
     }
     scr_w = req_w < 640 ? 640 : req_w > MAX_W ? MAX_W : req_w;           /* requested screen size */
@@ -1465,7 +1502,7 @@ static int real_main(int argc, char **argv)
                                  SA_ShowTitle, TRUE, SA_Draggable, TRUE, pen_tag, (ULONG)pens, TAG_DONE);
         }
     }
-    if (!scr) { fail("Cannot open the RTG screen (mode 0x%08lx, %d bit).", (unsigned long)id, depth); goto out; }
+    if (!scr) { fail(T("Cannot open the RTG screen (mode 0x%08lx, %d bit)."), (unsigned long)id, depth); goto out; }
     g_scr = scr;
     logmsg("screen open");
     {   /* the game picture fills the screen below the title bar */
@@ -1475,7 +1512,7 @@ static int real_main(int argc, char **argv)
         view_cols = (scr_w - TB_W) / 16; view_rows = (scr_h - BAR_H) / 16;
         fb = AllocVec(scr_w * scr_h, MEMF_ANY | MEMF_CLEAR);
         scratch = AllocVec(SCRATCH_STRIDE * MAX_H, MEMF_ANY | MEMF_CLEAR);
-        if (!fb || !scratch) { fail("Not enough memory for a %dx%d screen.", scr_w, scr_h); goto out; }
+        if (!fb || !scratch) { fail(T("Not enough memory for a %dx%d screen."), scr_w, scr_h); goto out; }
         recenter(); clamp_view();
         if (true_color) {
             for (int i = 0; i < 256; i++)
@@ -1488,11 +1525,11 @@ static int real_main(int argc, char **argv)
             LoadRGB32(&scr->ViewPort, pal);
         }
         idcmp_port = CreateMsgPort();
-        if (!idcmp_port) { fail("Cannot create a message port."); goto out; }
+        if (!idcmp_port) { fail(T("Cannot create a message port.")); goto out; }
         win = OpenWindowTags(NULL, WA_CustomScreen, (ULONG)scr, WA_Left, 0, WA_Top, top, WA_Width, scr_w,
                              WA_Height, scr_h, WA_Borderless, TRUE, WA_Backdrop, TRUE, WA_Activate, TRUE,
                              WA_ReportMouse, TRUE, WA_SimpleRefresh, TRUE, WA_IDCMP, 0, TAG_DONE);
-        if (!win) { fail("Cannot open the game window."); goto out; }
+        if (!win) { fail(T("Cannot open the game window.")); goto out; }
         win->UserPort = idcmp_port;
         ModifyIDCMP(win, IDCMP_RAWKEY | IDCMP_MOUSEBUTTONS | IDCMP_MOUSEMOVE | IDCMP_MENUPICK | IDCMP_REFRESHWINDOW);
         main_window_ptr = win;
@@ -1701,8 +1738,8 @@ static int real_main(int argc, char **argv)
         }
         if ((++title_tick & 7) == 0) {                                    /* the screen title bar shows the city's numbers */
             char t[120];
-            sprintf(t, "Micropolis %s   %s   %s   Pop %ld   %s", VERSION, status_date, status_funds, (long)CityPop,
-                    SimSpeed ? "" : "(paused)");
+            sprintf(t, "Micropolis %s   %s   %s   %s %ld   %s", VERSION, status_date, status_funds, T("Pop"), (long)CityPop,
+                    SimSpeed ? "" : T("(paused)"));
             set_screen_title(t);
         }
         sync_panels();
@@ -1743,6 +1780,7 @@ out:
     if (guide_handle) { CloseAmigaGuide(guide_handle); guide_handle = NULL; }
     if (AmigaGuideBase) CloseLibrary(AmigaGuideBase);
     if (KeymapBase) CloseLibrary(KeymapBase);
+    l10n_exit();
     logmsg("cleanup done");
     return rc;
 }
