@@ -1630,6 +1630,7 @@ static int real_main(int argc, char **argv)
     if (argc > 3 && !strcmp(argv[3], "show=eval")) open_info_panel(P_EVAL);              /* debug: open a panel at start */
     if (argc > 3 && !strcmp(argv[3], "show=graph")) open_info_panel(P_GRAPH);
     if (argc > 3 && !strcmp(argv[3], "show=budget")) DoBudgetFromMenu();
+    if (argc > 3 && !strncmp(argv[3], "at=", 3)) { int jx = 0, jy = 0; sscanf(argv[3] + 3, "%d,%d", &jx, &jy); view_x = jx; view_y = jy; clamp_view(); }   /* debug: scroll there, keep the speed */
     if (argc > 3 && !strncmp(argv[3], "speed=", 6)) do_command(CMD_PAUSE + atoi(argv[3] + 6), win, NULL);   /* debug: as the Speed menu */
     if (argc > 3 && !strcmp(argv[3], "show=map")) { open_info_panel(P_MAP); map_dirty = 1; }
     if (argc > 3 && !strncmp(argv[3], "notice=", 7)) { notice_show(atoi(argv[3] + 7)); notice_dirty = 1; }   /* debug */
