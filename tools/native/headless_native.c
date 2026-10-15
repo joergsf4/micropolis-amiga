@@ -11,6 +11,8 @@ void ui_flush(void) {}
 void ui_update_heads(void) {}
 void app_log(const char *msg) {}
 
+#include "statehash.h"
+
 static void adjacency(void)
 {
     static const int px[12] = { -1, 0, 1, 2, 2, 2, 1, 0, -1, -2, -2, -2 }, py[12] = { -2, -2, -2, -1, 0, 1, 2, 2, 2, 1, 0, -1 };
@@ -61,6 +63,12 @@ int main(int argc, char **argv)
     printf("loaded: year %d funds %ld pop %ld\n", (int)CurrentYear(), (long)TotalFunds, (long)CityPop);
     SimSpeed = 3;
     printf("at load: "); stats();
+    if (argc > 3 && !strcmp(argv[3], "hash")) {        /* deterministic run: state hashes after every month */
+        SeedRand(777);
+        state_report(0);
+        for (i = 0; i < months * 16; i++) { sim_loop(1); if ((i + 1) % 16 == 0) state_report((i + 1) / 16); }
+        return 0;
+    }
     autoBudget = 1;                    /* no budget window here: let the budget run by itself, otherwise the simulation waits for it */
     for (i = 0; i < months * 16; i++) {
         sim_loop(1);

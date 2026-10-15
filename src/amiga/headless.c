@@ -13,6 +13,8 @@ void ui_invalidate(int what) {}
 void ui_flush(void) {}
 void ui_update_heads(void) {}
 
+#include "statehash.h"
+
 static void adjacency(void)
 {
     static const int px[12] = { -1, 0, 1, 2, 2, 2, 1, 0, -1, -2, -2, -2 }, py[12] = { -2, -2, -2, -1, 0, 1, 2, 2, 2, 1, 0, -1 };
@@ -61,6 +63,15 @@ static int real_main(int argc, char **argv)
     printf("sizeof: short=%d int=%d long=%d QUAD=%d  map=%dx%d\n", (int)sizeof(short), (int)sizeof(int),
            (int)sizeof(long), (int)sizeof(QUAD), WORLD_X, WORLD_Y);
     if (argc < 2) { printf("usage: headless city.cty [months]\n"); return 5; }
+    if (argc > 3 && !strcmp(argv[3], "hash")) {            /* deterministic run: state hashes after every month */
+        sim = MakeNewSim();
+        HomeDir = ""; ResourceDir = "res"; HostName = "amiga";
+        sim_init();
+        if (!LoadCity(argv[1])) { printf("LoadCity failed\n"); return 10; }
+        SimSpeed = 3; SeedRand(777);
+        for (i = 0; i < months * 16; i++) { sim_loop(1); if ((i + 1) % 16 == 0) state_report((i + 1) / 16); }
+        return 0;
+    }
     if (argc > 3 && !strcmp(argv[3], "floattest")) {
         volatile float a = 7, b = 3, c = 1.3f, d = 600, e;
         volatile short s1 = 200, s2 = 40; volatile long l1 = 123456;

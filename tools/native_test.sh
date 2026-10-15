@@ -6,7 +6,7 @@ cd "$(dirname "$0")/.."
 OUT=out/native; mkdir -p $OUT
 CITY="${1:?city file}"; MONTHS="${2:-24}"; EVERY="${3:-6}"; shift 3 2>/dev/null || true
 # OSF1: QUAD is int (32 bit like on the Amiga); IS_INTEL: the core byte-swaps the big-endian .cty files
-CFLAGS="-DOSF1 -DIS_INTEL -std=gnu89 -w -Wno-return-mismatch -Wno-implicit-function-declaration -Wno-implicit-int -Wno-int-conversion -Wno-incompatible-pointer-types -Wno-error -fno-strict-aliasing -Isrc/core -Isrc/amiga -O1 $*"
+CFLAGS="-DOSF1 -DIS_INTEL -std=gnu89 -w -Wno-return-mismatch -Wno-implicit-function-declaration -Wno-implicit-int -Wno-int-conversion -Wno-incompatible-pointer-types -Wno-error -fno-strict-aliasing -Isrc/core -Isrc/amiga -O1 -fsingle-precision-constant -ffp-contract=off $*"
 for f in src/core/*.c src/amiga/ui_core.c tools/native/headless_native.c; do
     cc $CFLAGS -c "$f" -o "$OUT/$(basename "$f" .c).o"
 done
