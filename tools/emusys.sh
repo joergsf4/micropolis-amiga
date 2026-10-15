@@ -10,7 +10,8 @@ mkdir -p out/sys out/syswork
 [ -f out/sys/clean.hdf ] || cp -c "$HOME/dev/AmigaProjekt/workbench/hd/system.hdf" out/sys/clean.hdf
 cp -c out/sys/clean.hdf out/sys/system.hdf
 rm -rf out/syswork; mkdir -p out/syswork; cp -R "${SHAREDIR:-$HOME/dev/AmigaProjekt/workbench/share}/." out/syswork/
-rm -f out/syswork/result.txt* out/syswork/Micropolis/micropolis.log*
+rm -f out/syswork/result.txt* out/syswork/Micropolis/micropolis.log* out/syswork/Micropolis/Micropolis.prefs
+[ -n "${PREFS:-}" ] && printf "$PREFS" > out/syswork/Micropolis/Micropolis.prefs   # PREFS="ASK=0\nMODE=50051000\nSIZE=1024x768\nDEPTH=8\n"
 cp "$ROM" out/kick.rom
 printf '%s\n' "$CMD" > out/syswork/cmd.script
 printf 'FailAt 21\nAssign Picasso96: "Work:Picasso96"\nExecute Work:cmd.script >Work:result.txt\necho DONE >>Work:result.txt\n' > out/sys/us.txt

@@ -2,7 +2,7 @@ Short:        Micropolis (open-source SimCity) with RTG graphics
 Author:       Electronic Arts / Will Wright / Don Hopkins (original), Amiga port: joergsf4
 Uploader:     joergsf4
 Type:         game/strategy
-Version:      0.5.0
+Version:      0.6.0
 Requires:     AmigaOS 3.x, 68020+, RTG card (Picasso96 or CyberGraphX), 2 MB Chip + 2 MB Fast
 Architecture: m68k-amigaos >= 3.0.0
 
@@ -39,9 +39,13 @@ started from anywhere, also from a shell:
 ToolTypes of the icon (Information; remove the parentheses to switch one on):
   CITY=cities/bruce.cty   opens that city at start
   SIZE=800x600            screen size, 640x480 up to 1024x768 (the view fills the screen: more city visible)
-  MODE=ASK                choose the RTG screen mode in a requester at start
   DEBUG                   writes micropolis.log
 Command line: Micropolis [city] [SIZE=WxH] [ASK] [DEBUG]
+
+SCREEN MODE: by default Micropolis asks for the RTG screen mode at every start (screen mode requester, then
+"Always use this screen mode? - Always use it / Ask me next time"). "Always use it" saves the mode in
+ENVARC:Micropolis.prefs; the menu Options/Ask for screen mode at start switches the question on again.
+SIZE= (ToolType or argument) skips the question; the argument ASK forces it once.
 Startup problems (no RTG, no suitable screen mode, missing data) are reported in a requester.
 The Tools drawer has RTGTest (shows a colour gradient in a RTG screen - to check your setup)
 and ListModes (lists all screen modes the system knows).

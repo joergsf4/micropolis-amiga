@@ -73,6 +73,44 @@ void app_log(const char *msg)   /* progress log: when started from the Workbench
     if (f) { fputs(msg, f); fputc(10, f); fclose(f); }
 }
 
+/* ---------- preferences: screen mode ----------
+ * Default: ask for the RTG screen mode at every start. After choosing one the user can say "always use it"; the
+ * choice is saved in ENVARC:Micropolis.prefs (and ENV:), and the menu Options > "Ask for screen mode at start"
+ * switches asking on again. */
+static int pref_ask = 1;
+static ULONG pref_mode = 0xffffffffUL;          /* remembered RTG mode id, picture size and depth */
+static int pref_w, pref_h, pref_depth;
+
+static void prefs_load(void)
+{
+    static const char *const files[] = { "ENV:Micropolis.prefs", "ENVARC:Micropolis.prefs", "PROGDIR:Micropolis.prefs" };
+    for (int i = 0; i < 3; i++) {
+        FILE *f = fopen(files[i], "r");
+        char line[80];
+        if (!f) continue;
+        while (fgets(line, sizeof line, f)) {
+            unsigned long m;
+            if (!strncmp(line, "ASK=", 4)) pref_ask = atoi(line + 4);
+            else if (sscanf(line, "MODE=%lx", &m) == 1) pref_mode = (ULONG)m;
+            else if (!strncmp(line, "SIZE=", 5)) sscanf(line + 5, "%dx%d", &pref_w, &pref_h);
+            else if (!strncmp(line, "DEPTH=", 6)) pref_depth = atoi(line + 6);
+        }
+        fclose(f);
+        return;
+    }
+}
+
+static void prefs_save(void)
+{
+    static const char *const files[] = { "ENVARC:Micropolis.prefs", "ENV:Micropolis.prefs" };
+    for (int i = 0; i < 2; i++) {
+        FILE *f = fopen(files[i], "w");
+        if (!f) continue;
+        fprintf(f, "ASK=%d\nMODE=%lx\nSIZE=%dx%d\nDEPTH=%d\n", pref_ask, (unsigned long)pref_mode, pref_w, pref_h, pref_depth);
+        fclose(f);
+    }
+}
+
 static UBYTE *tiles;                   /* 960 * 256 palette indices */
 static UBYTE *objects;                 /* objects.bin */
 static UBYTE *fb;                      /* SCR_W x SCR_H chunky frame buffer */
@@ -629,7 +667,7 @@ static void render_frame(struct Window *win)
 /* ---------- menus and commands ---------- */
 enum { CMD_NEW = 1, CMD_LOAD, CMD_SAVE, CMD_SAVEAS, CMD_QUIT,
        CMD_PAUSE = 10, CMD_SLOW, CMD_MEDIUM, CMD_FAST,
-       CMD_AUTOBULLDOZE = 20, CMD_AUTOBUDGET, CMD_DISASTERS, CMD_SOUND,
+       CMD_AUTOBULLDOZE = 20, CMD_AUTOBUDGET, CMD_DISASTERS, CMD_SOUND, CMD_ASKMODE,
        CMD_ABOUT = 44, CMD_SCEN = 200, CMD_BUDGET = 40, CMD_MAP = 41, CMD_EVAL = 42, CMD_GRAPHS = 43, CMD_MAPMODE = 100,
        CMD_FIRE = 30, CMD_FLOOD, CMD_TORNADO, CMD_QUAKE, CMD_MONSTER, CMD_MELTDOWN };
 
@@ -672,6 +710,7 @@ static struct Menu *make_menus(struct Screen *scr, APTR *vi_out)
     mi(NM_ITEM, "Auto Budget", NULL, CHECKIT | MENUTOGGLE | (autoBudget ? CHECKED : 0), CMD_AUTOBUDGET);
     mi(NM_ITEM, "Disasters", NULL, CHECKIT | MENUTOGGLE | (NoDisasters ? 0 : CHECKED), CMD_DISASTERS);
     mi(NM_ITEM, "Sound", NULL, CHECKIT | MENUTOGGLE | (UserSoundOn ? CHECKED : 0), CMD_SOUND);
+    mi(NM_ITEM, "Ask for screen mode at start", NULL, CHECKIT | MENUTOGGLE | (pref_ask ? CHECKED : 0), CMD_ASKMODE);
     mi(NM_TITLE, "Windows", NULL, 0, 0);
     mi(NM_ITEM, "Budget...", "B", 0, CMD_BUDGET);
     mi(NM_ITEM, "Evaluation...", "E", 0, CMD_EVAL);
@@ -801,6 +840,12 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
     case CMD_AUTOBUDGET: autoBudget = checked; break;
     case CMD_DISASTERS: NoDisasters = !checked; break;
     case CMD_SOUND: UserSoundOn = checked; break;
+    case CMD_ASKMODE:
+        pref_ask = checked;
+        if (!pref_ask) { pref_mode = (ULONG)scr_mode_shown; pref_w = scr_w; pref_h = scr_h; pref_depth = scr_depth_shown; }   /* keep using the current mode */
+        prefs_save();
+        sprintf(status_msg, pref_ask ? "The screen mode will be asked at the next start." : "This screen mode is used from now on.");
+        break;
     case CMD_BUDGET: DoBudgetFromMenu(); break;
     case CMD_EVAL: open_info_panel(P_EVAL); break;
     case CMD_GRAPHS: open_info_panel(P_GRAPH); break;
@@ -845,7 +890,8 @@ static void fail(const char *fmt, ...)
 }
 
 static int req_w = 640, req_h = 480;      /* wanted screen size: ToolType SIZE=WxH */
-static int ask_mode_flag;                 /* MODE=ASK / argument ASK: let the user choose in a screen mode requester */
+static int ask_mode_flag;                 /* argument ASK / ToolType MODE=ASK: ask now, whatever the saved setting says */
+static int size_forced;                   /* SIZE= given: use exactly that size, do not ask */
 
 /* ToolTypes of the program's icon (PROGDIR:Micropolis.info); CLI arguments work as well */
 static char tt_city[200];
@@ -862,7 +908,7 @@ static void read_tooltypes(int argc, char **argv)
             if (dobj->do_ToolTypes) {
                 if ((v = FindToolType((CONST_STRPTR *)dobj->do_ToolTypes, (CONST_STRPTR)"CITY"))) { strncpy(tt_city, (char *)v, sizeof tt_city - 1); }
                 if (FindToolType((CONST_STRPTR *)dobj->do_ToolTypes, (CONST_STRPTR)"DEBUG")) tt_debug = 1;
-                if ((v = FindToolType((CONST_STRPTR *)dobj->do_ToolTypes, (CONST_STRPTR)"SIZE"))) sscanf((char *)v, "%dx%d", &req_w, &req_h);
+                if ((v = FindToolType((CONST_STRPTR *)dobj->do_ToolTypes, (CONST_STRPTR)"SIZE"))) { sscanf((char *)v, "%dx%d", &req_w, &req_h); size_forced = 1; }
                 if ((v = FindToolType((CONST_STRPTR *)dobj->do_ToolTypes, (CONST_STRPTR)"MODE")) && !strcasecmp((char *)v, "ASK")) ask_mode_flag = 1;
             }
             FreeDiskObject(dobj);
@@ -871,7 +917,7 @@ static void read_tooltypes(int argc, char **argv)
     for (int i = 1; i < argc; i++) {                     /* argc == 0 (Workbench): argv is not a string vector */
         if (!strcasecmp(argv[i], "debug")) tt_debug = 1;
         else if (!strncasecmp(argv[i], "depth=", 6)) force_depth = atoi(argv[i] + 6);
-        else if (!strncasecmp(argv[i], "size=", 5)) sscanf(argv[i] + 5, "%dx%d", &req_w, &req_h);
+        else if (!strncasecmp(argv[i], "size=", 5)) { sscanf(argv[i] + 5, "%dx%d", &req_w, &req_h); size_forced = 1; }
         else if (!strcasecmp(argv[i], "ask")) ask_mode_flag = 1;
     }
 }
@@ -884,11 +930,22 @@ static ULONG ask_mode(int *w, int *h, int *depth)
     if (!AslBase) return INVALID_ID;
     sr = (struct ScreenModeRequester *)AllocAslRequestTags(ASL_ScreenModeRequest,
             ASLSM_TitleText, (ULONG)"Micropolis: choose an RTG screen mode (at least 640x480)",
-            ASLSM_MinWidth, 640, ASLSM_MinHeight, 480, ASLSM_MinDepth, 8, TAG_DONE);
+            ASLSM_MinWidth, 640, ASLSM_MinHeight, 480, ASLSM_MinDepth, 8,
+            ASLSM_InitialDisplayID, (pref_mode != 0xffffffffUL) ? pref_mode : 0, TAG_DONE);
     if (sr) {
-        if (AslRequest(sr, NULL) && IsCyberModeID(sr->sm_DisplayID)) {
-            id = sr->sm_DisplayID;
-            *w = sr->sm_DisplayWidth; *h = sr->sm_DisplayHeight; *depth = sr->sm_DisplayDepth;
+        for (int tries = 0; tries < 5; tries++) {
+            if (!AslRequest(sr, NULL)) break;                      /* cancelled */
+            if (IsCyberModeID(sr->sm_DisplayID)) {
+                id = sr->sm_DisplayID;
+                *w = sr->sm_DisplayWidth; *h = sr->sm_DisplayHeight; *depth = sr->sm_DisplayDepth;
+                break;
+            }
+            {   struct EasyStruct es;                              /* the list also holds the Amiga chipset modes */
+                es.es_StructSize = sizeof(struct EasyStruct); es.es_Flags = 0;
+                es.es_Title = (CONST_STRPTR)"Micropolis"; es.es_TextFormat = (CONST_STRPTR)"That is not an RTG mode.\nPlease choose one of the RTG modes (Picasso96 / CyberGraphX).";
+                es.es_GadgetFormat = (CONST_STRPTR)"Choose again";
+                EasyRequestArgs(NULL, &es, NULL, NULL);
+            }
         }
         FreeAslRequest(sr);
     }
@@ -928,6 +985,7 @@ static int real_main(int argc, char **argv)
     GfxBase = (struct GfxBase *)OpenLibrary((CONST_STRPTR)"graphics.library", 39);
     if (!IntuitionBase || !GfxBase) { printf("Micropolis needs AmigaOS 3.0 or newer.\n"); goto out; }
     read_tooltypes(argc, argv);
+    prefs_load();
     debug_log = tt_debug;
     if (argc > 1 && strcasecmp(argv[1], "debug") && strncasecmp(argv[1], "depth=", 6) && strncasecmp(argv[1], "size=", 5) && strcasecmp(argv[1], "ask")) {
         city = argv[1];                                  /* given on the command line: relative to the current directory */
@@ -969,16 +1027,34 @@ static int real_main(int argc, char **argv)
 
     logmsg("view set");
     if (test_mode) { logmsg("test mode: stop before opening the screen"); rc = 0; goto out; }
-    if (ask_mode_flag) {
-        int w = 0, h = 0;
-        id = ask_mode(&w, &h, &depth);
-        if (id == INVALID_ID) { logmsg("mode requester cancelled"); rc = 0; goto out; }
-        req_w = w; req_h = h;
-    } else {
+    if (size_forced) {                                    /* SIZE= : exactly that, no questions */
         id = pick_mode(&depth);
+    } else {
+        int use_saved = !ask_mode_flag && !pref_ask && pref_mode != 0xffffffffUL && IsCyberModeID(pref_mode);
+        if (use_saved) {                                  /* "always use this mode" */
+            id = pref_mode; req_w = pref_w; req_h = pref_h; depth = pref_depth ? pref_depth : 8;
+        } else {
+            int w = 0, h = 0, d = 8;
+            id = ask_mode(&w, &h, &d);
+            if (id == INVALID_ID) {                       /* cancelled or no requester: take the default mode */
+                logmsg("mode requester cancelled: default mode");
+                id = pick_mode(&depth);
+            } else {
+                struct EasyStruct es;
+                ULONG args[3];
+                req_w = w; req_h = h; depth = d;
+                es.es_StructSize = sizeof(struct EasyStruct); es.es_Flags = 0;
+                es.es_Title = (CONST_STRPTR)"Micropolis"; es.es_TextFormat = (CONST_STRPTR)"Always use this screen mode (%ldx%ld, %ld bit)?\nOptions > \"Ask for screen mode at start\" turns the question on again.";
+                es.es_GadgetFormat = (CONST_STRPTR)"Always use it|Ask me next time";
+                args[0] = (ULONG)w; args[1] = (ULONG)h; args[2] = (ULONG)d;
+                pref_ask = EasyRequestArgs(NULL, &es, NULL, (APTR)args) ? 0 : 1;
+                pref_mode = id; pref_w = w; pref_h = h; pref_depth = d;
+                prefs_save();
+            }
+        }
     }
     if (id == INVALID_ID) {
-        fail("No suitable RTG screen mode found.\nMicropolis needs a mode of at least %dx%d pixels\nwith 8, 15, 16, 24 or 32 bit colour.", SCR_W, SCR_H);
+        fail("No suitable RTG screen mode found.\nMicropolis needs a mode of at least 640x480 pixels\nwith 8, 15, 16, 24 or 32 bit colour.");
         goto out;
     }
     scr_w = req_w < 640 ? 640 : req_w > MAX_W ? MAX_W : req_w;           /* the picture size we draw: 640x480 .. 1024x768 */

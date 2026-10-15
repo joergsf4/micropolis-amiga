@@ -34,8 +34,13 @@ Work:Micropolis/Micropolis my.cty          ; opens a city file (path relative to
 
 ToolTypes (icon information; remove the parentheses to switch one on): `CITY=cities/bruce.cty` city to open at start,
 `SIZE=800x600` screen size (640x480 up to 1024x768; the tile view fills the screen, so more of the city is visible),
-`MODE=ASK` pick the RTG screen mode in a requester at start, `DEBUG` write `micropolis.log`.
-Command line: `Micropolis [city] [SIZE=WxH] [ASK] [DEBUG]`. Startup problems (no RTG, no suitable screen mode, missing data) are shown in a requester.
+`DEBUG` write `micropolis.log`.
+Command line: `Micropolis [city] [SIZE=WxH] [ASK] [DEBUG]`.
+
+**Screen mode:** by default Micropolis asks for the RTG screen mode at every start (a screen mode requester, then
+"Always use this screen mode? - Always use it / Ask me next time"). With *Always use it* the mode is saved in
+`ENVARC:Micropolis.prefs` and used without asking; the menu *Options > Ask for screen mode at start* switches the
+question on again. `SIZE=` (ToolType or argument) skips the question and uses that size, `ASK` forces the question once. Startup problems (no RTG, no suitable screen mode, missing data) are shown in a requester.
 
 ## Controls
 
