@@ -44,6 +44,8 @@ ToolTypes (icon information): `CITY=cities/bruce.cty` city to open at start, `DE
 | Menus | right mouse button: Project, Speed, Options, Windows, Map, Disasters |
 | Speed | `0` pause, `1` slow, `2` medium, `3` fast, `P` pause on/off |
 | Budget | `B` or Windows > Budget (taxes, road/fire/police funding; Continue / Cancel) |
+| Evaluation | `E` or Windows > Evaluation (public opinion, worst problems, score) |
+| Graphs | `G` or Windows > Graphs (residential, commercial, industrial, money, crime, pollution; 10 or 120 years) |
 | Overview map | `M` on/off, `C` next overlay (power, traffic, pollution, crime, land value, ...) |
 | Quit | Esc or Project > Quit |
 
@@ -55,8 +57,8 @@ You can load and save cities (`.cty`, the original Micropolis format; `cities/` 
 ## Status
 
 Works: simulation, building tools, map with animation and sprites, overview map with 14 overlays,
-budget, city load/save/new random city, menus, disasters, event messages.
-Missing: evaluation window and graphs, sound, scenario selection, earthquake shake.
+budget, evaluation window, history graphs, city load/save/new random city, menus, disasters, event messages.
+Missing: sound, scenario selection, earthquake shake.
 See the [issues](../../issues).
 
 ## Troubleshooting

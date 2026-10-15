@@ -51,6 +51,8 @@ Scroll         W A S D, mouse wheel, mouse at the screen edge; in the overview m
 Menus          right mouse button
 Speed          0 pause, 1 slow, 2 medium, 3 fast, P toggles pause
 Budget         B, or menu Windows/Budget (Continue or Cancel)
+Evaluation     E, or menu Windows/Evaluation (opinion, problems, score)
+Graphs         G, or menu Windows/Graphs (6 histories, 10 or 120 years)
 Overview map   M on/off, C next overlay (14 overlays in the Map menu)
 Quit           Esc, or Project/Quit
 
@@ -60,9 +62,9 @@ Warnings and events open a message window (Continue, Return or Space closes it).
 
 STATUS
 ------
-Works: simulation, building tools, animated map, overview map with overlays, budget,
+Works: simulation, building tools, animated map, overview map with overlays, budget, evaluation, graphs,
 load/save/new random city, menus, disasters, event messages.
-Missing: evaluation window and graphs, sound, scenario selection, earthquake shake.
+Missing: sound, scenario selection, earthquake shake.
 An early crash on quitting seems fixed in 0.2 - if you still see it, please report the error number.
 
 micropolis.log is only written with the DEBUG option; attach it to bug reports.

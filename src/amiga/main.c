@@ -8,6 +8,8 @@
 #include "budget_ui.h"
 #include "mapview.h"
 #include "notice_ui.h"
+#include "eval_ui.h"
+#include "graph_ui.h"
 #include "gfx.h"
 #undef GetSprite
 #include <stdio.h>
@@ -70,8 +72,7 @@ static char status_date[32] = "", status_funds[48] = "", status_msg[96] = "";
 extern int sim_loops;
 static int dirty = 1;
 static int map_dirty = 1;
-static int budget_dirty = 1;
-static int notice_dirty = 1;
+static int budget_dirty = 1, notice_dirty = 1, eval_dirty = 1, graph_dirty = 1;   /* a panel must be redrawn */
 static int demand_r, demand_c, demand_i, demand_dirty = 1;   /* -15..15, from "UISetDemand" */
 static void clamp_view(void);
 #define MAP_X (SCR_W - MV_W - 6)
@@ -81,6 +82,7 @@ static SimView editor;                 /* the core's tools take a SimView; only 
 static int hover_x = -1, hover_y = -1; /* tile under the mouse, -1 = none */
 static int dragging;
 static int map_drag;
+static int debug_show;                  /* test option show=eval|graph: keep messages away so the panel can be photographed */
 static const int panning = 0;            /* (right button is the menu button now) */
 static int mouse_x = -1, mouse_y = -1;   /* last window position, for edge scrolling */
 
@@ -119,6 +121,7 @@ int ui_eval(const char *cmd)
         dirty = 1;
     }
     else if (!strncmp(cmd, "UISetBudget ", 12))       { budget_set_totals(cmd); budget_dirty = 1; dirty = 1; }
+    else if (!strncmp(cmd, "UISetEvaluation ", 16))  { eval_set(cmd); eval_dirty = 1; dirty = 1; }
     else if (!strncmp(cmd, "UISetBudgetValues ", 18)) { budget_set_values(cmd); dirty = 1; }
     else if (!strncmp(cmd, "UIShowBudgetAndWait", 19)) { budget_show(); budget_dirty = 1; dirty = 1; }
     else if (!strncmp(cmd, "UISetDemand ", 12)) {
@@ -191,7 +194,7 @@ static short shown[VIEW_ROWS][VIEW_COLS];       /* tile id last drawn in each ce
 static UBYTE redraw[VIEW_ROWS][VIEW_COLS];
 static int full_redraw = 1;                     /* start, scroll, panel closed: redraw all cells */
 static int toolbar_dirty = 1, first_present = 1, status_dirty = 1;
-static int last_map_visible, last_budget_visible, last_notice_visible;
+static int last_map_visible;
 static int last_view_x = -1, last_view_y = -1;
 #define MAX_SPR 48
 static struct rect prev_spr[MAX_SPR];
@@ -303,6 +306,43 @@ static void mark_rect(const struct rect *r)
         for (int x = c0; x <= c1; x++) redraw[y][x] = 1;
 }
 
+/* Modal panels (messages, budget, evaluation, graphs). Index 0 is the topmost one. They are drawn over the map
+ * into the frame buffer; the cells fully covered by a visible panel are not redrawn at all. */
+struct panel {
+    int *visible, *dirty, last_visible, redraw;
+    struct rect r;
+    void (*draw)(void);                      /* panel graphics + text into fb */
+    int (*click)(int x, int y);
+    void (*close)(void);                     /* Esc / Return / Space */
+};
+enum { P_NOTICE, P_BUDGET, P_EVAL, P_GRAPH, NPANELS };
+static void draw_notice(void) { notice_draw(fb, SCR_W); notice_text(); }
+static void draw_budget(void) { budget_draw(fb, SCR_W); budget_text(); }
+static void draw_eval(void)   { eval_draw(fb, SCR_W); }
+static void draw_graph(void)  { graph_draw(fb, SCR_W); }
+static void close_notice(void) { notice_close(); }
+static struct panel panels[NPANELS] = {
+    { &notice_visible, &notice_dirty, 0, 0, { NOTICE_X, NOTICE_Y, NOTICE_X + NOTICE_W - 1, NOTICE_Y + NOTICE_H - 1 }, draw_notice, notice_click, close_notice },
+    { &budget_visible, &budget_dirty, 0, 0, { BUDGET_X, BUDGET_Y, BUDGET_X + BUDGET_W - 1, BUDGET_Y + BUDGET_H - 1 }, draw_budget, budget_click, budget_key_close },
+    { &eval_visible,   &eval_dirty, 0, 0, { EVAL_X, EVAL_Y, EVAL_X + EVAL_W - 1, EVAL_Y + EVAL_H - 1 }, draw_eval, eval_click, eval_close },
+    { &graph_visible,  &graph_dirty, 0, 0, { GRAPH_X, GRAPH_Y, GRAPH_X + GRAPH_W - 1, GRAPH_Y + GRAPH_H - 1 }, draw_graph, graph_click, graph_close },
+};
+
+static int top_panel(void)                   /* the visible panel that gets the input, or -1 */
+{
+    for (int i = 0; i < NPANELS; i++) if (*panels[i].visible) return i;
+    return -1;
+}
+
+static void open_info_panel(int which)       /* evaluation / graphs: one at a time, not over a message or the budget */
+{
+    if (notice_visible || budget_visible) return;
+    if (*panels[which].visible) { panels[which].close(); return; }
+    eval_visible = graph_visible = 0;
+    *panels[which].visible = 1;
+    *panels[which].dirty = 1;
+}
+
 static int overlaps(const struct rect *a, int x0, int y0, int x1, int y1)
 {
     return !(a->x1 < x0 || a->x0 > x1 || a->y1 < y0 || a->y0 > y1);
@@ -354,18 +394,19 @@ static void render_frame(struct Window *win)
     struct rect cur_spr[MAX_SPR], cur;
     const UBYTE *spr_px[MAX_SPR];
     int spr_w[MAX_SPR], spr_h[MAX_SPR], n_spr = 0;
-    int have_cursor, map_need = 0, budget_redraw = budget_dirty, notice_redraw = notice_dirty;
+    int have_cursor, map_need = 0;
     struct rect maprect = { MAP_X - 1, MAP_Y - 1, MAP_X + MV_W, MAP_Y + MV_H };
-    struct rect notrect = { NOTICE_X, NOTICE_Y, NOTICE_X + NOTICE_W - 1, NOTICE_Y + NOTICE_H - 1 };
-    struct rect budrect = { BUDGET_X, BUDGET_Y, BUDGET_X + BUDGET_W - 1, BUDGET_Y + BUDGET_H - 1 };
 
     gettimeofday(&t_a, NULL);
     if (!map_visible && last_map_visible) full_redraw = 1;           /* cells under the panel are stale */
-    if (!budget_visible && last_budget_visible) full_redraw = 1;
-    if (!notice_visible && last_notice_visible) full_redraw = 1;
-    if (budget_visible && !last_budget_visible) budget_dirty = 1;
-    if (notice_visible && !last_notice_visible) { notice_dirty = 1; notice_redraw = 1; }
-    last_map_visible = map_visible; last_budget_visible = budget_visible; last_notice_visible = notice_visible;
+    for (int i = 0; i < NPANELS; i++) {
+        struct panel *pn = &panels[i];
+        if (!*pn->visible && pn->last_visible) full_redraw = 1;
+        if (*pn->visible && !pn->last_visible) *pn->dirty = 1;
+        pn->last_visible = *pn->visible;
+        pn->redraw = *pn->visible && *pn->dirty;
+    }
+    last_map_visible = map_visible;
     if (view_x != last_view_x || view_y != last_view_y) { full_redraw = 1; last_view_x = view_x; last_view_y = view_y; }
     if (full_redraw) {
         memset(redraw, 1, sizeof redraw);
@@ -412,17 +453,18 @@ static void render_frame(struct Window *win)
             if (map_visible && cell.x0 >= maprect.x0 && cell.x1 <= maprect.x1 && cell.y0 >= maprect.y0 && cell.y1 <= maprect.y1) {
                 redraw[row][col] = 0; shown[row][col] = -1; continue;
             }
-            if (budget_visible && cell.x0 >= budrect.x0 && cell.x1 <= budrect.x1 && cell.y0 >= budrect.y0 && cell.y1 <= budrect.y1) {
-                redraw[row][col] = 0; shown[row][col] = -1; continue;
-            }
-            if (notice_visible && cell.x0 >= notrect.x0 && cell.x1 <= notrect.x1 && cell.y0 >= notrect.y0 && cell.y1 <= notrect.y1) {
-                redraw[row][col] = 0; shown[row][col] = -1; continue;
+            {   int covered = 0;
+                for (int i = 0; i < NPANELS; i++) {
+                    const struct rect *pr = &panels[i].r;
+                    if (*panels[i].visible && cell.x0 >= pr->x0 && cell.x1 <= pr->x1 && cell.y0 >= pr->y0 && cell.y1 <= pr->y1) covered = 1;
+                }
+                if (covered) { redraw[row][col] = 0; shown[row][col] = -1; continue; }
             }
             draw_tile(col, row, shown[row][col]);
             stats.tiles++;
-            if (notice_visible && overlaps(&cell, notrect.x0, notrect.y0, notrect.x1, notrect.y1)) notice_redraw = 1;
+            for (int i = 0; i < NPANELS; i++)
+                if (*panels[i].visible && overlaps(&cell, panels[i].r.x0, panels[i].r.y0, panels[i].r.x1, panels[i].r.y1)) panels[i].redraw = 1;
             if (map_visible && overlaps(&cell, maprect.x0, maprect.y0, maprect.x1, maprect.y1)) map_need = 1;
-            if (budget_visible && overlaps(&cell, budrect.x0, budrect.y0, budrect.x1, budrect.y1)) budget_redraw = 1;
         }
     }
     for (int i = 0; i < n_spr; i++) draw_sprite(&cur_spr[i], spr_px[i], spr_w[i], spr_h[i]);
@@ -454,8 +496,13 @@ static void render_frame(struct Window *win)
         if (map_dirty || sim_loops - last_loops >= 16) { map_refresh(); map_dirty = 0; last_loops = sim_loops; map_need = 1; }
         if (map_need) map_blit(fb, SCR_W, MAP_X, MAP_Y, view_x, view_y, VIEW_COLS, VIEW_ROWS);
     }
-    if (budget_visible && budget_redraw) { budget_draw(fb, SCR_W); budget_text(); }
-    if (notice_visible && notice_redraw) { notice_draw(fb, SCR_W); notice_text(); }
+    gfx_target(fb, SCR_W);
+    for (int i = NPANELS - 1; i >= 0; i--) {                 /* lowest first, so the topmost ends up on top */
+        if (!*panels[i].visible) continue;
+        for (int j = i + 1; j < NPANELS; j++)                 /* a lower panel that redraws forces the ones above it, too */
+            if (*panels[j].visible && panels[j].redraw && overlaps(&panels[i].r, panels[j].r.x0, panels[j].r.y0, panels[j].r.x1, panels[j].r.y1)) panels[i].redraw = 1;
+        if (panels[i].redraw) panels[i].draw();
+    }
     if (demand_dirty) {
         draw_demand();
         gfx_colors(PEN_TEXT, PEN_BAR);
@@ -480,15 +527,15 @@ static void render_frame(struct Window *win)
         }
         if (toolbar_dirty) blit(rp, 0, BAR_H, TB_W, SCR_H - BAR_H);
         if (map_visible && map_need) blit(rp, maprect.x0, maprect.y0, maprect.x1 - maprect.x0 + 1, maprect.y1 - maprect.y0 + 1);
-        if (budget_visible && budget_redraw) blit(rp, budrect.x0, budrect.y0, BUDGET_W, BUDGET_H);
-        if (notice_visible && notice_redraw) blit(rp, notrect.x0, notrect.y0, NOTICE_W, NOTICE_H);
+        for (int i = 0; i < NPANELS; i++)
+            if (*panels[i].visible && panels[i].redraw)
+                blit(rp, panels[i].r.x0, panels[i].r.y0, panels[i].r.x1 - panels[i].r.x0 + 1, panels[i].r.y1 - panels[i].r.y0 + 1);
         if (demand_dirty) blit(rp, DEM_X, DEM_Y, DEM_W, DEM_H);
         if (status_dirty) blit(rp, 0, 0, DEM_X, BAR_H);
     }
 
     toolbar_dirty = 0; status_dirty = 0; demand_dirty = 0;
-    if (budget_visible && budget_redraw) budget_dirty = 0;
-    if (notice_visible && notice_redraw) notice_dirty = 0;
+    for (int i = 0; i < NPANELS; i++) if (panels[i].redraw) *panels[i].dirty = 0;
 
     if (++stats.frames >= 200) {                     /* performance log for tuning on slow machines */
         char b[160];
@@ -504,7 +551,7 @@ static void render_frame(struct Window *win)
 enum { CMD_NEW = 1, CMD_LOAD, CMD_SAVE, CMD_SAVEAS, CMD_QUIT,
        CMD_PAUSE = 10, CMD_SLOW, CMD_MEDIUM, CMD_FAST,
        CMD_AUTOBULLDOZE = 20, CMD_AUTOBUDGET, CMD_DISASTERS, CMD_SOUND,
-       CMD_BUDGET = 40, CMD_MAP = 41, CMD_MAPMODE = 100,
+       CMD_BUDGET = 40, CMD_MAP = 41, CMD_EVAL = 42, CMD_GRAPHS = 43, CMD_MAPMODE = 100,
        CMD_FIRE = 30, CMD_FLOOD, CMD_TORNADO, CMD_QUAKE, CMD_MONSTER, CMD_MELTDOWN };
 
 static struct NewMenu newmenu[40];
@@ -540,6 +587,8 @@ static struct Menu *make_menus(struct Screen *scr, APTR *vi_out)
     mi(NM_ITEM, "Sound", NULL, CHECKIT | MENUTOGGLE | (UserSoundOn ? CHECKED : 0), CMD_SOUND);
     mi(NM_TITLE, "Windows", NULL, 0, 0);
     mi(NM_ITEM, "Budget...", "B", 0, CMD_BUDGET);
+    mi(NM_ITEM, "Evaluation...", "E", 0, CMD_EVAL);
+    mi(NM_ITEM, "Graphs...", "G", 0, CMD_GRAPHS);
     mi(NM_TITLE, "Map", NULL, 0, 0);
     mi(NM_ITEM, "Show Map", "M", CHECKIT | MENUTOGGLE | (map_visible ? CHECKED : 0), CMD_MAP);
     mi(NM_ITEM, (const char *)NM_BARLABEL, NULL, 0, 0);
@@ -622,6 +671,8 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
     case CMD_DISASTERS: NoDisasters = !checked; break;
     case CMD_SOUND: UserSoundOn = checked; break;
     case CMD_BUDGET: DoBudgetFromMenu(); break;
+    case CMD_EVAL: open_info_panel(P_EVAL); break;
+    case CMD_GRAPHS: open_info_panel(P_GRAPH); break;
     case CMD_MAP: map_visible = checked; map_dirty = 1; break;
     case CMD_FIRE: MakeFire(); break;
     case CMD_FLOOD: MakeFlood(); break;
@@ -796,6 +847,9 @@ static int real_main(int argc, char **argv)
     }
     editor.tool_state = queryState;
     setSpeed(3);
+    if (argc > 3 && !strncmp(argv[3], "show=", 5)) debug_show = 1;
+    if (argc > 3 && !strcmp(argv[3], "show=eval")) open_info_panel(P_EVAL);              /* debug: open a panel at start */
+    if (argc > 3 && !strcmp(argv[3], "show=graph")) open_info_panel(P_GRAPH);
     if (argc > 3 && !strncmp(argv[3], "notice=", 7)) { notice_show(atoi(argv[3] + 7)); notice_dirty = 1; }   /* debug */
     int running = 1, tick = 0, frame = 0;
     static const int delay[4] = { 0, 12, 4, 1 };      /* video frames per simulation step */
@@ -826,9 +880,10 @@ static int real_main(int argc, char **argv)
                 case 0x21: view_y++; break;
                 case 0x22: view_x++; break;
                 case 0x20: view_x--; break;
-                case 0x45: if (notice_visible) { notice_close(); notice_dirty = 1; } else if (budget_visible) budget_key_close(); else running = 0; break;   /* Esc */
-                case 0x44: if (notice_visible) notice_close(); else budget_key_close(); break;   /* Return */
-                case 0x40: if (notice_visible) notice_close(); break;                             /* Space */
+                case 0x45: { int tp = top_panel(); if (tp >= 0) panels[tp].close(); else running = 0; } break;   /* Esc */
+                case 0x44: case 0x40: { int tp = top_panel(); if (tp >= 0) panels[tp].close(); } break;          /* Return, Space */
+                case 0x12: open_info_panel(P_EVAL); break;                    /* E */
+                case 0x24: open_info_panel(P_GRAPH); break;                   /* G */
                 case 0x4c: view_y--; break;                               /* cursor keys scroll */
                 case 0x4d: view_y++; break;
                 case 0x4e: view_x++; break;
@@ -848,18 +903,13 @@ static int real_main(int argc, char **argv)
                 int inview = mx >= TB_W && my >= BAR_H;
                 int wx = (view_x << 4) + (mx - TB_W), wy = (view_y << 4) + (my - BAR_H);
                 mouse_x = mx; mouse_y = my;
-                if (notice_visible) {
-                    hover_x = -1;
-                    if (cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) { notice_click(mx, my); notice_dirty = 1; }
-                    dirty = 1;
-                    continue;
-                }
-                if (budget_visible) {
-                    hover_x = -1;
-                    if (cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) budget_click(mx, my);
-                    if (cls == IDCMP_MOUSEBUTTONS) budget_dirty = 1;
-                    dirty = 1;
-                    continue;
+                {   int tp = top_panel();
+                    if (tp >= 0) {                                    /* a panel is open: it gets all clicks */
+                        hover_x = -1;
+                        if (cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) { panels[tp].click(mx, my); *panels[tp].dirty = 1; }
+                        dirty = 1;
+                        continue;
+                    }
                 }
                 if (inview) { hover_x = wx >> 4; hover_y = wy >> 4; } else hover_x = -1;
                 if (map_visible && ((cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) || (cls == IDCMP_MOUSEMOVE && map_drag))) {
@@ -897,6 +947,7 @@ static int real_main(int argc, char **argv)
             clamp_view();
             if (ox != view_x || oy != view_y) dirty = 1;
         }
+        if (debug_show && notice_visible) notice_close();
         if (SimSpeed && ++tick >= delay[SimSpeed]) {
             struct timeval t0, t1;
             tick = 0;
