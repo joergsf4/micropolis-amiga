@@ -56,7 +56,7 @@ question on again. `SIZE=` (ToolType or argument) skips the question and uses th
 | Action | How |
 |---|---|
 | Query | the Query tool shows zone, density, land value, crime, pollution and growth in a box at the top right (click it or Esc to close) |
-| Choose a tool | click the button on the left (Query, Bulldozer, Roads, Rails, Wires, Parks, zones, power plants, ..., Chalk and Eraser for notes on the map) |
+| Choose a tool | (hover an icon to see its name and cost at the top of the palette) click the button on the left (Query, Bulldozer, Roads, Rails, Wires, Parks, zones, power plants, ..., Chalk and Eraser for notes on the map) |
 | Build | click or drag on the map; the white frame shows what will be built |
 | Scroll | W A S D, mouse wheel, or move the mouse to the screen edge. With the overview map open: click or drag in it |
 | Menus | right mouse button: Project, Speed, Options, Windows, Map, Disasters |

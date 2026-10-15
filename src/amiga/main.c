@@ -397,6 +397,18 @@ static void draw_cursor(const struct rect *r)
     vline(r->x0, r->y0, r->y1, PEN_TEXT); vline(r->x1, r->y0, r->y1, PEN_TEXT);
 }
 
+static int tool_hover = -1;            /* tool icon under the mouse: its name and cost show in the label (a fixed-place tooltip) */
+
+static int tool_at(int mx, int my)
+{
+    if (mx >= TB_W || my < BAR_H) return -1;
+    for (int i = 0; i < NTOOLS; i++) {
+        int w = toolicons ? toolicons[2 + i * 10] : 34, h = toolicons ? toolicons[2 + i * 10 + 1] : 34;
+        if (mx >= tooldef[i].x && mx < tooldef[i].x + w && my >= BAR_H + tooldef[i].y && my < BAR_H + tooldef[i].y + h) return i;
+    }
+    return -1;
+}
+
 static void draw_toolbar(void)
 {
     char line[40];
@@ -413,13 +425,15 @@ static void draw_toolbar(void)
             }
         }
     }
-    if (editor.tool_state >= 0 && editor.tool_state < NTOOLS) {               /* name and cost of the chosen tool */
-        gfx_target(fb, SCR_W);
-        gfx_colors(PEN_TEXT, PEN_BAR);
-        sprintf(line, "%-17.17s", tooldef[editor.tool_state].name);
-        gfx_print(6, BAR_H + 22, line);
-        if (tooldef[editor.tool_state].cost) sprintf(line, "Cost: $%-8d", tooldef[editor.tool_state].cost); else strcpy(line, "                ");
-        gfx_print(6, BAR_H + 40, line);
+    {   int t = tool_hover >= 0 ? tool_hover : editor.tool_state;              /* name and cost of the tool under the mouse, else of the chosen one */
+        if (t >= 0 && t < NTOOLS) {
+            gfx_target(fb, SCR_W);
+            gfx_colors(tool_hover >= 0 ? PEN_V_YELLOW : PEN_TEXT, PEN_BAR);
+            sprintf(line, "%-17.17s", tooldef[t].name);
+            gfx_print(6, BAR_H + 22, line);
+            if (tooldef[t].cost) sprintf(line, "Cost: $%-8d", tooldef[t].cost); else strcpy(line, "                ");
+            gfx_print(6, BAR_H + 40, line);
+        }
     }
 }
 
@@ -1425,6 +1439,7 @@ static int real_main(int argc, char **argv)
     }
     if (argc > 3 && !strcmp(argv[3], "quake")) { MakeEarthquake(); }   /* debug */
     if (argc > 3 && !strcmp(argv[3], "help")) show_help();
+    if (argc > 3 && !strncmp(argv[3], "hover=", 6)) tool_hover = atoi(argv[3] + 6);   /* debug */
     if (argc > 3 && !strncmp(argv[3], "chalk", 5)) {                 /* debug: a note on the map */
         int bx = (view_x + 8) << 4, by = (view_y + 6) << 4;
         editor.tool_state = chalkState;
@@ -1535,15 +1550,14 @@ static int real_main(int argc, char **argv)
                 int inview = mx >= TB_W && my >= BAR_H;
                 int wx = (view_x << 4) + (mx - TB_W), wy = (view_y << 4) + (my - BAR_H);
                 mouse_x = mx; mouse_y = my;
+                {   int th = tool_at(mx, my);
+                    if (th != tool_hover) { tool_hover = th; toolbar_dirty = 1; }
+                }
                 if (inview) { hover_x = wx >> 4; hover_y = wy >> 4; } else hover_x = -1;
                 if (cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) {
                     if (mx < TB_W && my >= BAR_H) {
-                        int i;
-                        for (i = 0; i < NTOOLS; i++) {
-                            int w = toolicons ? toolicons[2 + i * 10] : 34, h = toolicons ? toolicons[2 + i * 10 + 1] : 34;
-                            if (mx >= tooldef[i].x && mx < tooldef[i].x + w && my >= BAR_H + tooldef[i].y && my < BAR_H + tooldef[i].y + h) break;
-                        }
-                        if (i < NTOOLS) {
+                        int i = tool_at(mx, my);
+                        if (i >= 0) {
                             static const char *const tool_sound[18] = { "res", "com", "ind", "fire", "query", "police", "wire", "bulldozer", "rail",
                                                                          "road", "chalk", "eraser", "stadium", "park", "seaport", "coal", "nuclear", "airport" };
                             editor.tool_state = i; toolbar_dirty = 1;
