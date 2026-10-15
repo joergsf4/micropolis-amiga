@@ -739,7 +739,7 @@ static void render_frame(struct Window *win)
 /* ---------- menus and commands ---------- */
 enum { CMD_NEW = 1, CMD_LOAD, CMD_SAVE, CMD_SAVEAS, CMD_QUIT,
        CMD_PAUSE = 10, CMD_SLOW, CMD_MEDIUM, CMD_FAST,
-       CMD_AUTOBULLDOZE = 20, CMD_AUTOBUDGET, CMD_DISASTERS, CMD_SOUND, CMD_ASKMODE, CMD_AUTOGO, CMD_ANIM, CMD_MSGS, CMD_NOTICES, CMD_OVERLAY, CMD_LEVEL = 60,
+       CMD_AUTOBULLDOZE = 20, CMD_AUTOBUDGET, CMD_DISASTERS, CMD_SOUND, CMD_ASKMODE, CMD_AUTOGO, CMD_ANIM, CMD_MSGS, CMD_NOTICES, CMD_OVERLAY, CMD_LEVEL = 60, CMD_SAYDEM = 64,
        CMD_ABOUT = 44, CMD_SCEN = 200, CMD_BUDGET = 40, CMD_MAP = 41, CMD_EVAL = 42, CMD_GRAPHS = 43, CMD_MAPMODE = 100,
        CMD_FIRE = 30, CMD_FLOOD, CMD_TORNADO, CMD_QUAKE, CMD_MONSTER, CMD_MELTDOWN };
 
@@ -796,6 +796,7 @@ static struct Menu *make_menus(struct Screen *scr, APTR *vi_out)
     mi(NM_ITEM, "Budget...", "B", 0, CMD_BUDGET);
     mi(NM_ITEM, "Evaluation...", "E", 0, CMD_EVAL);
     mi(NM_ITEM, "Graphs...", "G", 0, CMD_GRAPHS);
+    mi(NM_ITEM, "Say demands", NULL, 0, CMD_SAYDEM);
     mi(NM_TITLE, "Map", NULL, 0, 0);
     mi(NM_ITEM, "Map window on/off", "M", 0, CMD_MAP);
     mi(NM_ITEM, "Next overlay", "C", 0, CMD_OVERLAY);
@@ -933,6 +934,14 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
     case CMD_ANIM: DoAnimation = checked; MustUpdateOptions = 1; full_redraw = 1; break;
     case CMD_MSGS: DoMessages = checked; MustUpdateOptions = 1; break;
     case CMD_NOTICES: DoNotices = checked; MustUpdateOptions = 1; break;
+    case CMD_SAYDEM: {
+        int v[3] = { demand_r, demand_c, demand_i };
+        static const char *const nm[3] = { "o", "a", "e" };
+        for (int k = 0; k < 3; k++) {
+            int pct = 100 + v[k] * 3;
+            sound_play_later(nm[k], pct < 40 ? 40 : pct > 250 ? 250 : pct, 20 + 200 * k);
+        }
+        break; }
     case CMD_OVERLAY: map_mode = (map_mode + 1) % MAP_MODES; map_visible = 1; map_dirty = 1; map_panel_dirty = 1; sprintf(status_msg, "Map: %s", map_names[map_mode]); break;
     case CMD_ASKMODE:
         pref_ask = checked;
@@ -1376,10 +1385,12 @@ static int real_main(int argc, char **argv)
                         }
                     } else if (inview) {
                         ToolDown(&editor, wx, wy);
+                        if (UserSoundOn && editor.tool_state == dozeState) sound_loop(1);
                         dragging = 1;
                     }
                 } else if (cls == IDCMP_MOUSEBUTTONS && code == SELECTUP) {
                     if (dragging && inview) ToolUp(&editor, wx, wy);
+                    sound_loop(0);
                     dragging = 0;
                 } else if (cls == IDCMP_MOUSEMOVE && dragging && inview) {
                     ToolDrag(&editor, wx, wy);
