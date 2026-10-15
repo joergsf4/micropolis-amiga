@@ -14,7 +14,7 @@ python3 tools/make_icons.py "$OUT/icons" >/dev/null
 cp "$OUT/icons/Micropolis-drawer.info" "$D/Micropolis.info"
 cp out/micropolis "$D/Micropolis/Micropolis"; cp "$OUT/icons/Micropolis.info" "$D/Micropolis/Micropolis.info"
 cp release/ReadMe "$D/Micropolis/ReadMe"; cp "$OUT/icons/ReadMe.info" "$D/Micropolis/ReadMe.info"
-cp COPYING "$D/Micropolis/COPYING"
+cp COPYING "$D/Micropolis/COPYING"; cp release/Micropolis.guide "$D/Micropolis/Micropolis.guide"
 cp out/rtgtest "$D/Micropolis/Tools/RTGTest"; cp out/listmodes "$D/Micropolis/Tools/ListModes"
 cp -R "$SHARE"/res/. "$D/Micropolis/res/"
 cp "$SHARE"/cities/*.cty "$D/Micropolis/cities/"

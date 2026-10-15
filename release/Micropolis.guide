@@ -1,0 +1,135 @@
+@database Micropolis.guide
+@$VER: Micropolis.guide 0.8
+@author "Micropolis for AmigaOS"
+@(c) "GPL-3, see COPYING"
+@index INDEX
+@wordwrap
+
+@node MAIN "Micropolis - Help"
+
+  @{b}Micropolis for AmigaOS@{ub}
+
+  Build and run a city. The simulation is the original Micropolis
+  (SimCity) code; the user interface is a native Intuition/RTG one.
+
+  @{" Getting started     " link START}
+  @{" Building tools      " link TOOLS}
+  @{" Keyboard and mouse  " link KEYS}
+  @{" Windows             " link WINDOWS}
+  @{" Menus               " link MENUS}
+  @{" The R C I bars      " link DEMAND}
+  @{" Scenarios           " link SCENARIOS}
+  @{" Screen mode and settings " link SETTINGS}
+  @{" Cheat words         " link CHEATS}
+  @{" Index               " link INDEX}
+@endnode
+
+@node START "Getting started"
+@toc MAIN
+
+  1. Pick a tool on the left (the Query tool is active at the start).
+  2. Click or drag on the map. The white frame shows what will be built.
+  3. Zones (Resid, Comm, Indus) only grow when they have power
+     (power plant plus wires) and roads. Keep an eye on the R C I bars.
+  4. Open the budget (menu Windows/Budget) to set taxes and funding.
+
+  Speed: keys 0 (pause) to 3 (fast), or the Speed menu.
+@endnode
+
+@node TOOLS "Building tools"
+@toc MAIN
+
+  Query   zone status box (density, land value, crime, pollution)
+  Doze    bulldozer: removes anything, cost 1
+  Road    10 per tile        Rail  20 per tile       Wire  5 per tile
+  Park    10                 Resid/Comm/Indus  100 each (3x3 zones)
+  Fire    500 fire station   Polic 500 police station
+  Stadm   5000 stadium       Coal  3000 coal power plant
+  Nucl    5000 nuclear plant Sea   3000 sea port   Airp  10000 airport
+
+  Roads and wires over water are built as bridges and cost more.
+  Auto Bulldoze (menu Options) clears rubble automatically.
+@endnode
+
+@node KEYS "Keyboard and mouse"
+@toc MAIN
+
+  Left mouse button   use the tool / click buttons
+  Right mouse button  menus
+  W A S D, mouse wheel, mouse at the screen edge   scroll
+  0 1 2 3             pause, slow, medium, fast
+  b r p t x z         tool shortcuts as in the original (bulldozer,
+                      road, park, wire, rail, query)
+  Esc                 closes the active window; quits when none is open
+  Help                this guide
+
+  In the overview map: click or drag to scroll the city.
+@endnode
+
+@node WINDOWS "Windows"
+@toc MAIN
+
+  Messages, Budget, Evaluation, Graphs, the Query box and the overview
+  Map are normal Amiga windows on the game screen: drag them by the
+  title bar and close them with the close gadget (the budget window's
+  close gadget means Continue).
+
+  The screen title bar can be dragged down to see the Workbench.
+@endnode
+
+@node MENUS "Menus"
+@toc MAIN
+
+  Project    new city, load, save, About, Help, quit
+  Speed      pause / slow / medium / fast
+  Options    auto bulldoze, auto budget, disasters, sound, auto goto,
+             animation, messages, message windows, ask screen mode
+  Level      Easy / Medium / Hard (start funds of a new city)
+  Windows    budget, evaluation, graphs, map
+  Map        overlays: power, traffic, pollution, crime, land value ...
+  Disasters  fire, flood, tornado, earthquake, monster, meltdown
+  Scenarios  historic cities with a story and a goal
+@endnode
+
+@node DEMAND "The R C I bars"
+@toc MAIN
+
+  The three bars at the top right show the demand for Residential,
+  Commercial and Industrial zones. Up means people want more of it,
+  down means there is too much.
+@endnode
+
+@node SCENARIOS "Scenarios"
+@toc MAIN
+
+  Dullsville 1900, San Francisco 1906 (earthquake), Hamburg 1944 (fire
+  bombing), Bern 1965 (traffic), Tokyo 1957 (monster), Detroit 1972
+  (crime), Boston 2010 (nuclear meltdown), Rio de Janeiro 2047 (flood).
+  Each has a time limit and a goal; the story is shown when it starts.
+@endnode
+
+@node SETTINGS "Screen mode and settings"
+@toc MAIN
+
+  At start a screen mode requester lists the usable RTG modes (640x480
+  up to 800x600). You can choose "always use it"; Options/Ask for screen
+  mode at start turns the question on again.
+
+  Settings are stored in ENVARC:Micropolis.prefs. ToolTypes of the icon:
+  SIZE=800x600 (fixed size, no question), CITY=<file>.
+@endnode
+
+@node CHEATS "Cheat words"
+@toc MAIN
+
+  As in the original, a few words typed in the game window have effects
+  (for example "fund"). They are meant for fun; try them at your own risk.
+@endnode
+
+@node INDEX "Index"
+@toc MAIN
+
+  @{"Budget" link MENUS}   @{"Cheats" link CHEATS}   @{"Keys" link KEYS}
+  @{"Scenarios" link SCENARIOS}   @{"Screen mode" link SETTINGS}
+  @{"Tools" link TOOLS}   @{"Windows" link WINDOWS}
+@endnode

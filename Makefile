@@ -16,6 +16,7 @@ all: out/micropolis out/headless out/rtgtest out/listmodes out/tonetest data
 	cp out/icons/Micropolis.info $(DEST)/micropolis.info
 	cp out/icons/Micropolis-drawer.info $(DEST)/../Micropolis.info
 	cp release/ReadMe $(DEST)/ReadMe; cp out/icons/ReadMe.info $(DEST)/ReadMe.info
+	cp release/Micropolis.guide $(DEST)/Micropolis.guide
 	cp COPYING $(DEST)/COPYING
 
 out/obj/core/%.o: src/core/%.c $(wildcard src/core/*.h)

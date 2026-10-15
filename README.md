@@ -69,6 +69,7 @@ question on again. `SIZE=` (ToolType or argument) skips the question and uses th
 | Tool keys | as in the original: `b` bulldozer, `r` road, `p` park, `t` wire, `x` rail, `z` zone query; typed cheat words (e.g. `fund`) work too |
 | Level | menu Level: Easy / Medium / Hard (start funds of a new city; saved in the preferences) |
 | Options | Auto Goto, Animation, Messages, Message windows can be switched off in the Options menu |
+| Help | `Help` key or Project > Help (AmigaGuide document `Micropolis.guide`) |
 | Quit | Esc or Project > Quit |
 | Version | Project > About Micropolis (version, build, CPU, screen mode, free memory) |
 

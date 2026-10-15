@@ -34,6 +34,8 @@
 #include <proto/cybergraphics.h>
 #include <proto/icon.h>
 #include <proto/keymap.h>
+#include <libraries/amigaguide.h>
+#include <proto/amigaguide.h>
 #include <devices/inputevent.h>
 #include <utility/hooks.h>
 #include <workbench/startup.h>
@@ -50,6 +52,9 @@ struct Library *GadToolsBase;
 struct Library *AslBase;
 struct Library *IconBase;
 struct Library *KeymapBase;
+struct Library *AmigaGuideBase;
+static APTR guide_handle;
+static char guide_path[200];                       /* open help document */
 
 /* Screen size: 640x480 by default, up to MAX_W x MAX_H (ToolType SIZE=800x600, or MODE=ASK for a mode requester).
  * The tile view fills the screen, so a bigger screen shows more of the city. */
@@ -740,7 +745,7 @@ static void render_frame(struct Window *win)
 enum { CMD_NEW = 1, CMD_LOAD, CMD_SAVE, CMD_SAVEAS, CMD_QUIT,
        CMD_PAUSE = 10, CMD_SLOW, CMD_MEDIUM, CMD_FAST,
        CMD_AUTOBULLDOZE = 20, CMD_AUTOBUDGET, CMD_DISASTERS, CMD_SOUND, CMD_ASKMODE, CMD_AUTOGO, CMD_ANIM, CMD_MSGS, CMD_NOTICES, CMD_OVERLAY, CMD_LEVEL = 60,
-       CMD_ABOUT = 44, CMD_SCEN = 200, CMD_BUDGET = 40, CMD_MAP = 41, CMD_EVAL = 42, CMD_GRAPHS = 43, CMD_MAPMODE = 100,
+       CMD_ABOUT = 44, CMD_HELP = 45, CMD_SCEN = 200, CMD_BUDGET = 40, CMD_MAP = 41, CMD_EVAL = 42, CMD_GRAPHS = 43, CMD_MAPMODE = 100,
        CMD_FIRE = 30, CMD_FLOOD, CMD_TORNADO, CMD_QUAKE, CMD_MONSTER, CMD_MELTDOWN };
 
 static struct NewMenu newmenu[64];                      /* the menus have about 48 entries */
@@ -760,6 +765,7 @@ static struct Menu *make_menus(struct Screen *scr, APTR *vi_out)
     struct Menu *menu;
     nmenu = 0;
     mi(NM_TITLE, "Project", NULL, 0, 0);
+    mi(NM_ITEM, "Help...", NULL, 0, CMD_HELP);
     mi(NM_ITEM, "About Micropolis...", NULL, 0, CMD_ABOUT);
     mi(NM_ITEM, (const char *)NM_BARLABEL, NULL, 0, 0);
     mi(NM_ITEM, "New City", "N", 0, CMD_NEW);
@@ -879,6 +885,36 @@ static void show_about(void)
 }
 
 /* returns 0 to quit */
+static void fail(const char *fmt, ...);
+static void guide_poll(void)                                 /* AmigaGuide talks to us through messages */
+{
+    struct AmigaGuideMsg *gm;
+    if (!guide_handle) return;
+    while ((gm = GetAmigaGuideMsg(guide_handle))) {
+        if (gm->agm_Type == ToolStatusID && gm->agm_Pri_Ret) { char lb[60]; sprintf(lb, "help: error %ld", (long)gm->agm_Pri_Ret); logmsg(lb); }
+        ReplyAmigaGuideMsg(gm);
+    }
+}
+
+static void show_help(void)                                  /* AmigaGuide document next to the program */
+{
+    struct NewAmigaGuide nag;
+    if (!AmigaGuideBase) { fail("amigaguide.library is not available."); return; }
+    if (guide_handle) { CloseAmigaGuide(guide_handle); guide_handle = NULL; }
+    memset(&nag, 0, sizeof nag);
+    {   BPTR pd = GetProgramDir();                          /* the guide's process does not know our PROGDIR: */
+        if (pd && NameFromLock(pd, (STRPTR)guide_path, sizeof guide_path - 20) && AddPart((STRPTR)guide_path, (STRPTR)"Micropolis.guide", sizeof guide_path)) ;
+        else strcpy(guide_path, "PROGDIR:Micropolis.guide");
+    }
+    nag.nag_Name = (STRPTR)guide_path;
+    nag.nag_Screen = g_scr;
+    nag.nag_BaseName = (STRPTR)"Micropolis";
+    guide_handle = OpenAmigaGuideA(&nag, NULL);
+    { char lb[300]; sprintf(lb, "help: path=%s scr=%p err=%ld", guide_path, (void *)g_scr, (long)IoErr()); logmsg(lb); }
+    logmsg(guide_handle ? "help: guide opened" : "help: guide open failed");
+    if (!guide_handle) fail("Cannot open Micropolis.guide.");
+}
+
 static int do_command(int id, struct Window *win, struct MenuItem *item)
 {
     char path[256];
@@ -902,6 +938,7 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
         return 1;
     }
     switch (id) {
+    case CMD_HELP: show_help(); break;
     case CMD_ABOUT: show_about(); break;
     case CMD_NEW:
         GenerateNewCity(); SetGameLevelFunds((short)pref_level); setSpeed(3); recenter();
@@ -1130,6 +1167,7 @@ static int real_main(int argc, char **argv)
     GadToolsBase = OpenLibrary((CONST_STRPTR)"gadtools.library", 37);
     AslBase = OpenLibrary((CONST_STRPTR)"asl.library", 37);
     KeymapBase = OpenLibrary((CONST_STRPTR)"keymap.library", 36);
+    AmigaGuideBase = OpenLibrary((CONST_STRPTR)"amigaguide.library", 34);
     { char b[80]; struct Task *t = FindTask(NULL);
       sprintf(b, "stack: %ld bytes", (long)((char *)t->tc_SPUpper - (char *)t->tc_SPLower)); logmsg(b); }
     logmsg("start");
@@ -1264,6 +1302,7 @@ static int real_main(int argc, char **argv)
         { char lb[40]; sprintf(lb, "modes accepted: %d", n); logmsg(lb); }
     }
     if (argc > 3 && !strcmp(argv[3], "quake")) { MakeEarthquake(); }   /* debug */
+    if (argc > 3 && !strcmp(argv[3], "help")) show_help();   /* debug */
     for (int ai = 1; ai < argc; ai++) if (!strncmp(argv[ai], "quit=", 5)) dbg_quit_loops = atoi(argv[ai] + 5) * 50;
     if (argc > 3 && !strncmp(argv[3], "show=", 5)) debug_show = 1;
     if (argc > 3 && !strcmp(argv[3], "show=about")) show_about();
@@ -1330,6 +1369,7 @@ static int real_main(int argc, char **argv)
                 case 0x21: view_y++; break;
                 case 0x22: view_x++; break;
                 case 0x20: view_x--; break;
+                case 0x5f: show_help(); break;                                       /* Help key */
                 case 0x45: if (pi >= 0) panels[pi].close(); else running = 0; break;   /* Esc: closes the active panel window, else quits */
                 case 0x44: case 0x40: if (pi >= 0) panels[pi].close(); break;          /* Return, Space */
                 case 0x4c: view_y--; break;                               /* cursor keys scroll */
@@ -1397,6 +1437,7 @@ static int real_main(int argc, char **argv)
             if (ox != view_x || oy != view_y) dirty = 1;
         }
         sound_poll();
+        guide_poll();
         if (ShakeNow > 0 && shake_frames == 0) { shake_frames = 50; shake_bx = view_x; shake_by = view_y; }
         if (shake_frames > 0) {
             shake_frames--;
@@ -1453,6 +1494,8 @@ out:
     if (GadToolsBase) CloseLibrary(GadToolsBase);
     if (AslBase) CloseLibrary(AslBase);
     if (IconBase) CloseLibrary(IconBase);
+    if (guide_handle) { CloseAmigaGuide(guide_handle); guide_handle = NULL; }
+    if (AmigaGuideBase) CloseLibrary(AmigaGuideBase);
     if (KeymapBase) CloseLibrary(KeymapBase);
     logmsg("cleanup done");
     return rc;
