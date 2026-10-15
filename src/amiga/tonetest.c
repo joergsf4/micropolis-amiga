@@ -7,9 +7,20 @@
 #include <exec/io.h>
 #include <devices/audio.h>
 #include <proto/exec.h>
+#include <proto/dos.h>
+#include <proto/intuition.h>
+#include <intuition/intuition.h>
+struct IntuitionBase *IntuitionBase;
 
-int main(void)
+int main(int argc, char **argv)
 {
+    if (argc > 1 && argv[1][0] == 'b') {                      /* "tonetest beep": the system beep through Intuition, for comparison */
+        IntuitionBase = (struct IntuitionBase *)OpenLibrary((CONST_STRPTR)"intuition.library", 39);
+        if (!IntuitionBase) return 20;
+        for (int i = 0; i < 3; i++) { DisplayBeep(NULL); Delay(60); }
+        CloseLibrary((struct Library *)IntuitionBase);
+        return 0;
+    }
     static UBYTE chan[] = { 1, 2, 4, 8 };
     struct MsgPort *port = CreateMsgPort();
     struct IOAudio *ioa = (struct IOAudio *)CreateIORequest(port, sizeof(struct IOAudio));

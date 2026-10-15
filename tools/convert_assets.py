@@ -113,6 +113,13 @@ def read_wav(path):
         data = audioop.tomono(data, 2, 0.5, 0.5)
     return rate, data
 
+def iff_8svx(samples, rate):
+    """IFF 8SVX (signed 8 bit, uncompressed): readable by every sound.datatype since OS 3.0"""
+    vhdr = struct.pack('>IIIHBBI', len(samples), 0, 0, rate, 1, 0, 0x10000)
+    body = samples + (b'\0' if len(samples) & 1 else b'')
+    chunks = b'VHDR' + struct.pack('>I', len(vhdr)) + vhdr + b'BODY' + struct.pack('>I', len(samples)) + body
+    return b'FORM' + struct.pack('>I', 4 + len(chunks)) + b'8SVX' + chunks
+
 def convert_sounds(src_dir, out_dir, rate=11025):
     """raw signed 8 bit mono @ rate for Paula (audio.device); res/sounds/<name>.snd"""
     import audioop
@@ -128,13 +135,14 @@ def convert_sounds(src_dir, out_dir, rate=11025):
         data = audioop.lin2lin(data, 2, 1)                       # signed 8 bit
         if len(data) & 1:
             data += b'\0'                                       # Paula wants an even length
-        name = os.path.splitext(os.path.basename(f))[0].lower() + '.snd'
-        open(os.path.join(out_dir, name), 'wb').write(data)
+        name = os.path.splitext(os.path.basename(f))[0].lower() + '.8svx'
+        data8 = data
+        open(os.path.join(out_dir, name), 'wb').write(iff_8svx(data8, rate))
         total += len(data)
     import math                                                  # a test tone for diagnosing sound problems (argument sound=tone)
     tone = bytes((int(round(127 * math.sin(2 * math.pi * 1000 * i / rate))) & 255) for i in range(rate * 2))
-    open(os.path.join(out_dir, 'tone.snd'), 'wb').write(tone)
-    print('sounds: %d files, %d KB at %d Hz' % (len(glob.glob(os.path.join(out_dir, '*.snd'))), total // 1024, rate))
+    open(os.path.join(out_dir, 'tone.8svx'), 'wb').write(iff_8svx(tone, rate))
+    print('sounds: %d files, %d KB at %d Hz' % (len(glob.glob(os.path.join(out_dir, '*.8svx'))), total // 1024, rate))
 
 def main():
     src, out = sys.argv[1], sys.argv[2]
