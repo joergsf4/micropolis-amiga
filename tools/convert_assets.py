@@ -192,6 +192,22 @@ def main():
         data += px + pxh
     open(os.path.join(out, 'toolicons.bin'), 'wb').write(head + table + data)
 
+    # alternative tool icons (tools/icons/toolicons.py): 32x32 tiles, normal + selected, own colours at pen 48 and up
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'icons'))
+    import toolicons
+    cols, data2 = [], b''
+    for n in toolicons.ORDER:
+        for sel in (False, True):
+            im = toolicons.tile(n, sel)
+            for y in range(toolicons.T):
+                for x in range(toolicons.T):
+                    c = im.getpixel((x, y))[:3]
+                    if c not in cols:
+                        cols.append(c)
+                    data2 += bytes([48 + cols.index(c)])
+    assert 48 + len(cols) <= 256, len(cols)
+    open(os.path.join(out, 'toolicons2.bin'), 'wb').write(struct.pack('>HH', len(cols), toolicons.T) + b''.join(bytes(c) for c in cols) + data2)
+
     assert len(pal.colors) <= 64, len(pal.colors)
     p = b''.join(bytes(c) for c in pal.colors) + bytes(3 * (256 - len(pal.colors)))
     open(os.path.join(out, 'palette.bin'), 'wb').write(p)

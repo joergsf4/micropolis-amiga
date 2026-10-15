@@ -68,6 +68,7 @@ question on again. `SIZE=` (ToolType or argument) skips the question and uses th
 | Scenarios | menu Scenarios: Dullsville 1900, San Francisco 1906, Hamburg 1944, Bern 1965, Tokyo 1957, Detroit 1972, Boston 2010, Rio de Janeiro 2047 (each with its story and goal) |
 | Tool keys | as in the original: `b` bulldozer, `r` road, `p` park, `t` wire, `x` rail, `z` zone query; typed cheat words (e.g. `fund`) work too |
 | Start | at launch a requester asks: New city, Load city, Scenario or the current (default) city; Options > Start menu at launch turns it off |
+| Tool icons | uniform 32x32 icons by default; Options > Classic tool icons switches to the original pictures |
 | Level | menu Level: Easy / Medium / Hard (start funds of a new city; saved in the preferences) |
 | Options | Auto Goto, Animation, Messages, Message windows can be switched off in the Options menu; "Speak tool names" (off by default) says the tool when you choose it |
 | Help | `Help` key or Project > Help (AmigaGuide document `Micropolis.guide`) |

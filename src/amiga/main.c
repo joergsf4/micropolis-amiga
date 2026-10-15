@@ -90,13 +90,14 @@ static int pref_ask = 1;
 static ULONG pref_mode = 0xffffffffUL;          /* remembered RTG mode id, picture size and depth */
 static int pref_w, pref_h, pref_depth;
 static int pref_level;                          /* difficulty 0 easy, 1 medium, 2 hard */
-enum { O_BULLDOZE, O_BUDGET, O_DISASTERS, O_SOUND, O_AUTOGO, O_ANIM, O_MSGS, O_NOTICES, O_SPEAK, O_STARTMENU, N_OPT };
+enum { O_BULLDOZE, O_BUDGET, O_DISASTERS, O_SOUND, O_AUTOGO, O_ANIM, O_MSGS, O_NOTICES, O_SPEAK, O_STARTMENU, O_CLASSIC, N_OPT };
+static int classic_icons;                        /* 1 = the original tool palette pictures, 0 = the uniform 32x32 set */
 static int start_pending;
 static int refresh_full;                   /* the next window refresh must be followed by a complete redraw (the picture changed while a requester covered it) */
 static int start_menu = 1;                       /* ask what to start with: new city, load, scenario */
 static int speak_tools;                          /* spoken tool names when a tool is chosen (off by default) */
-static const char *const opt_key[N_OPT] = { "AUTOBULLDOZE", "AUTOBUDGET", "DISASTERS", "SOUND", "AUTOGOTO", "ANIMATION", "MESSAGES", "MESSAGEWINDOWS", "SPEAKTOOLS", "STARTMENU" };
-static int pref_opt[N_OPT] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };     /* -1 = not saved yet: keep the default */
+static const char *const opt_key[N_OPT] = { "AUTOBULLDOZE", "AUTOBUDGET", "DISASTERS", "SOUND", "AUTOGOTO", "ANIMATION", "MESSAGES", "MESSAGEWINDOWS", "SPEAKTOOLS", "STARTMENU", "CLASSICICONS" };
+static int pref_opt[N_OPT] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };     /* -1 = not saved yet: keep the default */
 static int pref_speed = -1;
 #define N_WINPOS 6                              /* NPANELS */
 static int pref_wx[N_WINPOS] = { -1, -1, -1, -1, -1, -1 }, pref_wy[N_WINPOS] = { -1, -1, -1, -1, -1, -1 };   /* remembered window positions */
@@ -105,7 +106,7 @@ static int opt_get(int o)
     switch (o) {
     case O_BULLDOZE: return autoBulldoze;  case O_BUDGET: return autoBudget;  case O_DISASTERS: return !NoDisasters;
     case O_SOUND: return UserSoundOn;      case O_AUTOGO: return autoGo;      case O_ANIM: return DoAnimation;
-    case O_MSGS: return DoMessages;        case O_SPEAK: return speak_tools;   case O_STARTMENU: return start_menu;   default: return DoNotices;
+    case O_MSGS: return DoMessages;        case O_SPEAK: return speak_tools;   case O_STARTMENU: return start_menu;   case O_CLASSIC: return classic_icons;   default: return DoNotices;
     }
 }
 static void opt_set(int o, int v)
@@ -113,7 +114,7 @@ static void opt_set(int o, int v)
     switch (o) {
     case O_BULLDOZE: autoBulldoze = v; break;  case O_BUDGET: autoBudget = v; break;  case O_DISASTERS: NoDisasters = !v; break;
     case O_SOUND: UserSoundOn = v; break;      case O_AUTOGO: autoGo = v; break;      case O_ANIM: DoAnimation = v; break;
-    case O_MSGS: DoMessages = v; break;        case O_SPEAK: speak_tools = v; break;   case O_STARTMENU: start_menu = v; break;   default: DoNotices = v; break;
+    case O_MSGS: DoMessages = v; break;        case O_SPEAK: speak_tools = v; break;   case O_STARTMENU: start_menu = v; break;   case O_CLASSIC: classic_icons = v; break;   default: DoNotices = v; break;
     }
 }
 
@@ -193,6 +194,8 @@ static const int panning = 0;            /* (right button is the menu button now
 static int mouse_x = -1, mouse_y = -1;   /* last window position, for edge scrolling */
 
 #define NTOOLS 18
+static UBYTE *toolicons2;              /* toolicons2.bin: uniform 32x32 set (colours from pen 48 up) */
+static int toolicons2_n, toolicons2_t;
 static UBYTE *toolicons;               /* toolicons.bin: the original's tool palette pictures (normal and highlighted) */
 static const struct { const char *name; int cost; short x, y; } tooldef[NTOOLS] = {   /* indexed by tool state; positions as in the original palette */
     { "Residential", 100, 13, 58 },  { "Commercial", 100, 51, 58 },   { "Industrial", 100, 89, 58 },
@@ -283,6 +286,8 @@ static int load_assets(void)
     tiles = load_file("PROGDIR:res/tiles.bin", NULL);
     objects = load_file("PROGDIR:res/objects.bin", NULL);
     toolicons = load_file("PROGDIR:res/toolicons.bin", NULL);
+    toolicons2 = load_file("PROGDIR:res/toolicons2.bin", NULL);
+    if (toolicons2) { toolicons2_n = *(UWORD *)toolicons2; toolicons2_t = *(UWORD *)(toolicons2 + 2); }
     if (!pal || !tiles || !objects) {
         char b[100];
         sprintf(b, "Assets missing: palette %s tiles %s objects %s (IoErr %ld)", pal ? "ok" : "NO", tiles ? "ok" : "NO", objects ? "ok" : "NO", (long)IoErr());
@@ -294,6 +299,7 @@ static int load_assets(void)
     notice_load();
     memcpy(palette, pal, 256 * 3);
     FreeVec(pal);
+    if (toolicons2) for (int i = 0; i < toolicons2_n && 48 + i < 256; i++) memcpy(&palette[(48 + i) * 3], toolicons2 + 4 + i * 3, 3);
     palette[PEN_BAR * 3 + 0] = 0x20; palette[PEN_BAR * 3 + 1] = 0x28; palette[PEN_BAR * 3 + 2] = 0x50;
     palette[PEN_TEXT * 3 + 0] = 0xff; palette[PEN_TEXT * 3 + 1] = 0xff; palette[PEN_TEXT * 3 + 2] = 0xff;
     palette[PEN_SEL * 3 + 0] = 0xb0; palette[PEN_SEL * 3 + 1] = 0x60; palette[PEN_SEL * 3 + 2] = 0x20;
@@ -404,14 +410,18 @@ static void draw_cursor(const struct rect *r)
     vline(r->x0, r->y0, r->y1, PEN_TEXT); vline(r->x1, r->y0, r->y1, PEN_TEXT);
 }
 
+static int tool_x(int i)  { return (classic_icons || !toolicons2) ? tooldef[i].x : 8 + (i % 3) * 40; }
+static int tool_y(int i)  { return (classic_icons || !toolicons2) ? tooldef[i].y : 58 + (i / 3) * 38; }
+static int tool_w(int i)  { return (classic_icons || !toolicons2) ? (toolicons ? toolicons[2 + i * 10] : 34) : toolicons2_t; }
+static int tool_h(int i)  { return (classic_icons || !toolicons2) ? (toolicons ? toolicons[2 + i * 10 + 1] : 34) : toolicons2_t; }
+
 static int tool_hover = -1;            /* tool icon under the mouse: its name and cost show in the label (a fixed-place tooltip) */
 
 static int tool_at(int mx, int my)
 {
     if (mx >= TB_W || my < BAR_H) return -1;
     for (int i = 0; i < NTOOLS; i++) {
-        int w = toolicons ? toolicons[2 + i * 10] : 34, h = toolicons ? toolicons[2 + i * 10 + 1] : 34;
-        if (mx >= tooldef[i].x && mx < tooldef[i].x + w && my >= BAR_H + tooldef[i].y && my < BAR_H + tooldef[i].y + h) return i;
+        if (mx >= tool_x(i) && mx < tool_x(i) + tool_w(i) && my >= BAR_H + tool_y(i) && my < BAR_H + tool_y(i) + tool_h(i)) return i;
     }
     return -1;
 }
@@ -420,7 +430,18 @@ static void draw_toolbar(void)
 {
     char line[40];
     for (int y = BAR_H; y < SCR_H; y++) memset(fb + y * SCR_W, PEN_BAR, TB_W);
-    if (toolicons) {
+    if (!classic_icons && toolicons2) {
+        const UBYTE *px0 = toolicons2 + 4 + toolicons2_n * 3;
+        int t = toolicons2_t;
+        for (int i = 0; i < NTOOLS; i++) {
+            const UBYTE *px = px0 + (long)(i * 2 + (i == editor.tool_state ? 1 : 0)) * t * t;
+            for (int y = 0; y < t; y++) {
+                int dy = BAR_H + tool_y(i) + y;
+                if (dy >= SCR_H) break;
+                memcpy(fb + dy * SCR_W + tool_x(i), px + y * t, t);
+            }
+        }
+    } else if (toolicons) {
         const UBYTE *tab = toolicons + 2;
         for (int i = 0; i < NTOOLS; i++) {
             int w = tab[i * 10], h = tab[i * 10 + 1];
@@ -884,7 +905,7 @@ static void render_frame(struct Window *win)
 /* ---------- menus and commands ---------- */
 enum { CMD_NEW = 1, CMD_LOAD, CMD_SAVE, CMD_SAVEAS, CMD_QUIT,
        CMD_PAUSE = 10, CMD_SLOW, CMD_MEDIUM, CMD_FAST,
-       CMD_AUTOBULLDOZE = 20, CMD_AUTOBUDGET, CMD_DISASTERS, CMD_SOUND, CMD_ASKMODE, CMD_AUTOGO, CMD_ANIM, CMD_MSGS, CMD_NOTICES, CMD_OVERLAY, CMD_LEVEL = 60, CMD_SPEAK = 65, CMD_STARTMENU = 66,
+       CMD_AUTOBULLDOZE = 20, CMD_AUTOBUDGET, CMD_DISASTERS, CMD_SOUND, CMD_ASKMODE, CMD_AUTOGO, CMD_ANIM, CMD_MSGS, CMD_NOTICES, CMD_OVERLAY, CMD_LEVEL = 60, CMD_SPEAK = 65, CMD_STARTMENU = 66, CMD_CLASSIC = 67,
        CMD_ABOUT = 44, CMD_HELP = 45, CMD_SCEN = 200, CMD_BUDGET = 40, CMD_MAP = 41, CMD_EVAL = 42, CMD_GRAPHS = 43, CMD_MAPMODE = 100,
        CMD_FIRE = 30, CMD_FLOOD, CMD_TORNADO, CMD_QUAKE, CMD_MONSTER, CMD_MELTDOWN };
 
@@ -934,6 +955,7 @@ static struct Menu *make_menus(struct Screen *scr, APTR *vi_out)
     mi(NM_ITEM, "Messages", NULL, CHECKIT | MENUTOGGLE | (DoMessages ? CHECKED : 0), CMD_MSGS);
     mi(NM_ITEM, "Speak tool names", NULL, CHECKIT | MENUTOGGLE | (speak_tools ? CHECKED : 0), CMD_SPEAK);
     mi(NM_ITEM, "Start menu at launch", NULL, CHECKIT | MENUTOGGLE | (start_menu ? CHECKED : 0), CMD_STARTMENU);
+    mi(NM_ITEM, "Classic tool icons", NULL, CHECKIT | MENUTOGGLE | (classic_icons ? CHECKED : 0), CMD_CLASSIC);
     mi(NM_ITEM, "Message windows", NULL, CHECKIT | MENUTOGGLE | (DoNotices ? CHECKED : 0), CMD_NOTICES);
     mi(NM_ITEM, "Ask for screen mode at start", NULL, CHECKIT | MENUTOGGLE | (pref_ask ? CHECKED : 0), CMD_ASKMODE);
     mi(NM_TITLE, "Level", NULL, 0, 0);
@@ -1126,6 +1148,7 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
     case CMD_AUTOGO: autoGo = checked; MustUpdateOptions = 1; break;
     case CMD_ANIM: DoAnimation = checked; MustUpdateOptions = 1; full_redraw = 1; break;
     case CMD_MSGS: DoMessages = checked; MustUpdateOptions = 1; break;
+    case CMD_CLASSIC: classic_icons = checked; toolbar_dirty = 1; break;
     case CMD_STARTMENU: start_menu = checked; break;
     case CMD_SPEAK: speak_tools = checked; break;
     case CMD_NOTICES: DoNotices = checked; MustUpdateOptions = 1; break;

@@ -75,6 +75,7 @@ Graphs         menu Windows/Graphs (6 histories, 10 or 120 years)
 Overview map   menu Windows/Map opens the map window, Map/Next overlay cycles (14 overlays); click/drag in it to scroll
 Tool keys      b bulldozer, r road, p park, t wire, x rail, z query (as in the original); cheat words work too
 Start          at launch you choose: New city, Load city, Scenario or the default city (Options/Start menu at launch)
+Tool icons     uniform 32x32 set by default; Options/Classic tool icons switches to the original pictures
 Level          menu Level: Easy/Medium/Hard (start funds of a new city, saved in the preferences)
 Options        Auto Goto, Animation, Messages, Message windows can be switched off; "Speak tool names" is off by default
 Scenarios      menu Scenarios: 8 historic disasters/challenges with story and goal
