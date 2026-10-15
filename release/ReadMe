@@ -2,7 +2,7 @@ Short:        Micropolis (open-source SimCity) with RTG graphics
 Author:       Electronic Arts / Will Wright / Don Hopkins (original), Amiga port: joergsf4
 Uploader:     joergsf4
 Type:         game/strategy
-Version:      0.2
+Version:      0.3
 Requires:     AmigaOS 3.x, 68020+, RTG card (Picasso96 or CyberGraphX), 2 MB Chip + 2 MB Fast
 Architecture: m68k-amigaos >= 3.0.0
 
@@ -17,7 +17,8 @@ simulation core to the Amiga with a native Intuition front end and RTG graphics
 REQUIREMENTS
 ------------
 - AmigaOS 3.x, Kickstart 3.2 recommended, 68020 or better (68030/50 MHz is the speed target)
-- 2 MB Chip RAM and 2 MB Fast RAM or more
+- 2 MB Chip RAM and 2 MB Fast RAM or more (sound effects use up to 300 KB Chip RAM while playing;
+  the Options menu has a Sound switch)
 - RTG graphics card with Picasso96 or CyberGraphX (cybergraphics.library 40+) and a screen mode of
   at least 640x480 with 8, 15, 16, 24 or 32 bit (8 bit is used if available).
   In FS-UAE: graphics_card = uaegfx-z3
@@ -62,9 +63,9 @@ Warnings and events open a message window (Continue, Return or Space closes it).
 
 STATUS
 ------
-Works: simulation, building tools, animated map, overview map with overlays, budget, evaluation, graphs,
+Works: simulation, building tools, animated map, overview map with overlays, budget, evaluation, graphs, sound effects,
 load/save/new random city, menus, disasters, event messages.
-Missing: sound, scenario selection, earthquake shake.
+Missing: scenario selection, earthquake shake, looping sounds (bulldozer).
 An early crash on quitting seems fixed in 0.2 - if you still see it, please report the error number.
 
 micropolis.log is only written with the DEBUG option; attach it to bug reports.

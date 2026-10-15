@@ -86,6 +86,53 @@ def convert_notices(tcl, out):
     open(os.path.join(out, 'notices.txt'), 'w', encoding='latin-1').write('\n'.join(lines) + '\n')
     print('notices:', len(lines))
 
+def read_wav(path):
+    """minimal RIFF reader: PCM (1), A-law (6) and mu-law (7); returns (rate, channels, 16 bit little-endian samples)"""
+    import audioop
+    d = open(path, 'rb').read()
+    assert d[:4] == b'RIFF' and d[8:12] == b'WAVE', path
+    pos, fmt, data = 12, None, None
+    while pos + 8 <= len(d):
+        cid, size = d[pos:pos + 4], struct.unpack('<I', d[pos + 4:pos + 8])[0]
+        body = d[pos + 8:pos + 8 + size]
+        if cid == b'fmt ':
+            fmt = struct.unpack('<HHIIHH', body[:16])
+        elif cid == b'data':
+            data = body
+        pos += 8 + size + (size & 1)
+    tag, ch, rate, _, _, bits = fmt
+    if tag == 7:
+        data = audioop.ulaw2lin(data, 2)
+    elif tag == 6:
+        data = audioop.alaw2lin(data, 2)
+    elif tag == 1 and bits == 8:
+        data = audioop.lin2lin(audioop.bias(data, 1, -128), 1, 2)   # unsigned 8 bit -> signed 16 bit
+    elif not (tag == 1 and bits == 16):
+        raise SystemExit('unsupported wav format %s %d bit: %s' % (tag, bits, path))
+    if ch == 2:
+        data = audioop.tomono(data, 2, 0.5, 0.5)
+    return rate, data
+
+def convert_sounds(src_dir, out_dir, rate=11025):
+    """raw signed 8 bit mono @ rate for Paula (audio.device); res/sounds/<name>.snd"""
+    import audioop
+    os.makedirs(out_dir, exist_ok=True)
+    total = 0
+    for f in sorted(glob.glob(os.path.join(src_dir, '*.wav'))):
+        r, data = read_wav(f)
+        if r != rate:
+            data, _ = audioop.ratecv(data, 2, 1, r, rate, None)
+        peak = audioop.max(data, 2)
+        if peak:                                                 # level all sounds to a similar loudness
+            data = audioop.mul(data, 2, min(8.0, 118 * 256.0 / peak))
+        data = audioop.lin2lin(data, 2, 1)                       # signed 8 bit
+        if len(data) & 1:
+            data += b'\0'                                       # Paula wants an even length
+        name = os.path.splitext(os.path.basename(f))[0].lower() + '.snd'
+        open(os.path.join(out_dir, name), 'wb').write(data)
+        total += len(data)
+    print('sounds: %d files, %d KB at %d Hz' % (len(glob.glob(os.path.join(out_dir, '*.snd'))), total // 1024, rate))
+
 def main():
     src, out = sys.argv[1], sys.argv[2]
     os.makedirs(out, exist_ok=True)
@@ -120,6 +167,7 @@ def main():
     p = b''.join(bytes(c) for c in pal.colors) + bytes(3 * (256 - len(pal.colors)))
     open(os.path.join(out, 'palette.bin'), 'wb').write(p)
     convert_notices(os.path.join(src, '..', 'res', 'micropolis.tcl'), out)
+    convert_sounds(os.path.join(src, '..', 'res', 'sounds'), os.path.join(out, 'sounds'))
     print('palette: %d colors, tiles: %d bytes, %d sprite frames' % (len(pal.colors), len(tiles), len(frames)))
 
     if '--preview' in sys.argv:

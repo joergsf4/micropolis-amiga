@@ -16,7 +16,7 @@ cp out/micropolis "$D/Micropolis/Micropolis"; cp "$OUT/icons/Micropolis.info" "$
 cp release/ReadMe "$D/Micropolis/ReadMe"; cp "$OUT/icons/ReadMe.info" "$D/Micropolis/ReadMe.info"
 cp COPYING "$D/Micropolis/COPYING"
 cp out/rtgtest "$D/Micropolis/Tools/RTGTest"; cp out/listmodes "$D/Micropolis/Tools/ListModes"
-cp "$SHARE"/res/* "$D/Micropolis/res/"
+cp -R "$SHARE"/res/. "$D/Micropolis/res/"
 cp "$SHARE"/cities/*.cty "$D/Micropolis/cities/"
 ARC="Micropolis-$VER.lha"
 docker run --rm -v "$PWD/$D":/stage -v "$PWD/$OUT":/out -w /stage sacredbanana/amiga-compiler:m68k-amigaos \

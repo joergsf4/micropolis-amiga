@@ -15,6 +15,7 @@ C code; Tcl/Tk and X11 were replaced by an Amiga user interface.
 | **RAM** | 2 MB Chip + 2 MB Fast or more (the program itself takes about 1.5 MB) |
 | **Graphics** | RTG card with Picasso96 or CyberGraphX (`cybergraphics.library` 40+) and any screen mode of at least 640x480 (8, 15, 16, 24 or 32 bit; 8 bit is used when available) |
 | **System files** | `mathieeedoubbas.library`, `mathieeedoubtrans.library` (in `LIBS:` of any Workbench), `gadtools.library`, `asl.library` |
+| **Sound** | Paula via `audio.device` (stereo, the original sound effects at 11 kHz); needs about 300 KB Chip RAM while playing |
 | **CPU libraries** | the right `680x0.library` for your CPU (68030/68040/68060), as AmigaOS 3.2 asks for |
 
 On an emulator: FS-UAE with `graphics_card = uaegfx-z3` (Zorro III) and Picasso96 installed.
@@ -57,8 +58,8 @@ You can load and save cities (`.cty`, the original Micropolis format; `cities/` 
 ## Status
 
 Works: simulation, building tools, map with animation and sprites, overview map with 14 overlays,
-budget, evaluation window, history graphs, city load/save/new random city, menus, disasters, event messages.
-Missing: sound, scenario selection, earthquake shake.
+budget, evaluation window, history graphs, sound effects, city load/save/new random city, menus, disasters, event messages.
+Missing: scenario selection, earthquake shake, looping sounds (bulldozer).
 See the [issues](../../issues).
 
 ## Troubleshooting

@@ -11,6 +11,7 @@
 #include "eval_ui.h"
 #include "graph_ui.h"
 #include "gfx.h"
+#include "sound.h"
 #undef GetSprite
 #include <stdio.h>
 #include <stdarg.h>
@@ -35,7 +36,7 @@
 #include <workbench/startup.h>
 #include <workbench/workbench.h>
 
-static const char verstag[] __attribute__((used)) = "$VER: Micropolis 0.2 (15.10.2026)";
+static const char verstag[] __attribute__((used)) = "$VER: Micropolis 0.3 (15.10.2026)";
 
 struct Library *CyberGfxBase;
 struct IntuitionBase *IntuitionBase;
@@ -136,6 +137,15 @@ int ui_eval(const char *cmd)
     }
     else if (!strncmp(cmd, "UILoseGame", 10))      { notice_show(200); notice_dirty = 1; dirty = 1; }
     else if (!strncmp(cmd, "UIWinGame", 9))        { notice_show(100); notice_dirty = 1; dirty = 1; }
+    else if (!strncmp(cmd, "UIMakeSound ", 12) || !strncmp(cmd, "UIMakeSoundOn ", 14)) {
+        const char *q = strrchr(cmd, '"');                    /* last quoted word = sound id */
+        if (q) {
+            const char *e = q, *b;
+            for (b = e - 1; b > cmd && *b != '"'; b--) ;
+            if (*b == '"' && e > b + 1 && e - b - 1 < 40) { char id[44]; memcpy(id, b + 1, e - b - 1); id[e - b - 1] = 0; sound_play(id);
+                if (debug_log) { char lb[80]; sprintf(lb, "sound: %s", id); logmsg(lb); } }
+        }
+    }
     else if (!strncmp(cmd, "UISetMessage ", 13)) { copy_braced(status_msg, sizeof status_msg, cmd); dirty = 1; }
     return 0;
 }
@@ -870,6 +880,7 @@ static int real_main(int argc, char **argv)
     if (!win) { fail("Cannot open the game window."); goto out; }
 
     logmsg("window open");
+    sound_init();
     if (GadToolsBase) {
         menu = make_menus(scr, &vi);
         if (menu) SetMenuStrip(win, menu);
@@ -878,6 +889,7 @@ static int real_main(int argc, char **argv)
     setSpeed(3);
     if (argc > 3 && !strncmp(argv[3], "scroll=", 7)) { dbg_scroll = atoi(argv[3] + 7); setSpeed(0); }   /* debug: scroll test */
     if (argc > 3 && !strncmp(argv[3], "jump=", 5)) { int jx = 0, jy = 0; sscanf(argv[3] + 5, "%d,%d", &jx, &jy); view_x = jx; view_y = jy; clamp_view(); setSpeed(0); }
+    if (argc > 3 && !strncmp(argv[3], "sound=", 6)) sound_play(argv[3] + 6);               /* debug: play a sound at start */
     if (argc > 3 && !strncmp(argv[3], "show=", 5)) debug_show = 1;
     if (argc > 3 && !strcmp(argv[3], "show=eval")) open_info_panel(P_EVAL);              /* debug: open a panel at start */
     if (argc > 3 && !strcmp(argv[3], "show=graph")) open_info_panel(P_GRAPH);
@@ -978,6 +990,7 @@ static int real_main(int argc, char **argv)
             clamp_view();
             if (ox != view_x || oy != view_y) dirty = 1;
         }
+        sound_poll();
         if (debug_show && notice_visible) notice_close();
         if (dbg_scroll > 0 && (frame & 3) == 0) { view_x++; if (dbg_scroll & 1) view_y++; dbg_scroll--; clamp_view(); dirty = 1; }
         if (SimSpeed && ++tick >= delay[SimSpeed]) {
@@ -1002,6 +1015,7 @@ static int real_main(int argc, char **argv)
     }
     rc = 0;
 out:
+    sound_exit();
     logmsg("cleanup");
     if (win && menu) ClearMenuStrip(win);
     if (menu) FreeMenus(menu);

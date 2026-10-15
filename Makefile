@@ -29,7 +29,7 @@ out/obj/amiga/%.o: src/amiga/%.c $(wildcard src/core/*.h src/amiga/*.h)
 out/headless: $(CORE_OBJ) out/obj/amiga/ui_core.o out/obj/amiga/stack.o out/obj/amiga/mapview.o out/obj/amiga/headless.o
 	$(CC) $(ARCH) -o $@ $^ -lm
 
-out/micropolis: $(CORE_OBJ) out/obj/amiga/ui_core.o out/obj/amiga/stack.o out/obj/amiga/gfx.o out/obj/amiga/budget_ui.o out/obj/amiga/notice_ui.o out/obj/amiga/eval_ui.o out/obj/amiga/graph_ui.o out/obj/amiga/mapview.o out/obj/amiga/main.o
+out/micropolis: $(CORE_OBJ) out/obj/amiga/ui_core.o out/obj/amiga/stack.o out/obj/amiga/gfx.o out/obj/amiga/sound.o out/obj/amiga/budget_ui.o out/obj/amiga/notice_ui.o out/obj/amiga/eval_ui.o out/obj/amiga/graph_ui.o out/obj/amiga/mapview.o out/obj/amiga/main.o
 	$(CC) $(ARCH) -o $@ $^ -lm
 
 out/listmodes: src/amiga/listmodes.c
@@ -46,6 +46,7 @@ data:
 	cp $(UP)/res/stri.* $(UP)/res/hexa.* $(UP)/res/snro.* $(DEST)/res/
 	cp $(UP)/cities/*.cty $(DEST)/cities/
 	cp out/data/*.bin out/data/notices.txt $(DEST)/res/
+	mkdir -p $(DEST)/res/sounds; cp out/data/sounds/*.snd $(DEST)/res/sounds/
 
 clean:
 	rm -rf out
