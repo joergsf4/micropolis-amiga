@@ -1028,13 +1028,15 @@ static int ask_file(struct Window *win, int save, char *out, size_t n)
     return ok;
 }
 
-/* What is on the screen decides the background sound: share of water, built-up and open land among the visible tiles
- * (the middle of the picture counts double). Volumes: 0 below 10 %, full at 60 % share, at most AMB_MAX of 64. */
+/* What is on the screen decides the background sound. Water and built-up area each get their sound when they take up
+ * enough of the picture (silent below 15 %, full at 55-60 %); the nature sound fills in whatever neither of them
+ * dominates, so open land, forest, a few roads or a thin town all sound like nature. Roads, rails and wires count half
+ * as built-up area (a road through the woods is still woods); the middle of the picture counts double. */
 #define AMB_MAX 22
 static void ambient_update(void)
 {
-    long water = 0, city = 0, nature = 0, total;
-    int target[3];
+    long water = 0, built = 0, infra = 0, total;
+    int sea_dom, city_dom, nat;
     if (!ambient_on || !UserSoundOn || SimSpeed == 0) { ambient_set(0, 0, 0); return; }
     for (int row = 0; row < VIEW_ROWS; row++) {
         for (int col = 0; col < VIEW_COLS; col++) {
@@ -1043,22 +1045,30 @@ static void ambient_update(void)
             w = (col > VIEW_COLS / 4 && col < VIEW_COLS * 3 / 4 && row > VIEW_ROWS / 4 && row < VIEW_ROWS * 3 / 4) ? 2 : 1;
             t = (unsigned short)Map[mx][my] & LOMASK;
             if (t >= 2 && t <= 20) water += w;                 /* river, shore, channel */
-            else if (t == 0 || (t >= 21 && t <= 43)) nature += w;   /* bare land, trees, woods */
-            else if (t >= 64) city += w;                        /* roads, rails, wires, zones, buildings */
+            else if (t >= 240) built += w;                      /* zones, buildings, plants, stations */
+            else if (t >= 64) infra += w;                       /* roads, rails, wires */
+            /* everything else (bare land, trees, woods, rubble) is open land: it is what is left over */
         }
     }
-    total = water + city + nature;
-    if (total == 0) { ambient_set(0, 0, 0); return; }
-    {   long share[3] = { water * 100 / total, city * 100 / total, nature * 100 / total };
-        for (int i = 0; i < 3; i++) {
-            long v = (share[i] - 10) * AMB_MAX / 50;
-            target[i] = (int)(v < 0 ? 0 : v > AMB_MAX ? AMB_MAX : v);
-        }
+    {   long vis = 0;                                           /* all counted tiles, weighted */
+        for (int row = 0; row < VIEW_ROWS; row++)
+            for (int col = 0; col < VIEW_COLS; col++) {
+                int mx = view_x + col, my = view_y + row;
+                if (mx < 0 || my < 0 || mx >= WORLD_X || my >= WORLD_Y) continue;
+                vis += (col > VIEW_COLS / 4 && col < VIEW_COLS * 3 / 4 && row > VIEW_ROWS / 4 && row < VIEW_ROWS * 3 / 4) ? 2 : 1;
+            }
+        total = vis ? vis : 1;
     }
-    ambient_set(target[0], target[1], target[2]);
-    if (debug_log) { static int last[3] = { -1, -1, -1 }; if (last[0] != target[0] || last[1] != target[1] || last[2] != target[2]) {
-        char b[80]; sprintf(b, "ambient: target sea %d city %d nature %d (shares %ld/%ld/%ld)", target[0], target[1], target[2], water * 100 / total, city * 100 / total, nature * 100 / total);
-        logmsg(b); last[0] = target[0]; last[1] = target[1]; last[2] = target[2]; } }
+    {   long ws = water * 100 / total, cs = (built * 100 + infra * 50) / total;      /* shares in percent */
+        long sd = (ws - 15) * 100 / 40, cd = (cs - 15) * 100 / 45;                  /* how strongly each one dominates, 0..100 */
+        sea_dom = (int)(sd < 0 ? 0 : sd > 100 ? 100 : sd);
+        city_dom = (int)(cd < 0 ? 0 : cd > 100 ? 100 : cd);
+    }
+    nat = 100 - (sea_dom > city_dom ? sea_dom : city_dom);                          /* nature fills in what neither dominates */
+    ambient_set(sea_dom * AMB_MAX / 100, city_dom * AMB_MAX / 100, nat * AMB_MAX / 100);
+    if (debug_log) { static int last[3] = { -1, -1, -1 }; if (last[0] != sea_dom || last[1] != city_dom || last[2] != nat) {
+        char b[96]; sprintf(b, "ambient: sea %d city %d nature %d (water %ld%%, built %ld%%, infra %ld%%)", sea_dom, city_dom, nat, water * 100 / total, built * 100 / total, infra * 100 / total);
+        logmsg(b); last[0] = sea_dom; last[1] = city_dom; last[2] = nat; } }
 }
 
 static void recenter(void)
