@@ -35,7 +35,6 @@ void DoTimeoutListen(void)   {}
 void DoStopMicropolis(void)  {}
 void StartMicropolisTimer(void) {}
 void StopMicropolisTimer(void)  {}
-void ResetLastKeys(void)     { PunishCnt = 0; }
 void setUpMapProcs(void)     {}
 
 void StopEarthquake(void)    { ShakeNow = 0; }

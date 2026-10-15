@@ -33,6 +33,8 @@
 #include <proto/asl.h>
 #include <proto/cybergraphics.h>
 #include <proto/icon.h>
+#include <proto/keymap.h>
+#include <devices/inputevent.h>
 #include <utility/hooks.h>
 #include <workbench/startup.h>
 #include <workbench/workbench.h>
@@ -47,6 +49,7 @@ struct GfxBase *GfxBase;
 struct Library *GadToolsBase;
 struct Library *AslBase;
 struct Library *IconBase;
+struct Library *KeymapBase;
 
 /* Screen size: 640x480 by default, up to MAX_W x MAX_H (ToolType SIZE=800x600, or MODE=ASK for a mode requester).
  * The tile view fills the screen, so a bigger screen shows more of the city. */
@@ -81,6 +84,7 @@ void app_log(const char *msg)   /* progress log: when started from the Workbench
 static int pref_ask = 1;
 static ULONG pref_mode = 0xffffffffUL;          /* remembered RTG mode id, picture size and depth */
 static int pref_w, pref_h, pref_depth;
+static int pref_level;                          /* difficulty 0 easy, 1 medium, 2 hard */
 
 static void prefs_load(void)
 {
@@ -95,6 +99,7 @@ static void prefs_load(void)
             else if (sscanf(line, "MODE=%lx", &m) == 1) pref_mode = (ULONG)m;
             else if (!strncmp(line, "SIZE=", 5)) sscanf(line + 5, "%dx%d", &pref_w, &pref_h);
             else if (!strncmp(line, "DEPTH=", 6)) pref_depth = atoi(line + 6);
+            else if (!strncmp(line, "LEVEL=", 6)) { pref_level = atoi(line + 6); if (pref_level < 0 || pref_level > 2) pref_level = 0; }
         }
         fclose(f);
         return;
@@ -107,7 +112,7 @@ static void prefs_save(void)
     for (int i = 0; i < 2; i++) {
         FILE *f = fopen(files[i], "w");
         if (!f) continue;
-        fprintf(f, "ASK=%d\nMODE=%lx\nSIZE=%dx%d\nDEPTH=%d\n", pref_ask, (unsigned long)pref_mode, pref_w, pref_h, pref_depth);
+        fprintf(f, "ASK=%d\nMODE=%lx\nSIZE=%dx%d\nDEPTH=%d\nLEVEL=%d\n", pref_ask, (unsigned long)pref_mode, pref_w, pref_h, pref_depth, pref_level);
         fclose(f);
     }
 }
@@ -121,6 +126,7 @@ static int view_x, view_y;             /* top-left tile of the view */
 static char status_date[32] = "", status_funds[48] = "", status_msg[96] = "";
 extern int sim_loops;
 static int dirty = 1;
+static int toolbar_dirty_ext;              /* set by ui_update_heads(), picked up by the renderer */
 static int map_dirty = 1;
 static int budget_dirty = 1, notice_dirty = 1, eval_dirty = 1, graph_dirty = 1, query_dirty = 1;
 static int query_visible;
@@ -183,7 +189,7 @@ int ui_eval(const char *cmd)
         int r, c, i;
         if (sscanf(cmd + 12, "%d %d %d", &r, &c, &i) == 3) { demand_r = r; demand_c = c; demand_i = i; demand_dirty = 1; dirty = 1; }
     }
-    else if (!strncmp(cmd, "UIShowPicture ", 14))   { if (!debug_show) notice_show(atoi(cmd + 14)); notice_dirty = 1; dirty = 1; }
+    else if (!strncmp(cmd, "UIShowPicture ", 14))   { if (!debug_show && DoNotices) { notice_show(atoi(cmd + 14)); notice_dirty = 1; } dirty = 1; }
     else if (!strncmp(cmd, "UIAutoGoto ", 11)) {
         int x, y;
         if (autoGo && sscanf(cmd + 11, "%d %d", &x, &y) == 2) { view_x = x - VIEW_COLS / 2; view_y = y - VIEW_ROWS / 2; clamp_view(); dirty = 1; }
@@ -200,12 +206,12 @@ int ui_eval(const char *cmd)
         }
     }
     else if (!strncmp(cmd, "UISetSpeed ", 11))      { if (sound_ui_ready && UserSoundOn) sound_play("boing"); }
-    else if (!strncmp(cmd, "UISetMessage ", 13)) { copy_braced(status_msg, sizeof status_msg, cmd); dirty = 1; }
+    else if (!strncmp(cmd, "UISetMessage ", 13)) { if (DoMessages) copy_braced(status_msg, sizeof status_msg, cmd); dirty = 1; }
     return 0;
 }
 void ui_invalidate(int what) { dirty = 1; }
 void ui_flush(void) {}
-void ui_update_heads(void) {}
+void ui_update_heads(void) { toolbar_dirty_ext = 1; dirty = 1; }   /* the core changed the tool (keyboard shortcut) */
 
 /* ---------- assets ---------- */
 static UBYTE *load_file(const char *name, ULONG *size)
@@ -566,9 +572,9 @@ static long elapsed_us(void)
 }
 
 /* residential / commercial / industrial demand bars in the status bar (what the city needs) */
-#define DEM_X 520
-#define DEM_Y 0
 #define DEM_W 100
+#define DEM_X (SCR_W - DEM_W - 6)             /* at the right end of the status bar */
+#define DEM_Y 0
 #define DEM_H 32
 static void draw_demand(void)
 {
@@ -672,6 +678,7 @@ static void render_frame(struct Window *win)
     n_prev_spr = n_spr;
     prev_cursor = cur; have_prev_cursor = have_cursor;
 
+    if (toolbar_dirty_ext) { toolbar_dirty = 1; toolbar_dirty_ext = 0; }
     gfx_target(fb, SCR_W);
     if (toolbar_dirty) {
         draw_toolbar();
@@ -732,18 +739,19 @@ static void render_frame(struct Window *win)
 /* ---------- menus and commands ---------- */
 enum { CMD_NEW = 1, CMD_LOAD, CMD_SAVE, CMD_SAVEAS, CMD_QUIT,
        CMD_PAUSE = 10, CMD_SLOW, CMD_MEDIUM, CMD_FAST,
-       CMD_AUTOBULLDOZE = 20, CMD_AUTOBUDGET, CMD_DISASTERS, CMD_SOUND, CMD_ASKMODE,
+       CMD_AUTOBULLDOZE = 20, CMD_AUTOBUDGET, CMD_DISASTERS, CMD_SOUND, CMD_ASKMODE, CMD_AUTOGO, CMD_ANIM, CMD_MSGS, CMD_NOTICES, CMD_OVERLAY, CMD_LEVEL = 60,
        CMD_ABOUT = 44, CMD_SCEN = 200, CMD_BUDGET = 40, CMD_MAP = 41, CMD_EVAL = 42, CMD_GRAPHS = 43, CMD_MAPMODE = 100,
        CMD_FIRE = 30, CMD_FLOOD, CMD_TORNADO, CMD_QUAKE, CMD_MONSTER, CMD_MELTDOWN };
 
 static struct NewMenu newmenu[64];                      /* the menus have about 48 entries */
 static int nmenu;
+static unsigned mi_excl;                       /* mutual-exclude mask for the next item (GadTools: bit n = item n of the same menu) */
 static void mi(UBYTE type, const char *label, const char *key, UWORD flags, int id)
 {
     if (nmenu >= (int)(sizeof newmenu / sizeof newmenu[0]) - 1) return;     /* never overrun the table */
     struct NewMenu *n = &newmenu[nmenu++];
     n->nm_Type = type; n->nm_Label = (STRPTR)label; n->nm_CommKey = (STRPTR)key;
-    n->nm_Flags = flags; n->nm_MutualExclude = 0; n->nm_UserData = (APTR)(long)id;
+    n->nm_Flags = flags; n->nm_MutualExclude = mi_excl; mi_excl = 0; n->nm_UserData = (APTR)(long)id;
 }
 
 static struct Menu *make_menus(struct Screen *scr, APTR *vi_out)
@@ -775,13 +783,22 @@ static struct Menu *make_menus(struct Screen *scr, APTR *vi_out)
     mi(NM_ITEM, "Auto Budget", NULL, CHECKIT | MENUTOGGLE | (autoBudget ? CHECKED : 0), CMD_AUTOBUDGET);
     mi(NM_ITEM, "Disasters", NULL, CHECKIT | MENUTOGGLE | (NoDisasters ? 0 : CHECKED), CMD_DISASTERS);
     mi(NM_ITEM, "Sound", NULL, CHECKIT | MENUTOGGLE | (UserSoundOn ? CHECKED : 0), CMD_SOUND);
+    mi(NM_ITEM, "Auto Goto (jump to events)", NULL, CHECKIT | MENUTOGGLE | (autoGo ? CHECKED : 0), CMD_AUTOGO);
+    mi(NM_ITEM, "Animation", NULL, CHECKIT | MENUTOGGLE | (DoAnimation ? CHECKED : 0), CMD_ANIM);
+    mi(NM_ITEM, "Messages", NULL, CHECKIT | MENUTOGGLE | (DoMessages ? CHECKED : 0), CMD_MSGS);
+    mi(NM_ITEM, "Message windows", NULL, CHECKIT | MENUTOGGLE | (DoNotices ? CHECKED : 0), CMD_NOTICES);
     mi(NM_ITEM, "Ask for screen mode at start", NULL, CHECKIT | MENUTOGGLE | (pref_ask ? CHECKED : 0), CMD_ASKMODE);
+    mi(NM_TITLE, "Level", NULL, 0, 0);
+    mi_excl = 6; mi(NM_ITEM, "Easy ($20,000 start)",   NULL, CHECKIT | (pref_level == 0 ? CHECKED : 0), CMD_LEVEL + 0);
+    mi_excl = 5; mi(NM_ITEM, "Medium ($10,000 start)", NULL, CHECKIT | (pref_level == 1 ? CHECKED : 0), CMD_LEVEL + 1);
+    mi_excl = 3; mi(NM_ITEM, "Hard ($5,000 start)",    NULL, CHECKIT | (pref_level == 2 ? CHECKED : 0), CMD_LEVEL + 2);
     mi(NM_TITLE, "Windows", NULL, 0, 0);
     mi(NM_ITEM, "Budget...", "B", 0, CMD_BUDGET);
     mi(NM_ITEM, "Evaluation...", "E", 0, CMD_EVAL);
     mi(NM_ITEM, "Graphs...", "G", 0, CMD_GRAPHS);
     mi(NM_TITLE, "Map", NULL, 0, 0);
     mi(NM_ITEM, "Map window on/off", "M", 0, CMD_MAP);
+    mi(NM_ITEM, "Next overlay", "C", 0, CMD_OVERLAY);
     mi(NM_ITEM, (const char *)NM_BARLABEL, NULL, 0, 0);
     for (int i = 0; i < MAP_MODES; i++) mi(NM_ITEM, map_names[i], NULL, 0, CMD_MAPMODE + i);
     mi(NM_TITLE, "Disasters", NULL, 0, 0);
@@ -877,10 +894,17 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
         notice_show(id - CMD_SCEN); notice_dirty = 1;
         return 1;
     }
+    if (id >= CMD_LEVEL && id < CMD_LEVEL + 3) {          /* difficulty: the start funds of the next new city, and the evaluation */
+        pref_level = id - CMD_LEVEL;
+        SetGameLevel((short)pref_level);
+        prefs_save();
+        sprintf(status_msg, "Level: %s", pref_level == 0 ? "Easy" : pref_level == 1 ? "Medium" : "Hard");
+        return 1;
+    }
     switch (id) {
     case CMD_ABOUT: show_about(); break;
     case CMD_NEW:
-        GenerateNewCity(); setSpeed(3); recenter();
+        GenerateNewCity(); SetGameLevelFunds((short)pref_level); setSpeed(3); recenter();
         sprintf(status_msg, "New city generated."); break;
     case CMD_LOAD:
         if (ask_file(win, 0, path, sizeof path)) {
@@ -905,6 +929,11 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
     case CMD_AUTOBUDGET: autoBudget = checked; break;
     case CMD_DISASTERS: NoDisasters = !checked; break;
     case CMD_SOUND: UserSoundOn = checked; break;
+    case CMD_AUTOGO: autoGo = checked; MustUpdateOptions = 1; break;
+    case CMD_ANIM: DoAnimation = checked; MustUpdateOptions = 1; full_redraw = 1; break;
+    case CMD_MSGS: DoMessages = checked; MustUpdateOptions = 1; break;
+    case CMD_NOTICES: DoNotices = checked; MustUpdateOptions = 1; break;
+    case CMD_OVERLAY: map_mode = (map_mode + 1) % MAP_MODES; map_visible = 1; map_dirty = 1; map_panel_dirty = 1; sprintf(status_msg, "Map: %s", map_names[map_mode]); break;
     case CMD_ASKMODE:
         pref_ask = checked;
         if (!pref_ask) { pref_mode = (ULONG)scr_mode_shown; pref_w = scr_w; pref_h = scr_h; pref_depth = scr_depth_shown; }   /* keep using the current mode */
@@ -1100,6 +1129,7 @@ static int real_main(int argc, char **argv)
     CyberGfxBase = OpenLibrary((CONST_STRPTR)"cybergraphics.library", 40);
     GadToolsBase = OpenLibrary((CONST_STRPTR)"gadtools.library", 37);
     AslBase = OpenLibrary((CONST_STRPTR)"asl.library", 37);
+    KeymapBase = OpenLibrary((CONST_STRPTR)"keymap.library", 36);
     { char b[80]; struct Task *t = FindTask(NULL);
       sprintf(b, "stack: %ld bytes", (long)((char *)t->tc_SPUpper - (char *)t->tc_SPLower)); logmsg(b); }
     logmsg("start");
@@ -1218,7 +1248,8 @@ static int real_main(int argc, char **argv)
         g_menu = menu;
         if (menu) SetMenuStrip(win, menu);
     }
-    editor.tool_state = queryState;
+    editor.tool_state = queryState; editor.tool_state_save = -1;
+    SetGameLevel((short)pref_level);
     setSpeed(3);
     if (argc > 3 && !strncmp(argv[3], "scroll=", 7)) { dbg_scroll = atoi(argv[3] + 7); setSpeed(0); }   /* debug: scroll test */
     if (argc > 3 && !strncmp(argv[3], "jump=", 5)) { int jx = 0, jy = 0; sscanf(argv[3] + 5, "%d,%d", &jx, &jy); view_x = jx; view_y = jy; clamp_view(); setSpeed(0); }
@@ -1249,6 +1280,8 @@ static int real_main(int argc, char **argv)
             ULONG cls = m->Class;
             UWORD code = m->Code;
             int mx = m->MouseX, my = m->MouseY;
+            UWORD qual = m->Qualifier;
+            APTR iaddr = m->IAddress;
             struct Window *mw = m->IDCMPWindow;
             int pi = panel_index(mw);                             /* which panel window, or -1 = the game window */
             ReplyMsg((struct Message *)m);
@@ -1275,7 +1308,20 @@ static int real_main(int argc, char **argv)
                 continue;
             }
             if (cls == IDCMP_RAWKEY) {
-                if (code & IECODE_UP_PREFIX) continue;
+                int up = (code & IECODE_UP_PREFIX) != 0;
+                if (KeymapBase) {                                   /* typed characters: tool shortcuts (b r p t x z) and cheat words, like the original */
+                    struct InputEvent ie;
+                    char kb[8];
+                    memset(&ie, 0, sizeof ie);
+                    ie.ie_Class = IECLASS_RAWKEY; ie.ie_Code = code & ~IECODE_UP_PREFIX; ie.ie_Qualifier = qual;
+                    ie.ie_EventAddress = (APTR *)iaddr;
+                    if (MapRawKey(&ie, (STRPTR)kb, sizeof kb, NULL) == 1 && (unsigned char)kb[0] >= 27 && (unsigned char)kb[0] < 127) {
+                        if (!(qual & (IEQUALIFIER_LCOMMAND | IEQUALIFIER_RCOMMAND))) {
+                            if (up) doKeyUp(&editor, kb[0]); else doKeyDown(&editor, kb[0]);
+                        }
+                    }
+                }
+                if (up) continue;
                 { static int n; if (n < 25) { char b[40]; sprintf(b, "rawkey 0x%02x", (unsigned)code); logmsg(b); n++; } }
                 switch (code) {
                 case 0x7a: view_y -= 2; break;                            /* mouse wheel */
@@ -1286,8 +1332,6 @@ static int real_main(int argc, char **argv)
                 case 0x20: view_x--; break;
                 case 0x45: if (pi >= 0) panels[pi].close(); else running = 0; break;   /* Esc: closes the active panel window, else quits */
                 case 0x44: case 0x40: if (pi >= 0) panels[pi].close(); break;          /* Return, Space */
-                case 0x12: open_info_panel(P_EVAL); break;                    /* E */
-                case 0x24: open_info_panel(P_GRAPH); break;                   /* G */
                 case 0x4c: view_y--; break;                               /* cursor keys scroll */
                 case 0x4d: view_y++; break;
                 case 0x4e: view_x++; break;
@@ -1296,10 +1340,6 @@ static int real_main(int argc, char **argv)
                 case 0x01: setSpeed(1); break;
                 case 0x02: setSpeed(2); break;
                 case 0x03: setSpeed(3); break;
-                case 0x19: setSpeed(SimMetaSpeed ? 0 : 3); break;        /* P */
-                case 0x35: DoBudgetFromMenu(); break;                      /* B */
-                case 0x37: open_info_panel(P_MAP); map_dirty = 1; break;   /* M */
-                case 0x36: if (map_visible) { map_mode = (map_mode + 1) % MAP_MODES; map_dirty = 1; sprintf(status_msg, "Map: %s", map_names[map_mode]); } break;   /* C: next overlay */
                 }
                 clamp_view();
             } else if (pi >= 0) {
@@ -1378,7 +1418,7 @@ static int real_main(int argc, char **argv)
         }
         if (dirty) {
             static int first = 1; if (first) { logmsg("first frame"); first = 0; }
-            if (!TilesAnimated) { animateTiles(); TilesAnimated = 1; }
+            if (!TilesAnimated) { if (DoAnimation) animateTiles(); TilesAnimated = 1; }
             render_frame(win);
             dirty = 0;
         }
@@ -1413,6 +1453,7 @@ out:
     if (GadToolsBase) CloseLibrary(GadToolsBase);
     if (AslBase) CloseLibrary(AslBase);
     if (IconBase) CloseLibrary(IconBase);
+    if (KeymapBase) CloseLibrary(KeymapBase);
     logmsg("cleanup done");
     return rc;
 }

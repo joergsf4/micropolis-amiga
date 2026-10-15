@@ -60,12 +60,15 @@ question on again. `SIZE=` (ToolType or argument) skips the question and uses th
 | Build | click or drag on the map; the white frame shows what will be built |
 | Scroll | W A S D, mouse wheel, or move the mouse to the screen edge. With the overview map open: click or drag in it |
 | Menus | right mouse button: Project, Speed, Options, Windows, Map, Disasters |
-| Speed | `0` pause, `1` slow, `2` medium, `3` fast, `P` pause on/off |
-| Budget | `B` or Windows > Budget (taxes, road/fire/police funding; Continue / Cancel) |
-| Evaluation | `E` or Windows > Evaluation (public opinion, worst problems, score) |
-| Graphs | `G` or Windows > Graphs (residential, commercial, industrial, money, crime, pollution; 10 or 120 years) |
-| Overview map | `M` opens/closes the map window, `C` next overlay (power, traffic, pollution, crime, land value, ...); click or drag in it to scroll |
+| Speed | `0` pause, `1` slow, `2` medium, `3` fast (or the Speed menu) |
+| Budget | Windows > Budget (taxes, road/fire/police funding; Continue / Cancel) |
+| Evaluation | Windows > Evaluation (public opinion, worst problems, score) |
+| Graphs | Windows > Graphs (residential, commercial, industrial, money, crime, pollution; 10 or 120 years) |
+| Overview map | Windows > Map opens the overview map, Map > Next overlay cycles power, traffic, pollution, crime, land value, ...; click or drag in it to scroll |
 | Scenarios | menu Scenarios: Dullsville 1900, San Francisco 1906, Hamburg 1944, Bern 1965, Tokyo 1957, Detroit 1972, Boston 2010, Rio de Janeiro 2047 (each with its story and goal) |
+| Tool keys | as in the original: `b` bulldozer, `r` road, `p` park, `t` wire, `x` rail, `z` zone query; typed cheat words (e.g. `fund`) work too |
+| Level | menu Level: Easy / Medium / Hard (start funds of a new city; saved in the preferences) |
+| Options | Auto Goto, Animation, Messages, Message windows can be switched off in the Options menu |
 | Quit | Esc or Project > Quit |
 | Version | Project > About Micropolis (version, build, CPU, screen mode, free memory) |
 

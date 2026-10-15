@@ -67,11 +67,14 @@ Tools          click a button on the left (Query, Doze, Road, Rail, Wire, Park, 
 Build          click or drag on the map; the white frame shows the area
 Scroll         W A S D, mouse wheel, mouse at the screen edge; in the overview map click or drag
 Menus          right mouse button
-Speed          0 pause, 1 slow, 2 medium, 3 fast, P toggles pause
-Budget         B, or menu Windows/Budget (Continue or Cancel)
-Evaluation     E, or menu Windows/Evaluation (opinion, problems, score)
-Graphs         G, or menu Windows/Graphs (6 histories, 10 or 120 years)
-Overview map   M opens/closes the map window, C next overlay (14 overlays in the Map menu); click/drag in it to scroll
+Speed          0 pause, 1 slow, 2 medium, 3 fast (or menu Speed)
+Budget         menu Windows/Budget (Continue or Cancel)
+Evaluation     menu Windows/Evaluation (opinion, problems, score)
+Graphs         menu Windows/Graphs (6 histories, 10 or 120 years)
+Overview map   menu Windows/Map opens the map window, Map/Next overlay cycles (14 overlays); click/drag in it to scroll
+Tool keys      b bulldozer, r road, p park, t wire, x rail, z query (as in the original); cheat words work too
+Level          menu Level: Easy/Medium/Hard (start funds of a new city, saved in the preferences)
+Options        Auto Goto, Animation, Messages, Message windows can be switched off
 Scenarios      menu Scenarios: 8 historic disasters/challenges with story and goal
 Quit           Esc, or Project/Quit
 About          Project/About Micropolis: version, build, CPU, screen mode, free memory
