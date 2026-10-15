@@ -186,15 +186,16 @@ static int debug_show;                  /* test option show=eval|graph: keep mes
 static const int panning = 0;            /* (right button is the menu button now) */
 static int mouse_x = -1, mouse_y = -1;   /* last window position, for edge scrolling */
 
-static const struct { const char *name; short state; } toolbtn[16] = {
+#define NTOOLS 18
+static const struct { const char *name; short state; } toolbtn[NTOOLS] = {
     { "Query", queryState },       { "Doze 1", dozeState },       { "Road 10", roadState },
     { "Rail 20", rrState },        { "Wire 5", wireState },       { "Park 10", parkState },
     { "Resid 100", residentialState }, { "Comm 100", commercialState }, { "Indus 100", industrialState },
     { "Fire 500", fireState },     { "Polic 500", policeState }, { "Stadm 5k", stadiumState },
     { "Coal 3k", powerState },     { "Nucl 5k", nuclearState },   { "Sea 3k", seaportState },
-    { "Airp 10k", airportState },
+    { "Airp 10k", airportState }, { "Chalk", chalkState },       { "Eraser", eraserState },
 };
-#define TB_BTN_H ((SCR_H - BAR_H) / 16)
+#define TB_BTN_H ((SCR_H - BAR_H) / NTOOLS)
 
 /* ---------- notifications from the simulation core (see ui_core.c) ---------- */
 static void copy_braced(char *dst, size_t n, const char *s)
@@ -395,11 +396,73 @@ static void draw_cursor(const struct rect *r)
 
 static void draw_toolbar(void)
 {
-    for (int i = 0; i < 16; i++) {
+    for (int y = BAR_H + NTOOLS * TB_BTN_H; y < SCR_H; y++) memset(fb + y * SCR_W, PEN_BAR, TB_W);
+    for (int i = 0; i < NTOOLS; i++) {
         UBYTE c = toolbtn[i].state == editor.tool_state ? PEN_SEL : PEN_BTN;
         for (int y = 0; y < TB_BTN_H; y++)
             memset(fb + (BAR_H + i * TB_BTN_H + y) * SCR_W, (y == TB_BTN_H - 1) ? PEN_BAR : c, TB_W);
     }
+}
+
+/* chalk notes: world pixel polylines. Cells they touch (now or in the last frame) are redrawn every frame, then the lines go on top. */
+static UBYTE ink_cur[WORLD_Y][WORLD_X], ink_prev[WORLD_Y][WORLD_X];
+static int ink_prev_any;
+
+static void ink_mark(int wx, int wy)
+{
+    int cx = wx >> 4, cy = wy >> 4;
+    if (cx >= 0 && cx < WORLD_X && cy >= 0 && cy < WORLD_Y) ink_cur[cy][cx] = 1;
+}
+
+static void ink_pixel(int wx, int wy, UBYTE pen)
+{
+    int x = TB_W + wx - (view_x << 4), y = BAR_H + wy - (view_y << 4);
+    if (x >= TB_W && x < SCR_W && y >= BAR_H && y < SCR_H) fb[y * SCR_W + x] = pen;
+}
+
+static void ink_line(int x0, int y0, int x1, int y1, UBYTE pen)
+{
+    int dx = x1 > x0 ? x1 - x0 : x0 - x1, dy = y1 > y0 ? y0 - y1 : y1 - y0;
+    int sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1, err = dx + dy;
+    for (;;) {
+        ink_pixel(x0, y0, pen); ink_pixel(x0 + 1, y0, pen);
+        if (x0 == x1 && y0 == y1) break;
+        { int e2 = 2 * err; if (e2 >= dy) { err += dy; x0 += sx; } if (e2 <= dx) { err += dx; y0 += sy; } }
+    }
+}
+
+static void ink_walk(int draw)            /* draw = 0: mark the touched cells, 1: draw the lines */
+{
+    for (Ink *ink = sim->overlay; ink; ink = ink->next) {
+        int x = ink->points[0].x, y = ink->points[0].y;
+        UBYTE pen = ink->color == COLOR_WHITE ? PEN_TEXT : PEN_V_YELLOW;
+        if (!draw) ink_mark(x, y); else ink_pixel(x, y, pen);
+        for (int i = 1; i < ink->length; i++) {
+            int nx = x + ink->points[i].x, ny = y + ink->points[i].y;
+            if (draw) ink_line(x, y, nx, ny, pen);
+            else {
+                int n = (abs(nx - x) > abs(ny - y) ? abs(nx - x) : abs(ny - y)) / 8 + 1;
+                for (int k = 0; k <= n; k++) ink_mark(x + (nx - x) * k / n, y + (ny - y) * k / n);
+            }
+            x = nx; y = ny;
+        }
+    }
+}
+
+static void ink_prepare(void)             /* before the tiles are drawn: which cells must be redrawn */
+{
+    int any = 0;
+    memset(ink_cur, 0, sizeof ink_cur);
+    if (sim->overlay) { ink_walk(0); any = 1; }
+    if (any || ink_prev_any) {
+        for (int row = 0; row < VIEW_ROWS; row++)
+            for (int col = 0; col < VIEW_COLS; col++) {
+                int mx = view_x + col, my = view_y + row;
+                if (mx < WORLD_X && my < WORLD_Y && (ink_cur[my][mx] || ink_prev[my][mx])) redraw[row][col] = 1;
+            }
+    }
+    memcpy(ink_prev, ink_cur, sizeof ink_prev);
+    ink_prev_any = any;
 }
 
 /* mark every cell touched by a pixel rectangle */
@@ -708,6 +771,8 @@ static void render_frame(struct Window *win)
     if (have_cursor) mark_rect(&cur);
     if (have_prev_cursor) mark_rect(&prev_cursor);
 
+    ink_prepare();
+
     /* draw the tiles that changed */
     for (int row = 0; row < VIEW_ROWS; row++) {
         for (int col = 0; col < VIEW_COLS; col++) {
@@ -716,6 +781,7 @@ static void render_frame(struct Window *win)
             stats.tiles++;
         }
     }
+    if (sim->overlay) ink_walk(1);
     for (int i = 0; i < n_spr; i++) draw_sprite(&cur_spr[i], spr_px[i], spr_w[i], spr_h[i]);
     if (have_cursor) draw_cursor(&cur);
     for (int i = 0; i < n_spr; i++) prev_spr[i] = cur_spr[i];
@@ -727,7 +793,7 @@ static void render_frame(struct Window *win)
     if (toolbar_dirty) {
         draw_toolbar();
         gfx_colors(PEN_TEXT, PEN_BTN);
-        for (int i = 0; i < 16; i++) {
+        for (int i = 0; i < NTOOLS; i++) {
             gfx_colors(PEN_TEXT, toolbtn[i].state == editor.tool_state ? PEN_SEL : PEN_BTN);
             gfx_print(4, BAR_H + i * TB_BTN_H + TB_BTN_H / 2 + 4, toolbtn[i].name);
         }
@@ -964,7 +1030,7 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
         return 1;
     }
     if (id > CMD_SCEN && id <= CMD_SCEN + 8) {            /* scenario: load it and show its story, as the original does */
-        LoadScenario((short)(id - CMD_SCEN));
+        EraseOverlay(); LoadScenario((short)(id - CMD_SCEN));
         recenter();
         notice_show(id - CMD_SCEN); notice_dirty = 1;
         return 1;
@@ -980,11 +1046,11 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
     case CMD_HELP: show_help(); break;
     case CMD_ABOUT: show_about(); break;
     case CMD_NEW:
-        GenerateNewCity(); SetGameLevelFunds((short)pref_level); setSpeed(3); recenter();
+        EraseOverlay(); GenerateNewCity(); SetGameLevelFunds((short)pref_level); setSpeed(3); recenter();
         sprintf(status_msg, "New city generated."); break;
     case CMD_LOAD:
         if (ask_file(win, 0, path, sizeof path)) {
-            if (LoadCity(path)) { recenter(); sprintf(status_msg, "Loaded %s", path); }
+            if (LoadCity(path)) { EraseOverlay(); recenter(); sprintf(status_msg, "Loaded %s", path); }
             else sprintf(status_msg, "Could not load %s", path);
         }
         break;
@@ -1342,7 +1408,16 @@ static int real_main(int argc, char **argv)
         { char lb[40]; sprintf(lb, "modes accepted: %d", n); logmsg(lb); }
     }
     if (argc > 3 && !strcmp(argv[3], "quake")) { MakeEarthquake(); }   /* debug */
-    if (argc > 3 && !strcmp(argv[3], "help")) show_help();   /* debug */
+    if (argc > 3 && !strcmp(argv[3], "help")) show_help();
+    if (argc > 3 && !strncmp(argv[3], "chalk", 5)) {                 /* debug: a note on the map */
+        int bx = (view_x + 8) << 4, by = (view_y + 6) << 4;
+        editor.tool_state = chalkState;
+        ToolDown(&editor, bx, by);
+        for (int k = 1; k <= 40; k++) ToolDrag(&editor, bx + k * 5, by + (k % 10) * 6 + k);
+        ToolUp(&editor, bx + 200, by + 60);
+        if (!strcmp(argv[3], "chalkerase")) { editor.tool_state = eraserState; ToolDown(&editor, bx + 100, by + 40); ToolUp(&editor, bx + 100, by + 40); }
+        editor.tool_state = queryState;
+    }   /* debug */
     for (int ai = 1; ai < argc; ai++) if (!strncmp(argv[ai], "quit=", 5)) dbg_quit_loops = atoi(argv[ai] + 5) * 50;
     if (argc > 3 && !strncmp(argv[3], "show=", 5)) debug_show = 1;
     if (argc > 3 && !strcmp(argv[3], "show=about")) show_about();
@@ -1448,7 +1523,7 @@ static int real_main(int argc, char **argv)
                 if (cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) {
                     if (mx < TB_W && my >= BAR_H) {
                         int i = (my - BAR_H) / TB_BTN_H;
-                        if (i < 16) {
+                        if (i < NTOOLS) {
                             static const char *const tool_sound[18] = { "res", "com", "ind", "fire", "query", "police", "wire", "bulldozer", "rail",
                                                                          "road", "chalk", "eraser", "stadium", "park", "seaport", "coal", "nuclear", "airport" };
                             editor.tool_state = toolbtn[i].state; toolbar_dirty = 1;

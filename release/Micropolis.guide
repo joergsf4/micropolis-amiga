@@ -47,6 +47,9 @@
   Stadm   5000 stadium       Coal  3000 coal power plant
   Nucl    5000 nuclear plant Sea   3000 sea port   Airp  10000 airport
 
+  Chalk   draw a note on the map (white line); notes are not saved with the city
+  Eraser  removes the chalk lines you touch
+
   Roads and wires over water are built as bridges and cost more.
   Auto Bulldoze (menu Options) clears rubble automatically.
 @endnode

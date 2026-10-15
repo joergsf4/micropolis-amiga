@@ -63,7 +63,8 @@ CONTROLS
 --------
 Query          the Query tool opens a zone status box at the top right (click it or Esc to close)
 Tools          click a button on the left (Query, Doze, Road, Rail, Wire, Park, zones,
-               Fire, Police, Stadium, power plants, Sea port, Airport)
+               Fire, Police, Stadium, power plants, Sea port, Airport,
+               Chalk and Eraser for notes on the map; one click with the Eraser removes a whole line)
 Build          click or drag on the map; the white frame shows the area
 Scroll         W A S D, mouse wheel, mouse at the screen edge; in the overview map click or drag
 Menus          right mouse button

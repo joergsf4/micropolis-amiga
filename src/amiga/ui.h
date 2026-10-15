@@ -27,6 +27,7 @@ void sim_loop(int doSim);
 int  LoadCity(char *filename);
 int  CurrentYear(void);
 void animateTiles(void);
+void EraseOverlay(void);
 void doKeyDown(SimView *view, short charCode);
 void doKeyUp(SimView *view, short charCode);
 void doZoneStatus(short x, short y);
