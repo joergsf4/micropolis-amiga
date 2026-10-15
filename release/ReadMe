@@ -77,6 +77,7 @@ Tool keys      b bulldozer, r road, p park, t wire, x rail, z query (as in the o
 Start          at launch you choose: New city, Load city, Scenario or the default city (Options/Start menu at launch)
 Tool icons     uniform 32x32 set by default; Options/Classic tool icons switches to the original pictures
 Level          menu Level: Easy/Medium/Hard (start funds of a new city, saved in the preferences)
+Ambient sounds quiet sea / city / nature loops that follow the visible part of the map (Options menu)
 Options        Auto Goto, Animation, Messages, Message windows can be switched off; "Speak tool names" is off by default
 Scenarios      menu Scenarios: 8 historic disasters/challenges with story and goal
 Help           Help key, or menu Project/Help (Micropolis.guide, AmigaGuide)
@@ -109,3 +110,6 @@ GNU GPL v3 (file COPYING) with the additional terms of the original Micropolis r
 texts come from the original Micropolis distribution and are (c) Electronic Arts. Original game design:
 Will Wright. Unix/X11 version and open-sourcing: Don Hopkins.
 No Kickstart or Workbench files are included in this archive.
+
+CREDITS (ambient sounds, all CC0): RandomMind (waves), IgnasD (traffic), Spring Spring with isaiah658, syncopika and
+pauliuw (birds and wind); sources in tools/ambient/SOURCES.md of the source repository.

@@ -51,7 +51,7 @@ data:
 	cp $(UP)/res/stri.* $(UP)/res/hexa.* $(UP)/res/snro.* $(DEST)/res/
 	cp $(UP)/cities/*.cty $(DEST)/cities/
 	cp out/data/*.bin out/data/notices.txt $(DEST)/res/
-	mkdir -p $(DEST)/res/sounds; cp out/data/sounds/*.8svx $(DEST)/res/sounds/; rm -f $(DEST)/res/sounds/*.snd
+	mkdir -p $(DEST)/res/sounds; cp out/data/sounds/*.8svx assets/ambient/*.8svx $(DEST)/res/sounds/; rm -f $(DEST)/res/sounds/*.snd
 
 clean:
 	rm -rf out

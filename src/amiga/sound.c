@@ -75,8 +75,62 @@ void sound_play(const char *id)
     }
 }
 
+/* --- ambient loops: sea, city, nature; only their volumes change (see ambient_set / ambient_tick) --- */
+enum { AMB_SEA, AMB_CITY, AMB_NATURE, AMB_N };
+static const char *const amb_file[AMB_N] = { "amb_sea", "amb_city", "amb_nature" };
+static Object *amb_obj[AMB_N];
+static int amb_vol[AMB_N], amb_target[AMB_N], amb_tick_no;
+
+static void amb_trigger(Object *o, ULONG fn)
+{
+    struct dtTrigger t;
+    t.MethodID = DTM_TRIGGER; t.dtt_GInfo = NULL; t.dtt_Function = fn; t.dtt_Data = NULL;
+    DoDTMethodA(o, NULL, NULL, (Msg)&t);
+}
+
+void ambient_set(int sea, int city, int nature)              /* wanted volumes 0..64 */
+{
+    amb_target[AMB_SEA] = sea < 3 ? 0 : sea; amb_target[AMB_CITY] = city < 3 ? 0 : city; amb_target[AMB_NATURE] = nature < 3 ? 0 : nature;   /* nothing audible is not worth a channel */
+}
+
+void ambient_tick(void)                                       /* once per frame: move the volumes towards the targets (about 1 s from silence to 25) */
+{
+    if (!DataTypesBase) return;
+    if (++amb_tick_no & 1) return;
+    for (int i = 0; i < AMB_N; i++) {
+        int v = amb_vol[i];
+        if (v < amb_target[i]) v++; else if (v > amb_target[i]) v--;
+        if (v == amb_vol[i] && (v > 0) == (amb_obj[i] != NULL)) continue;
+        if (v > 0 && !amb_obj[i]) {                           /* a loop that becomes audible: load and start it (its samples use Chip RAM only while it plays) */
+            char path[80];
+            sprintf(path, "PROGDIR:res/sounds/%s.8svx", amb_file[i]);
+            amb_obj[i] = NewDTObject((CONST_STRPTR)path, DTA_SourceType, DTST_FILE, DTA_GroupID, GID_SOUND,
+                                     SDTA_Volume, v, SDTA_Cycles, 0, TAG_DONE);
+            if (!amb_obj[i]) { amb_target[i] = 0; v = 0; app_log("ambient: cannot load a loop"); }
+            else { amb_trigger(amb_obj[i], STM_PLAY); app_log("ambient: loop started"); }
+        } else if (v == 0 && amb_obj[i]) {                    /* silent again: stop it and give the memory back */
+            amb_trigger(amb_obj[i], STM_STOP);
+            DisposeDTObject(amb_obj[i]); amb_obj[i] = NULL;
+            app_log("ambient: loop stopped");
+        } else if (amb_obj[i]) {
+            SetDTAttrs(amb_obj[i], NULL, NULL, SDTA_Volume, (ULONG)v, TAG_DONE);
+        }
+        amb_vol[i] = v;
+    }
+}
+
+void ambient_off(void)
+{
+    ambient_set(0, 0, 0);
+    for (int i = 0; i < AMB_N; i++) {
+        if (amb_obj[i]) { amb_trigger(amb_obj[i], STM_STOP); DisposeDTObject(amb_obj[i]); amb_obj[i] = NULL; }
+        amb_vol[i] = 0;
+    }
+}
+
 void sound_exit(void)
 {
+    ambient_off();
     for (int i = 0; i < ncache; i++) DisposeDTObject(cache[i].obj);
     ncache = 0;
     if (DataTypesBase) { CloseLibrary(DataTypesBase); DataTypesBase = NULL; }

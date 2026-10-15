@@ -91,14 +91,15 @@ static int pref_ask = 1;
 static ULONG pref_mode = 0xffffffffUL;          /* remembered RTG mode id, picture size and depth */
 static int pref_w, pref_h, pref_depth;
 static int pref_level;                          /* difficulty 0 easy, 1 medium, 2 hard */
-enum { O_BULLDOZE, O_BUDGET, O_DISASTERS, O_SOUND, O_AUTOGO, O_ANIM, O_MSGS, O_NOTICES, O_SPEAK, O_STARTMENU, O_CLASSIC, N_OPT };
+enum { O_BULLDOZE, O_BUDGET, O_DISASTERS, O_SOUND, O_AUTOGO, O_ANIM, O_MSGS, O_NOTICES, O_SPEAK, O_STARTMENU, O_CLASSIC, O_AMBIENT, N_OPT };
+static int ambient_on = 1;                       /* background sounds that follow the visible part of the map */
 static int classic_icons;                        /* 1 = the original tool palette pictures, 0 = the uniform 32x32 set */
 static int start_pending;
 static int refresh_full;                   /* the next window refresh must be followed by a complete redraw (the picture changed while a requester covered it) */
 static int start_menu = 1;                       /* ask what to start with: new city, load, scenario */
 static int speak_tools;                          /* spoken tool names when a tool is chosen (off by default) */
-static const char *const opt_key[N_OPT] = { "AUTOBULLDOZE", "AUTOBUDGET", "DISASTERS", "SOUND", "AUTOGOTO", "ANIMATION", "MESSAGES", "MESSAGEWINDOWS", "SPEAKTOOLS", "STARTMENU", "CLASSICICONS" };
-static int pref_opt[N_OPT] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };     /* -1 = not saved yet: keep the default */
+static const char *const opt_key[N_OPT] = { "AUTOBULLDOZE", "AUTOBUDGET", "DISASTERS", "SOUND", "AUTOGOTO", "ANIMATION", "MESSAGES", "MESSAGEWINDOWS", "SPEAKTOOLS", "STARTMENU", "CLASSICICONS", "AMBIENT" };
+static int pref_opt[N_OPT] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };     /* -1 = not saved yet: keep the default */
 static int pref_speed = -1;
 static char pref_lang[24];                       /* "" = the system's preferred language, else "english" "deutsch" "polski" */
 static char arg_lang[24];                        /* lang= argument or LANGUAGE tooltype: wins over the preferences */
@@ -109,7 +110,7 @@ static int opt_get(int o)
     switch (o) {
     case O_BULLDOZE: return autoBulldoze;  case O_BUDGET: return autoBudget;  case O_DISASTERS: return !NoDisasters;
     case O_SOUND: return UserSoundOn;      case O_AUTOGO: return autoGo;      case O_ANIM: return DoAnimation;
-    case O_MSGS: return DoMessages;        case O_SPEAK: return speak_tools;   case O_STARTMENU: return start_menu;   case O_CLASSIC: return classic_icons;   default: return DoNotices;
+    case O_MSGS: return DoMessages;        case O_SPEAK: return speak_tools;   case O_STARTMENU: return start_menu;   case O_CLASSIC: return classic_icons;   case O_AMBIENT: return ambient_on;   default: return DoNotices;
     }
 }
 static void opt_set(int o, int v)
@@ -117,7 +118,7 @@ static void opt_set(int o, int v)
     switch (o) {
     case O_BULLDOZE: autoBulldoze = v; break;  case O_BUDGET: autoBudget = v; break;  case O_DISASTERS: NoDisasters = !v; break;
     case O_SOUND: UserSoundOn = v; break;      case O_AUTOGO: autoGo = v; break;      case O_ANIM: DoAnimation = v; break;
-    case O_MSGS: DoMessages = v; break;        case O_SPEAK: speak_tools = v; break;   case O_STARTMENU: start_menu = v; break;   case O_CLASSIC: classic_icons = v; break;   default: DoNotices = v; break;
+    case O_MSGS: DoMessages = v; break;        case O_SPEAK: speak_tools = v; break;   case O_STARTMENU: start_menu = v; break;   case O_CLASSIC: classic_icons = v; break;   case O_AMBIENT: ambient_on = v; break;   default: DoNotices = v; break;
     }
 }
 
@@ -920,7 +921,7 @@ static void render_frame(struct Window *win)
 /* ---------- menus and commands ---------- */
 enum { CMD_NEW = 1, CMD_LOAD, CMD_SAVE, CMD_SAVEAS, CMD_QUIT,
        CMD_PAUSE = 10, CMD_SLOW, CMD_MEDIUM, CMD_FAST,
-       CMD_AUTOBULLDOZE = 20, CMD_AUTOBUDGET, CMD_DISASTERS, CMD_SOUND, CMD_ASKMODE, CMD_AUTOGO, CMD_ANIM, CMD_MSGS, CMD_NOTICES, CMD_OVERLAY, CMD_LEVEL = 60, CMD_SPEAK = 65, CMD_STARTMENU = 66, CMD_CLASSIC = 67, CMD_LANG = 70,
+       CMD_AUTOBULLDOZE = 20, CMD_AUTOBUDGET, CMD_DISASTERS, CMD_SOUND, CMD_ASKMODE, CMD_AUTOGO, CMD_ANIM, CMD_MSGS, CMD_NOTICES, CMD_OVERLAY, CMD_LEVEL = 60, CMD_SPEAK = 65, CMD_STARTMENU = 66, CMD_CLASSIC = 67, CMD_LANG = 70, CMD_AMBIENT = 75,
        CMD_ABOUT = 44, CMD_HELP = 45, CMD_SCEN = 200, CMD_BUDGET = 40, CMD_MAP = 41, CMD_EVAL = 42, CMD_GRAPHS = 43, CMD_MAPMODE = 100,
        CMD_FIRE = 30, CMD_FLOOD, CMD_TORNADO, CMD_QUAKE, CMD_MONSTER, CMD_MELTDOWN };
 
@@ -968,6 +969,7 @@ static struct Menu *make_menus(struct Screen *scr, APTR *vi_out)
     mi(NM_ITEM, T("Auto Goto (jump to events)"), NULL, CHECKIT | MENUTOGGLE | (autoGo ? CHECKED : 0), CMD_AUTOGO);
     mi(NM_ITEM, T("Animation"), NULL, CHECKIT | MENUTOGGLE | (DoAnimation ? CHECKED : 0), CMD_ANIM);
     mi(NM_ITEM, T("Messages"), NULL, CHECKIT | MENUTOGGLE | (DoMessages ? CHECKED : 0), CMD_MSGS);
+    mi(NM_ITEM, T("Ambient sounds"), NULL, CHECKIT | MENUTOGGLE | (ambient_on ? CHECKED : 0), CMD_AMBIENT);
     mi(NM_ITEM, T("Speak tool names"), NULL, CHECKIT | MENUTOGGLE | (speak_tools ? CHECKED : 0), CMD_SPEAK);
     mi(NM_ITEM, T("Start menu at launch"), NULL, CHECKIT | MENUTOGGLE | (start_menu ? CHECKED : 0), CMD_STARTMENU);
     mi(NM_ITEM, T("Classic tool icons"), NULL, CHECKIT | MENUTOGGLE | (classic_icons ? CHECKED : 0), CMD_CLASSIC);
@@ -1024,6 +1026,39 @@ static int ask_file(struct Window *win, int save, char *out, size_t n)
         FreeAslRequest(fr);
     }
     return ok;
+}
+
+/* What is on the screen decides the background sound: share of water, built-up and open land among the visible tiles
+ * (the middle of the picture counts double). Volumes: 0 below 10 %, full at 60 % share, at most AMB_MAX of 64. */
+#define AMB_MAX 22
+static void ambient_update(void)
+{
+    long water = 0, city = 0, nature = 0, total;
+    int target[3];
+    if (!ambient_on || !UserSoundOn || SimSpeed == 0) { ambient_set(0, 0, 0); return; }
+    for (int row = 0; row < VIEW_ROWS; row++) {
+        for (int col = 0; col < VIEW_COLS; col++) {
+            int mx = view_x + col, my = view_y + row, w, t;
+            if (mx < 0 || my < 0 || mx >= WORLD_X || my >= WORLD_Y) continue;
+            w = (col > VIEW_COLS / 4 && col < VIEW_COLS * 3 / 4 && row > VIEW_ROWS / 4 && row < VIEW_ROWS * 3 / 4) ? 2 : 1;
+            t = (unsigned short)Map[mx][my] & LOMASK;
+            if (t >= 2 && t <= 20) water += w;                 /* river, shore, channel */
+            else if (t == 0 || (t >= 21 && t <= 43)) nature += w;   /* bare land, trees, woods */
+            else if (t >= 64) city += w;                        /* roads, rails, wires, zones, buildings */
+        }
+    }
+    total = water + city + nature;
+    if (total == 0) { ambient_set(0, 0, 0); return; }
+    {   long share[3] = { water * 100 / total, city * 100 / total, nature * 100 / total };
+        for (int i = 0; i < 3; i++) {
+            long v = (share[i] - 10) * AMB_MAX / 50;
+            target[i] = (int)(v < 0 ? 0 : v > AMB_MAX ? AMB_MAX : v);
+        }
+    }
+    ambient_set(target[0], target[1], target[2]);
+    if (debug_log) { static int last[3] = { -1, -1, -1 }; if (last[0] != target[0] || last[1] != target[1] || last[2] != target[2]) {
+        char b[80]; sprintf(b, "ambient: target sea %d city %d nature %d (shares %ld/%ld/%ld)", target[0], target[1], target[2], water * 100 / total, city * 100 / total, nature * 100 / total);
+        logmsg(b); last[0] = target[0]; last[1] = target[1]; last[2] = target[2]; } }
 }
 
 static void recenter(void)
@@ -1182,6 +1217,7 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
     case CMD_AUTOGO: autoGo = checked; MustUpdateOptions = 1; break;
     case CMD_ANIM: DoAnimation = checked; MustUpdateOptions = 1; full_redraw = 1; break;
     case CMD_MSGS: DoMessages = checked; MustUpdateOptions = 1; break;
+    case CMD_AMBIENT: ambient_on = checked; break;
     case CMD_CLASSIC: classic_icons = checked; toolbar_dirty = 1; break;
     case CMD_STARTMENU: start_menu = checked; break;
     case CMD_SPEAK: speak_tools = checked; break;
@@ -1710,6 +1746,7 @@ static int real_main(int argc, char **argv)
             if (ox != view_x || oy != view_y) dirty = 1;
         }
         sound_poll();
+        { static int amb_frame; if ((++amb_frame & 31) == 0 || amb_frame == 1) ambient_update(); ambient_tick(); }
         guide_poll();
         if (ShakeNow > 0 && shake_frames == 0) { shake_frames = 50; shake_bx = view_x; shake_by = view_y; }
         if (shake_frames > 0) {

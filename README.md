@@ -70,6 +70,7 @@ question on again. `SIZE=` (ToolType or argument) skips the question and uses th
 | Start | at launch a requester asks: New city, Load city, Scenario or the current (default) city; Options > Start menu at launch turns it off |
 | Tool icons | uniform 32x32 icons by default; Options > Classic tool icons switches to the original pictures |
 | Level | menu Level: Easy / Medium / Hard (start funds of a new city; saved in the preferences) |
+| Ambient sounds | quiet loops that follow the visible part of the map: sea where it shows mostly water, traffic hum over a city, birds and wind over open land (Options > Ambient sounds; CC0 recordings, see `tools/ambient/SOURCES.md`) |
 | Options | Auto Goto, Animation, Messages, Message windows can be switched off in the Options menu; "Speak tool names" (off by default) says the tool when you choose it |
 | Help | `Help` key or Project > Help (AmigaGuide document `Micropolis.guide`) |
 | Preferences | screen mode, options, speed, level and window positions are remembered (ENVARC:Micropolis.prefs) |
