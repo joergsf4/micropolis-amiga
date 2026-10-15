@@ -684,7 +684,9 @@ static int scr_depth_shown, scr_mode_shown;       /* filled in at startup */
 
 static void show_about(void)
 {
-    char txt[800], cpu[40] = "68000", fpu[24] = "no FPU", modeline[60];
+    char txt[800], cpu[40] = "68000", fpu[24] = "no FPU", modeline[60], snd[60];
+    sound_status(snd);
+    if (!UserSoundOn) strcpy(snd, "Sound: switched off (Options menu)");
     sprintf(modeline, "Screen mode 0x%08lx, %d bit", (unsigned long)scr_mode_shown, scr_depth_shown);
     UWORD af = SysBase->AttnFlags;
     if (af & AFF_68010) strcpy(cpu, "68010");
@@ -702,13 +704,14 @@ static void show_about(void)
         "CPU %s, %s\n"
         "%s\n"
         "Memory: %ld KB Chip, %ld KB Fast free\n"
+        "%s\n"
         "\n"
         "Simulation and graphics from Micropolis, the open-source SimCity (GPL v3, (c) Electronic Arts). "
         "Original design Will Wright, Unix version Don Hopkins.\n"
         "github.com/joergsf4/micropolis-amiga",
         VERSION, VER_DATE, BUILD_TIME, BUILD_REV, cpu, fpu,
         modeline,
-        (long)(AvailMem(MEMF_CHIP) / 1024), (long)(AvailMem(MEMF_FAST) / 1024));
+        (long)(AvailMem(MEMF_CHIP) / 1024), (long)(AvailMem(MEMF_FAST) / 1024), snd);
     notice_show_text("About Micropolis", txt);
     notice_dirty = 1;
 }

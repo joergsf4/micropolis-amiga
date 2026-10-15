@@ -11,6 +11,7 @@
 #include <proto/exec.h>
 #include <proto/dos.h>
 #include "sound.h"
+#include "stack.h"             /* app_log() */
 
 #define RATE 11025
 #define PERIOD (3546895 / RATE)            /* PAL colour clock; NTSC machines play about 1.3 % slower, nobody will hear it */
@@ -22,22 +23,31 @@ static struct cached cache[MAX_CACHE];
 static int ncache; static ULONG cache_size;
 
 static struct MsgPort *port;
-static struct IOAudio *io[2];              /* left, right */
-static int open_ok[2], in_flight[2];
-static struct cached *playing[2];
+#define NCH 4                              /* all four Paula channels: 0 and 3 are left, 1 and 2 are right; two per side = twice as loud */
+static struct IOAudio *io[NCH];
+static int open_ok[NCH], in_flight[NCH];
+static int open_err[NCH];                 /* OpenDevice result per channel (0 = ok) */
+static int played_count;
+static struct cached *playing[NCH];
 
 static int open_channel(int side)
 {
-    static UBYTE maps[2][2] = { { 1, 8 }, { 2, 4 } };       /* left: channels 0 or 3, right: channels 1 or 2 */
+    static UBYTE maps[NCH][1] = { { 1 }, { 8 }, { 2 }, { 4 } };   /* one channel each: 0, 3 (left), 1, 2 (right) */
     io[side] = (struct IOAudio *)CreateIORequest(port, sizeof(struct IOAudio));
     if (!io[side]) return 0;
     io[side]->ioa_Request.io_Message.mn_Node.ln_Pri = 20;
     io[side]->ioa_AllocKey = 0;
     io[side]->ioa_Data = maps[side];
-    io[side]->ioa_Length = 2;
-    if (OpenDevice((CONST_STRPTR)"audio.device", 0, (struct IORequest *)io[side], 0)) {
-        DeleteIORequest((struct IORequest *)io[side]); io[side] = NULL;
-        return 0;
+    io[side]->ioa_Length = 1;
+    {   BYTE err = OpenDevice((CONST_STRPTR)"audio.device", 0, (struct IORequest *)io[side], 0);
+        char lb[80];
+        open_err[side] = (int)err;
+        sprintf(lb, "sound: audio.device channel %d: OpenDevice error %d", side, (int)err);
+        app_log(lb);
+        if (err) {
+            DeleteIORequest((struct IORequest *)io[side]); io[side] = NULL;
+            return 0;
+        }
     }
     return 1;
 }
@@ -45,9 +55,8 @@ static int open_channel(int side)
 void sound_init(void)
 {
     port = CreateMsgPort();
-    if (!port) return;
-    open_ok[0] = open_channel(0);
-    open_ok[1] = open_channel(1);
+    if (!port) { for (int i = 0; i < NCH; i++) open_err[i] = 999; return; }
+    for (int i = 0; i < NCH; i++) open_ok[i] = open_channel(i);
 }
 
 static void reap(int side)
@@ -60,7 +69,7 @@ static void reap(int side)
     }
 }
 
-void sound_poll(void) { reap(0); reap(1); }
+void sound_poll(void) { for (int i = 0; i < NCH; i++) reap(i); }
 
 static void drop_idle(void)
 {
@@ -103,12 +112,17 @@ void sound_play(const char *id)
     char name[40];
     struct cached *c;
     int i;
-    if (!port || !(open_ok[0] || open_ok[1])) return;
+    if (!port || !(open_ok[0] || open_ok[1] || open_ok[2] || open_ok[3])) { app_log("sound: no audio channel, not playing"); return; }
     for (i = 0; id[i] && i < 38; i++) name[i] = (id[i] >= 'A' && id[i] <= 'Z') ? id[i] + 32 : id[i];
     name[i] = 0;
     sound_poll();
-    if (!(c = load(name))) return;
-    for (int side = 0; side < 2; side++) {
+    if (!(c = load(name))) {
+        char lb[100]; sprintf(lb, "sound: cannot load %s", name); app_log(lb);
+        return;
+    }
+    { char lb[100]; sprintf(lb, "sound: play %s (%ld bytes)", name, (long)c->len); app_log(lb); }
+    played_count++;
+    for (int side = 0; side < NCH; side++) {
         struct IOAudio *a = io[side];
         if (!open_ok[side]) continue;
         if (in_flight[side]) {                          /* a sound is still running on this channel: newest wins */
@@ -129,7 +143,7 @@ void sound_play(const char *id)
 
 void sound_exit(void)
 {
-    for (int side = 0; side < 2; side++) {
+    for (int side = 0; side < NCH; side++) {
         if (io[side]) {
             if (in_flight[side]) { AbortIO((struct IORequest *)io[side]); WaitIO((struct IORequest *)io[side]); }
             CloseDevice((struct IORequest *)io[side]);
@@ -140,4 +154,14 @@ void sound_exit(void)
     if (port) { DeleteMsgPort(port); port = NULL; }
     for (int i = 0; i < ncache; i++) FreeVec(cache[i].data);
     ncache = 0; cache_size = 0;
+}
+
+const char *sound_status(char *buf)            /* one line for the About box */
+{
+    int n = 0;
+    for (int i = 0; i < NCH; i++) n += open_ok[i];
+    if (n == NCH) sprintf(buf, "Sound: 4 channels, %d played", played_count);
+    else if (n) sprintf(buf, "Sound: %d of 4 channels, %d played", n, played_count);
+    else sprintf(buf, "Sound: audio.device unavailable (error %d)", open_err[0]);
+    return buf;
 }
