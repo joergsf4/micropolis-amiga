@@ -74,7 +74,6 @@ Graphs         menu Windows/Graphs (6 histories, 10 or 120 years)
 Overview map   menu Windows/Map opens the map window, Map/Next overlay cycles (14 overlays); click/drag in it to scroll
 Tool keys      b bulldozer, r road, p park, t wire, x rail, z query (as in the original); cheat words work too
 Level          menu Level: Easy/Medium/Hard (start funds of a new city, saved in the preferences)
-Sound          bulldozer noise while dragging; menu Windows/Say demands speaks O-A-E (pitch = R/C/I demand)
 Options        Auto Goto, Animation, Messages, Message windows can be switched off
 Scenarios      menu Scenarios: 8 historic disasters/challenges with story and goal
 Quit           Esc, or Project/Quit

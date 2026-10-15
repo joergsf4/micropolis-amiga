@@ -31,16 +31,7 @@ void sound_init(void)
     app_log(DataTypesBase ? "sound: datatypes.library open" : "sound: datatypes.library missing, no sound");
 }
 
-static Object *loop_obj;                        /* running bulldozer loop */
-struct later { char name[24]; int pct; unsigned long due; int used; };
-static struct later queue[4];
-
-static unsigned long now_ticks(void)            /* 1/50 s */
-{
-    struct DateStamp ds;
-    DateStamp(&ds);
-    return (unsigned long)ds.ds_Minute * 3000UL + (unsigned long)ds.ds_Tick;
-}
+void sound_poll(void) {}
 
 static Object *load(const char *name)
 {
@@ -61,7 +52,7 @@ static Object *load(const char *name)
     return o;
 }
 
-static void play_pitch(const char *id, int pct)
+void sound_play(const char *id)
 {
     char name[40];
     Object *o;
@@ -76,11 +67,6 @@ static void play_pitch(const char *id, int pct)
     }
     {   char lb[100]; sprintf(lb, "sound: play %s", name); app_log(lb); }
     played_count++;
-    {   ULONG base = 0;
-        GetDTAttrs(o, SDTA_SamplesPerSec, (ULONG)&base, TAG_DONE);
-        if (!base) base = 11025;
-        SetDTAttrs(o, NULL, NULL, SDTA_SamplesPerSec, base * (ULONG)pct / 100, TAG_DONE);
-    }
     {   struct dtTrigger t;
         t.MethodID = DTM_TRIGGER; t.dtt_GInfo = NULL; t.dtt_Function = STM_PLAY; t.dtt_Data = NULL;
         DoDTMethodA(o, NULL, NULL, (Msg)&t);
@@ -88,48 +74,8 @@ static void play_pitch(const char *id, int pct)
     }
 }
 
-void sound_play(const char *id) { play_pitch(id, 100); }
-
-void sound_play_later(const char *id, int pct, int delay_ms)   /* played from sound_poll once the time has come */
-{
-    for (int i = 0; i < 4; i++) if (!queue[i].used) {
-        strncpy(queue[i].name, id, 23); queue[i].name[23] = 0;
-        queue[i].pct = pct; queue[i].due = now_ticks() + (unsigned long)delay_ms / 20; queue[i].used = 1;
-        return;
-    }
-}
-
-void sound_poll(void)
-{
-    unsigned long t;
-    int any = 0;
-    for (int i = 0; i < 4; i++) if (queue[i].used) { any = 1; break; }
-    if (!any) return;
-    t = now_ticks();
-    for (int i = 0; i < 4; i++)
-        if (queue[i].used && (long)(t - queue[i].due) >= 0) { queue[i].used = 0; play_pitch(queue[i].name, queue[i].pct); }
-}
-
-void sound_loop(int on)                         /* continuous bulldozer noise */
-{
-    struct dtTrigger t;
-    if (!DataTypesBase) return;
-    if (on && !loop_obj) {
-        loop_obj = NewDTObject((CONST_STRPTR)"PROGDIR:res/sounds/bulldozer.8svx", DTA_SourceType, DTST_FILE, DTA_GroupID, GID_SOUND,
-                               SDTA_Volume, 48, SDTA_Cycles, 0, TAG_DONE);
-        if (!loop_obj) return;
-        t.MethodID = DTM_TRIGGER; t.dtt_GInfo = NULL; t.dtt_Function = STM_PLAY; t.dtt_Data = NULL;
-        DoDTMethodA(loop_obj, NULL, NULL, (Msg)&t);
-    } else if (!on && loop_obj) {
-        t.MethodID = DTM_TRIGGER; t.dtt_GInfo = NULL; t.dtt_Function = STM_STOP; t.dtt_Data = NULL;
-        DoDTMethodA(loop_obj, NULL, NULL, (Msg)&t);
-        DisposeDTObject(loop_obj); loop_obj = NULL;
-    }
-}
-
 void sound_exit(void)
 {
-    sound_loop(0);
     for (int i = 0; i < ncache; i++) DisposeDTObject(cache[i].obj);
     ncache = 0;
     if (DataTypesBase) { CloseLibrary(DataTypesBase); DataTypesBase = NULL; }

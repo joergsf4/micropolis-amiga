@@ -68,7 +68,6 @@ question on again. `SIZE=` (ToolType or argument) skips the question and uses th
 | Scenarios | menu Scenarios: Dullsville 1900, San Francisco 1906, Hamburg 1944, Bern 1965, Tokyo 1957, Detroit 1972, Boston 2010, Rio de Janeiro 2047 (each with its story and goal) |
 | Tool keys | as in the original: `b` bulldozer, `r` road, `p` park, `t` wire, `x` rail, `z` zone query; typed cheat words (e.g. `fund`) work too |
 | Level | menu Level: Easy / Medium / Hard (start funds of a new city; saved in the preferences) |
-| Sound | bulldozer noise while you drag the Bulldozer; Windows > Say demands speaks O-A-E (pitch = residential/commercial/industrial demand) |
 | Options | Auto Goto, Animation, Messages, Message windows can be switched off in the Options menu |
 | Quit | Esc or Project > Quit |
 | Version | Project > About Micropolis (version, build, CPU, screen mode, free memory) |
