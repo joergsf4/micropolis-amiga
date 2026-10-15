@@ -1036,7 +1036,9 @@ static ULONG ask_mode(int *w, int *h, int *depth)
             if (!AslRequest(sr, NULL)) break;                      /* cancelled */
             if (mode_ok(sr->sm_DisplayID)) {
                 id = sr->sm_DisplayID;
-                *w = sr->sm_DisplayWidth; *h = sr->sm_DisplayHeight; *depth = sr->sm_DisplayDepth;
+                /* size and depth come from the mode itself: the requester's own width/height fields default to 640x480 */
+                *w = (int)GetCyberIDAttr(CYBRIDATTR_WIDTH, id); *h = (int)GetCyberIDAttr(CYBRIDATTR_HEIGHT, id);
+                *depth = (int)GetCyberIDAttr(CYBRIDATTR_DEPTH, id);
                 break;
             }
             {   struct EasyStruct es;                              /* the list also holds the Amiga chipset modes */
@@ -1132,7 +1134,9 @@ static int real_main(int argc, char **argv)
     } else {
         int use_saved = !ask_mode_flag && !pref_ask && pref_mode != 0xffffffffUL && mode_ok(pref_mode);
         if (use_saved) {                                  /* "always use this mode" */
-            id = pref_mode; req_w = pref_w; req_h = pref_h; depth = pref_depth ? pref_depth : 8;
+            id = pref_mode;                                   /* size and depth from the mode (older prefs files saved the wrong size) */
+            req_w = (int)GetCyberIDAttr(CYBRIDATTR_WIDTH, id); req_h = (int)GetCyberIDAttr(CYBRIDATTR_HEIGHT, id);
+            depth = (int)GetCyberIDAttr(CYBRIDATTR_DEPTH, id);
         } else {
             int w = 0, h = 0, d = 8;
             id = ask_mode(&w, &h, &d);
