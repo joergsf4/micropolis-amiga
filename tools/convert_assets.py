@@ -174,6 +174,24 @@ def main():
         data += px
     open(os.path.join(out, 'objects.bin'), 'wb').write(head + table + data)
 
+    # tool palette icons (normal + highlighted), in the order of the game's tool states
+    names = ['res', 'com', 'ind', 'fire', 'qry', 'pol', 'wire', 'dozr', 'rail', 'road', 'chlk', 'ersr', 'stad', 'park', 'seap', 'coal', 'nuc', 'airp']
+    icons = []
+    for n in names:
+        ims = []
+        for suffix in ('', 'hi'):
+            w, h, pix = parse_xpm(os.path.join(src, 'ic%s%s.xpm' % (n, suffix)))
+            ims.append((w, h, bytes(pal.index(c) for row in pix for c in row)))
+        assert ims[0][:2] == ims[1][:2], n
+        icons.append(ims)
+    head = struct.pack('>H', len(icons))
+    off = len(head) + len(icons) * 10
+    table, data = b'', b''
+    for (w, h, px), (_, _, pxh) in icons:
+        table += struct.pack('>BBII', w, h, off + len(data), off + len(data) + len(px))
+        data += px + pxh
+    open(os.path.join(out, 'toolicons.bin'), 'wb').write(head + table + data)
+
     assert len(pal.colors) <= 64, len(pal.colors)
     p = b''.join(bytes(c) for c in pal.colors) + bytes(3 * (256 - len(pal.colors)))
     open(os.path.join(out, 'palette.bin'), 'wb').write(p)

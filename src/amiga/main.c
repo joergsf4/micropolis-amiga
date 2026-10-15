@@ -64,7 +64,7 @@ static int scr_w = 640, scr_h = 480;
 #define SCR_W scr_w
 #define SCR_H scr_h
 #define BAR_H 32                       /* status bar on top */
-#define TB_W 80                        /* tool palette on the left */
+#define TB_W 144                       /* tool palette on the left */
 #define MAX_COLS ((MAX_W - TB_W) / 16)
 #define MAX_ROWS ((MAX_H - BAR_H) / 16)
 static int view_cols = 35, view_rows = 28;
@@ -90,9 +90,10 @@ static int pref_ask = 1;
 static ULONG pref_mode = 0xffffffffUL;          /* remembered RTG mode id, picture size and depth */
 static int pref_w, pref_h, pref_depth;
 static int pref_level;                          /* difficulty 0 easy, 1 medium, 2 hard */
-enum { O_BULLDOZE, O_BUDGET, O_DISASTERS, O_SOUND, O_AUTOGO, O_ANIM, O_MSGS, O_NOTICES, N_OPT };
-static const char *const opt_key[N_OPT] = { "AUTOBULLDOZE", "AUTOBUDGET", "DISASTERS", "SOUND", "AUTOGOTO", "ANIMATION", "MESSAGES", "MESSAGEWINDOWS" };
-static int pref_opt[N_OPT] = { -1, -1, -1, -1, -1, -1, -1, -1 };     /* -1 = not saved yet: keep the default */
+enum { O_BULLDOZE, O_BUDGET, O_DISASTERS, O_SOUND, O_AUTOGO, O_ANIM, O_MSGS, O_NOTICES, O_SPEAK, N_OPT };
+static int speak_tools;                          /* spoken tool names when a tool is chosen (off by default) */
+static const char *const opt_key[N_OPT] = { "AUTOBULLDOZE", "AUTOBUDGET", "DISASTERS", "SOUND", "AUTOGOTO", "ANIMATION", "MESSAGES", "MESSAGEWINDOWS", "SPEAKTOOLS" };
+static int pref_opt[N_OPT] = { -1, -1, -1, -1, -1, -1, -1, -1, -1 };     /* -1 = not saved yet: keep the default */
 static int pref_speed = -1;
 #define N_WINPOS 6                              /* NPANELS */
 static int pref_wx[N_WINPOS] = { -1, -1, -1, -1, -1, -1 }, pref_wy[N_WINPOS] = { -1, -1, -1, -1, -1, -1 };   /* remembered window positions */
@@ -101,7 +102,7 @@ static int opt_get(int o)
     switch (o) {
     case O_BULLDOZE: return autoBulldoze;  case O_BUDGET: return autoBudget;  case O_DISASTERS: return !NoDisasters;
     case O_SOUND: return UserSoundOn;      case O_AUTOGO: return autoGo;      case O_ANIM: return DoAnimation;
-    case O_MSGS: return DoMessages;        default: return DoNotices;
+    case O_MSGS: return DoMessages;        case O_SPEAK: return speak_tools;   default: return DoNotices;
     }
 }
 static void opt_set(int o, int v)
@@ -109,7 +110,7 @@ static void opt_set(int o, int v)
     switch (o) {
     case O_BULLDOZE: autoBulldoze = v; break;  case O_BUDGET: autoBudget = v; break;  case O_DISASTERS: NoDisasters = !v; break;
     case O_SOUND: UserSoundOn = v; break;      case O_AUTOGO: autoGo = v; break;      case O_ANIM: DoAnimation = v; break;
-    case O_MSGS: DoMessages = v; break;        default: DoNotices = v; break;
+    case O_MSGS: DoMessages = v; break;        case O_SPEAK: speak_tools = v; break;   default: DoNotices = v; break;
     }
 }
 
@@ -187,15 +188,16 @@ static const int panning = 0;            /* (right button is the menu button now
 static int mouse_x = -1, mouse_y = -1;   /* last window position, for edge scrolling */
 
 #define NTOOLS 18
-static const struct { const char *name; short state; } toolbtn[NTOOLS] = {
-    { "Query", queryState },       { "Doze 1", dozeState },       { "Road 10", roadState },
-    { "Rail 20", rrState },        { "Wire 5", wireState },       { "Park 10", parkState },
-    { "Resid 100", residentialState }, { "Comm 100", commercialState }, { "Indus 100", industrialState },
-    { "Fire 500", fireState },     { "Polic 500", policeState }, { "Stadm 5k", stadiumState },
-    { "Coal 3k", powerState },     { "Nucl 5k", nuclearState },   { "Sea 3k", seaportState },
-    { "Airp 10k", airportState }, { "Chalk", chalkState },       { "Eraser", eraserState },
+static UBYTE *toolicons;               /* toolicons.bin: the original's tool palette pictures (normal and highlighted) */
+static const struct { const char *name; int cost; short x, y; } tooldef[NTOOLS] = {   /* indexed by tool state; positions as in the original palette */
+    { "Residential", 100, 13, 58 },  { "Commercial", 100, 51, 58 },   { "Industrial", 100, 89, 58 },
+    { "Fire Station", 500, 13, 112 }, { "Query", 0, 51, 112 },        { "Police Station", 500, 89, 112 },
+    { "Wire", 5, 32, 150 },          { "Bulldozer", 1, 70, 150 },
+    { "Rail", 20, 10, 188 },         { "Road", 10, 70, 188 },
+    { "Chalk", 0, 32, 216 },         { "Eraser", 0, 70, 216 },
+    { "Stadium", 5000, 5, 254 },     { "Park", 10, 51, 254 },         { "Seaport", 3000, 89, 254 },
+    { "Coal Power", 3000, 5, 300 },  { "Nuclear Power", 5000, 89, 300 }, { "Airport", 10000, 39, 346 },
 };
-#define TB_BTN_H ((SCR_H - BAR_H) / NTOOLS)
 
 /* ---------- notifications from the simulation core (see ui_core.c) ---------- */
 static void copy_braced(char *dst, size_t n, const char *s)
@@ -273,6 +275,7 @@ static int load_assets(void)
     UBYTE *pal = load_file("PROGDIR:res/palette.bin", NULL);
     tiles = load_file("PROGDIR:res/tiles.bin", NULL);
     objects = load_file("PROGDIR:res/objects.bin", NULL);
+    toolicons = load_file("PROGDIR:res/toolicons.bin", NULL);
     if (!pal || !tiles || !objects) {
         char b[100];
         sprintf(b, "Assets missing: palette %s tiles %s objects %s (IoErr %ld)", pal ? "ok" : "NO", tiles ? "ok" : "NO", objects ? "ok" : "NO", (long)IoErr());
@@ -396,11 +399,27 @@ static void draw_cursor(const struct rect *r)
 
 static void draw_toolbar(void)
 {
-    for (int y = BAR_H + NTOOLS * TB_BTN_H; y < SCR_H; y++) memset(fb + y * SCR_W, PEN_BAR, TB_W);
-    for (int i = 0; i < NTOOLS; i++) {
-        UBYTE c = toolbtn[i].state == editor.tool_state ? PEN_SEL : PEN_BTN;
-        for (int y = 0; y < TB_BTN_H; y++)
-            memset(fb + (BAR_H + i * TB_BTN_H + y) * SCR_W, (y == TB_BTN_H - 1) ? PEN_BAR : c, TB_W);
+    char line[40];
+    for (int y = BAR_H; y < SCR_H; y++) memset(fb + y * SCR_W, PEN_BAR, TB_W);
+    if (toolicons) {
+        const UBYTE *tab = toolicons + 2;
+        for (int i = 0; i < NTOOLS; i++) {
+            int w = tab[i * 10], h = tab[i * 10 + 1];
+            const UBYTE *px = toolicons + *(const ULONG *)(tab + i * 10 + (i == editor.tool_state ? 6 : 2));
+            for (int y = 0; y < h; y++) {
+                int dy = BAR_H + tooldef[i].y + y;
+                if (dy >= SCR_H) break;
+                for (int x = 0; x < w; x++) fb[dy * SCR_W + tooldef[i].x + x] = px[y * w + x] ? px[y * w + x] : PEN_BAR;
+            }
+        }
+    }
+    if (editor.tool_state >= 0 && editor.tool_state < NTOOLS) {               /* name and cost of the chosen tool */
+        gfx_target(fb, SCR_W);
+        gfx_colors(PEN_TEXT, PEN_BAR);
+        sprintf(line, "%-17.17s", tooldef[editor.tool_state].name);
+        gfx_print(6, BAR_H + 22, line);
+        if (tooldef[editor.tool_state].cost) sprintf(line, "Cost: $%-8d", tooldef[editor.tool_state].cost); else strcpy(line, "                ");
+        gfx_print(6, BAR_H + 40, line);
     }
 }
 
@@ -792,11 +811,6 @@ static void render_frame(struct Window *win)
     gfx_target(fb, SCR_W);
     if (toolbar_dirty) {
         draw_toolbar();
-        gfx_colors(PEN_TEXT, PEN_BTN);
-        for (int i = 0; i < NTOOLS; i++) {
-            gfx_colors(PEN_TEXT, toolbtn[i].state == editor.tool_state ? PEN_SEL : PEN_BTN);
-            gfx_print(4, BAR_H + i * TB_BTN_H + TB_BTN_H / 2 + 4, toolbtn[i].name);
-        }
     }
     {   /* status lines (top left) */
         char line[200];
@@ -849,7 +863,7 @@ static void render_frame(struct Window *win)
 /* ---------- menus and commands ---------- */
 enum { CMD_NEW = 1, CMD_LOAD, CMD_SAVE, CMD_SAVEAS, CMD_QUIT,
        CMD_PAUSE = 10, CMD_SLOW, CMD_MEDIUM, CMD_FAST,
-       CMD_AUTOBULLDOZE = 20, CMD_AUTOBUDGET, CMD_DISASTERS, CMD_SOUND, CMD_ASKMODE, CMD_AUTOGO, CMD_ANIM, CMD_MSGS, CMD_NOTICES, CMD_OVERLAY, CMD_LEVEL = 60,
+       CMD_AUTOBULLDOZE = 20, CMD_AUTOBUDGET, CMD_DISASTERS, CMD_SOUND, CMD_ASKMODE, CMD_AUTOGO, CMD_ANIM, CMD_MSGS, CMD_NOTICES, CMD_OVERLAY, CMD_LEVEL = 60, CMD_SPEAK = 65,
        CMD_ABOUT = 44, CMD_HELP = 45, CMD_SCEN = 200, CMD_BUDGET = 40, CMD_MAP = 41, CMD_EVAL = 42, CMD_GRAPHS = 43, CMD_MAPMODE = 100,
        CMD_FIRE = 30, CMD_FLOOD, CMD_TORNADO, CMD_QUAKE, CMD_MONSTER, CMD_MELTDOWN };
 
@@ -897,6 +911,7 @@ static struct Menu *make_menus(struct Screen *scr, APTR *vi_out)
     mi(NM_ITEM, "Auto Goto (jump to events)", NULL, CHECKIT | MENUTOGGLE | (autoGo ? CHECKED : 0), CMD_AUTOGO);
     mi(NM_ITEM, "Animation", NULL, CHECKIT | MENUTOGGLE | (DoAnimation ? CHECKED : 0), CMD_ANIM);
     mi(NM_ITEM, "Messages", NULL, CHECKIT | MENUTOGGLE | (DoMessages ? CHECKED : 0), CMD_MSGS);
+    mi(NM_ITEM, "Speak tool names", NULL, CHECKIT | MENUTOGGLE | (speak_tools ? CHECKED : 0), CMD_SPEAK);
     mi(NM_ITEM, "Message windows", NULL, CHECKIT | MENUTOGGLE | (DoNotices ? CHECKED : 0), CMD_NOTICES);
     mi(NM_ITEM, "Ask for screen mode at start", NULL, CHECKIT | MENUTOGGLE | (pref_ask ? CHECKED : 0), CMD_ASKMODE);
     mi(NM_TITLE, "Level", NULL, 0, 0);
@@ -1074,6 +1089,7 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
     case CMD_AUTOGO: autoGo = checked; MustUpdateOptions = 1; break;
     case CMD_ANIM: DoAnimation = checked; MustUpdateOptions = 1; full_redraw = 1; break;
     case CMD_MSGS: DoMessages = checked; MustUpdateOptions = 1; break;
+    case CMD_SPEAK: speak_tools = checked; break;
     case CMD_NOTICES: DoNotices = checked; MustUpdateOptions = 1; break;
     case CMD_OVERLAY: map_mode = (map_mode + 1) % MAP_MODES; map_visible = 1; map_dirty = 1; map_panel_dirty = 1; sprintf(status_msg, "Map: %s", map_names[map_mode]); break;
     case CMD_ASKMODE:
@@ -1522,12 +1538,16 @@ static int real_main(int argc, char **argv)
                 if (inview) { hover_x = wx >> 4; hover_y = wy >> 4; } else hover_x = -1;
                 if (cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) {
                     if (mx < TB_W && my >= BAR_H) {
-                        int i = (my - BAR_H) / TB_BTN_H;
+                        int i;
+                        for (i = 0; i < NTOOLS; i++) {
+                            int w = toolicons ? toolicons[2 + i * 10] : 34, h = toolicons ? toolicons[2 + i * 10 + 1] : 34;
+                            if (mx >= tooldef[i].x && mx < tooldef[i].x + w && my >= BAR_H + tooldef[i].y && my < BAR_H + tooldef[i].y + h) break;
+                        }
                         if (i < NTOOLS) {
                             static const char *const tool_sound[18] = { "res", "com", "ind", "fire", "query", "police", "wire", "bulldozer", "rail",
                                                                          "road", "chalk", "eraser", "stadium", "park", "seaport", "coal", "nuclear", "airport" };
-                            editor.tool_state = toolbtn[i].state; toolbar_dirty = 1;
-                            if (UserSoundOn && editor.tool_state >= 0 && editor.tool_state < 18) sound_play(tool_sound[editor.tool_state]);   /* like the original palette */
+                            editor.tool_state = i; toolbar_dirty = 1;
+                            if (UserSoundOn && speak_tools && editor.tool_state >= 0 && editor.tool_state < 18) sound_play(tool_sound[editor.tool_state]);   /* like the original palette */
                         }
                     } else if (inview) {
                         ToolDown(&editor, wx, wy);
