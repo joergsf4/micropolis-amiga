@@ -120,6 +120,7 @@ static struct cached *load(const char *name)
     c->data = AllocVec(len, MEMF_CHIP);
     if (!c->data || Read(f, c->data, len) != len) { if (c->data) FreeVec(c->data); Close(f); return NULL; }
     Close(f);
+    CacheClearU();                       /* on 68040/060 the CPU cache may hold the sample: flush before Paula reads it from Chip RAM */
     strncpy(c->name, name, 31); c->name[31] = 0;
     c->len = len; c->busy = 0;
     ncache++; cache_size += len;

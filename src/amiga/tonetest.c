@@ -17,6 +17,7 @@ int main(void)
     int err;
     if (!port || !ioa || !wave) return 20;
     for (int i = 0; i < 64; i++) wave[i] = (i < 32) ? 100 : -100;          /* square wave, 64 samples per cycle */
+    CacheClearU();                                                   /* flush the CPU cache so Paula sees the data in Chip RAM */
     ioa->ioa_Request.io_Message.mn_Node.ln_Pri = 127;
     ioa->ioa_Data = chan;
     ioa->ioa_Length = sizeof chan;
