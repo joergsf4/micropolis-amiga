@@ -82,6 +82,7 @@ static SimView editor;                 /* the core's tools take a SimView; only 
 static int hover_x = -1, hover_y = -1; /* tile under the mouse, -1 = none */
 static int dragging;
 static int map_drag;
+static int dbg_scroll;                  /* test option scroll=N: scroll N tiles (x and y), then stop */
 static int debug_show;                  /* test option show=eval|graph: keep messages away so the panel can be photographed */
 static const int panning = 0;            /* (right button is the menu button now) */
 static int mouse_x = -1, mouse_y = -1;   /* last window position, for edge scrolling */
@@ -387,6 +388,26 @@ static void draw_demand(void)
     }
 }
 
+/* Small scroll steps: move the picture inside the RTG screen (graphics.library blit, no bus traffic from the CPU)
+ * and redraw only the newly exposed row/column of tiles. Only used while no panel and no overview map covers the
+ * view, otherwise the whole view is redrawn (see render_frame). */
+static void scroll_by(struct RastPort *rp, int dx, int dy)
+{
+    short old[VIEW_ROWS][VIEW_COLS];
+    int sx = TB_W, sy = BAR_H, w = VIEW_COLS * 16, h = VIEW_ROWS * 16, tx = sx, ty = sy;
+    if (dx > 0) { sx += dx * 16; w -= dx * 16; } else if (dx < 0) { tx -= dx * 16; w += dx * 16; }
+    if (dy > 0) { sy += dy * 16; h -= dy * 16; } else if (dy < 0) { ty -= dy * 16; h += dy * 16; }
+    ClipBlit(rp, sx, sy, rp, tx, ty, w, h, 0xC0);
+    memcpy(old, shown, sizeof old);                       /* what each tile cell showed before */
+    for (int r = 0; r < VIEW_ROWS; r++)
+        for (int c = 0; c < VIEW_COLS; c++) {
+            int or_ = r + dy, oc = c + dx;
+            shown[r][c] = (or_ >= 0 && or_ < VIEW_ROWS && oc >= 0 && oc < VIEW_COLS) ? old[or_][oc] : -1;
+        }
+    for (int i = 0; i < n_prev_spr; i++) { prev_spr[i].x0 -= dx * 16; prev_spr[i].x1 -= dx * 16; prev_spr[i].y0 -= dy * 16; prev_spr[i].y1 -= dy * 16; }
+    prev_cursor.x0 -= dx * 16; prev_cursor.x1 -= dx * 16; prev_cursor.y0 -= dy * 16; prev_cursor.y1 -= dy * 16;
+}
+
 static void render_frame(struct Window *win)
 {
     struct RastPort *rp = win->RPort;
@@ -407,7 +428,15 @@ static void render_frame(struct Window *win)
         pn->redraw = *pn->visible && *pn->dirty;
     }
     last_map_visible = map_visible;
-    if (view_x != last_view_x || view_y != last_view_y) { full_redraw = 1; last_view_x = view_x; last_view_y = view_y; }
+    if (view_x != last_view_x || view_y != last_view_y) {
+        int ddx = view_x - last_view_x, ddy = view_y - last_view_y;
+        if (!full_redraw && !first_present && last_view_x >= 0 && !map_visible && top_panel() < 0 &&
+            ddx >= -6 && ddx <= 6 && ddy >= -6 && ddy <= 6)
+            scroll_by(rp, ddx, ddy);
+        else
+            full_redraw = 1;
+        last_view_x = view_x; last_view_y = view_y;
+    }
     if (full_redraw) {
         memset(redraw, 1, sizeof redraw);
         memset(shown, 0xff, sizeof shown);
@@ -847,6 +876,8 @@ static int real_main(int argc, char **argv)
     }
     editor.tool_state = queryState;
     setSpeed(3);
+    if (argc > 3 && !strncmp(argv[3], "scroll=", 7)) { dbg_scroll = atoi(argv[3] + 7); setSpeed(0); }   /* debug: scroll test */
+    if (argc > 3 && !strncmp(argv[3], "jump=", 5)) { int jx = 0, jy = 0; sscanf(argv[3] + 5, "%d,%d", &jx, &jy); view_x = jx; view_y = jy; clamp_view(); setSpeed(0); }
     if (argc > 3 && !strncmp(argv[3], "show=", 5)) debug_show = 1;
     if (argc > 3 && !strcmp(argv[3], "show=eval")) open_info_panel(P_EVAL);              /* debug: open a panel at start */
     if (argc > 3 && !strcmp(argv[3], "show=graph")) open_info_panel(P_GRAPH);
@@ -948,6 +979,7 @@ static int real_main(int argc, char **argv)
             if (ox != view_x || oy != view_y) dirty = 1;
         }
         if (debug_show && notice_visible) notice_close();
+        if (dbg_scroll > 0 && (frame & 3) == 0) { view_x++; if (dbg_scroll & 1) view_y++; dbg_scroll--; clamp_view(); dirty = 1; }
         if (SimSpeed && ++tick >= delay[SimSpeed]) {
             struct timeval t0, t1;
             tick = 0;

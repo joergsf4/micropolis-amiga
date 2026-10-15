@@ -12,6 +12,11 @@ CORE_OBJ = $(patsubst src/%.c,out/obj/%.o,$(CORE_SRC))
 all: out/micropolis out/headless out/rtgtest out/listmodes data
 	mkdir -p $(DEST)
 	cp out/micropolis out/headless out/rtgtest out/listmodes $(DEST)/
+	# icons like in the release (the drawer icon lives next to the drawer)
+	cp out/icons/Micropolis.info $(DEST)/micropolis.info
+	cp out/icons/Micropolis-drawer.info $(DEST)/../Micropolis.info
+	cp release/ReadMe $(DEST)/ReadMe; cp out/icons/ReadMe.info $(DEST)/ReadMe.info
+	cp COPYING $(DEST)/COPYING
 
 out/obj/core/%.o: src/core/%.c $(wildcard src/core/*.h)
 	@mkdir -p $(dir $@)
