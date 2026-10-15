@@ -169,6 +169,8 @@ static UBYTE palette[256 * 3];
 static int view_x, view_y;             /* top-left tile of the view */
 static char status_date[32] = "", status_funds[48] = "", status_msg[96] = "";
 extern int sim_loops;
+static int save_state;                     /* 1 = the core saved the city, 2 = it could not (save_msg) */
+static char save_msg[300];
 static int dirty = 1;
 static int toolbar_dirty_ext;              /* set by ui_update_heads(), picked up by the renderer */
 static int map_dirty = 1;
@@ -251,6 +253,8 @@ int ui_eval(const char *cmd)
                 if (debug_log) { char lb[80]; sprintf(lb, "sound: %s", id); logmsg(lb); } }
         }
     }
+    else if (!strncmp(cmd, "UIDidSaveCity", 13))   { save_state = 1; }
+    else if (!strncmp(cmd, "UIDidntSaveCity ", 16)) { save_state = 2; copy_braced(save_msg, sizeof save_msg, cmd); }
     else if (!strncmp(cmd, "UISetSpeed ", 11))      { if (sound_ui_ready && UserSoundOn) sound_play("boing"); }
     else if (!strncmp(cmd, "UISetMessage ", 13)) { if (DoMessages) copy_braced(status_msg, sizeof status_msg, cmd); dirty = 1; }
     return 0;
@@ -1053,6 +1057,19 @@ static void show_help(void)                                  /* AmigaGuide docum
     if (!guide_handle) fail("Cannot open Micropolis.guide.");
 }
 
+static void save_city(struct Window *win, const char *path)
+{
+    char name[256];
+    strncpy(name, path, sizeof name - 1); name[sizeof name - 1] = 0;     /* SaveCityAs takes ownership of its own copy and cuts the name it is given */
+    save_state = 0;
+    SaveCityAs(name);
+    if (save_state == 1) sprintf(status_msg, "Saved %s", path);
+    else {
+        sprintf(status_msg, "Could not save %s", path);
+        fail("Cannot save the city:\n%s", save_state == 2 ? save_msg : "unknown error");
+    }
+}
+
 static int do_command(int id, struct Window *win, struct MenuItem *item)
 {
     char path[256];
@@ -1088,11 +1105,13 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
         }
         break;
     case CMD_SAVE:
-        if (CityFileName) { SaveCityAs(CityFileName); sprintf(status_msg, "Saved %s", CityFileName); break; }
+        if (CityFileName) { strncpy(path, CityFileName, sizeof path - 1); path[sizeof path - 1] = 0; save_city(win, path); break; }
         /* no name yet: fall through to "Save As" */
     case CMD_SAVEAS:
         if (ask_file(win, 1, path, sizeof path)) {
-            SaveCityAs(path); sprintf(status_msg, "Saved %s", path);
+            size_t l = strlen(path);
+            if (l < 4 || strcasecmp(path + l - 4, ".cty")) strncat(path, ".cty", sizeof path - l - 1);   /* the file requester's pattern is #?.cty */
+            save_city(win, path);
         }
         break;
     case CMD_QUIT: return 0;
@@ -1480,6 +1499,7 @@ static int real_main(int argc, char **argv)
     }
     if (argc > 3 && !strcmp(argv[3], "quake")) { MakeEarthquake(); }   /* debug */
     if (argc > 3 && !strcmp(argv[3], "help")) show_help();
+    if (argc > 3 && !strcmp(argv[3], "savetest")) { save_city(win, "PROGDIR:cities/savetest.cty"); logmsg(status_msg); }   /* debug */
     if (argc > 3 && !strncmp(argv[3], "hover=", 6)) tool_hover = atoi(argv[3] + 6);   /* debug */
     if (argc > 3 && !strncmp(argv[3], "chalk", 5)) {                 /* debug: a note on the map */
         int bx = (view_x + 8) << 4, by = (view_y + 6) << 4;
