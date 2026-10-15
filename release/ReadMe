@@ -55,6 +55,7 @@ Budget         B, or menu Windows/Budget (Continue or Cancel)
 Evaluation     E, or menu Windows/Evaluation (opinion, problems, score)
 Graphs         G, or menu Windows/Graphs (6 histories, 10 or 120 years)
 Overview map   M on/off, C next overlay (14 overlays in the Map menu)
+Scenarios      menu Scenarios: 8 historic disasters/challenges with story and goal
 Quit           Esc, or Project/Quit
 About          Project/About Micropolis: version, build, CPU, screen mode, free memory
 
@@ -66,7 +67,7 @@ STATUS
 ------
 Works: simulation, building tools, animated map, overview map with overlays, budget, evaluation, graphs, sound effects,
 load/save/new random city, menus, disasters, event messages.
-Missing: scenario selection, earthquake shake, looping sounds (bulldozer).
+Missing: earthquake shake, looping sounds (bulldozer), terrain options for new cities.
 An early crash on quitting seems fixed in 0.2 - if you still see it, please report the error number.
 
 micropolis.log is only written with the DEBUG option; attach it to bug reports.

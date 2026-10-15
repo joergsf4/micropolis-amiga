@@ -26,6 +26,7 @@ void sim_loop(int doSim);
 int  LoadCity(char *filename);
 int  CurrentYear(void);
 void animateTiles(void);
+void LoadScenario(short s);
 void DoBudgetFromMenu(void);
 void ClearMes(void);
 void SendMes(int mes);

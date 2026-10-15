@@ -48,6 +48,7 @@ ToolTypes (icon information): `CITY=cities/bruce.cty` city to open at start, `DE
 | Evaluation | `E` or Windows > Evaluation (public opinion, worst problems, score) |
 | Graphs | `G` or Windows > Graphs (residential, commercial, industrial, money, crime, pollution; 10 or 120 years) |
 | Overview map | `M` on/off, `C` next overlay (power, traffic, pollution, crime, land value, ...) |
+| Scenarios | menu Scenarios: Dullsville 1900, San Francisco 1906, Hamburg 1944, Bern 1965, Tokyo 1957, Detroit 1972, Boston 2010, Rio de Janeiro 2047 (each with its story and goal) |
 | Quit | Esc or Project > Quit |
 | Version | Project > About Micropolis (version, build, CPU, screen mode, free memory) |
 
@@ -60,7 +61,7 @@ You can load and save cities (`.cty`, the original Micropolis format; `cities/` 
 
 Works: simulation, building tools, map with animation and sprites, overview map with 14 overlays,
 budget, evaluation window, history graphs, sound effects, city load/save/new random city, menus, disasters, event messages.
-Missing: scenario selection, earthquake shake, looping sounds (bulldozer).
+Missing: earthquake shake, looping sounds (bulldozer), terrain generator options for new cities.
 See the [issues](../../issues).
 
 ## Troubleshooting

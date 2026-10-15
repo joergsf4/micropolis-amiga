@@ -594,7 +594,7 @@ static void render_frame(struct Window *win)
 enum { CMD_NEW = 1, CMD_LOAD, CMD_SAVE, CMD_SAVEAS, CMD_QUIT,
        CMD_PAUSE = 10, CMD_SLOW, CMD_MEDIUM, CMD_FAST,
        CMD_AUTOBULLDOZE = 20, CMD_AUTOBUDGET, CMD_DISASTERS, CMD_SOUND,
-       CMD_ABOUT = 44, CMD_BUDGET = 40, CMD_MAP = 41, CMD_EVAL = 42, CMD_GRAPHS = 43, CMD_MAPMODE = 100,
+       CMD_ABOUT = 44, CMD_SCEN = 200, CMD_BUDGET = 40, CMD_MAP = 41, CMD_EVAL = 42, CMD_GRAPHS = 43, CMD_MAPMODE = 100,
        CMD_FIRE = 30, CMD_FLOOD, CMD_TORNADO, CMD_QUAKE, CMD_MONSTER, CMD_MELTDOWN };
 
 static struct NewMenu newmenu[64];                      /* the menus have about 48 entries */
@@ -621,6 +621,11 @@ static struct Menu *make_menus(struct Screen *scr, APTR *vi_out)
     mi(NM_ITEM, "Save City As...", NULL, 0, CMD_SAVEAS);
     mi(NM_ITEM, (const char *)NM_BARLABEL, NULL, 0, 0);
     mi(NM_ITEM, "Quit", "Q", 0, CMD_QUIT);
+    mi(NM_TITLE, "Scenarios", NULL, 0, 0);
+    {   static const char *const scen[8] = { "Dullsville 1900", "San Francisco 1906", "Hamburg 1944", "Bern 1965",
+                                              "Tokyo 1957", "Detroit 1972", "Boston 2010", "Rio de Janeiro 2047" };
+        for (int i = 0; i < 8; i++) mi(NM_ITEM, scen[i], NULL, 0, CMD_SCEN + i + 1);
+    }
     mi(NM_TITLE, "Speed", NULL, 0, 0);
     mi(NM_ITEM, "Pause", "0", 0, CMD_PAUSE);
     mi(NM_ITEM, "Slow", "1", 0, CMD_SLOW);
@@ -724,6 +729,12 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
     if (id >= CMD_MAPMODE && id < CMD_MAPMODE + MAP_MODES) {
         map_mode = id - CMD_MAPMODE; map_visible = 1; map_dirty = 1;
         sprintf(status_msg, "Map: %s", map_names[map_mode]);
+        return 1;
+    }
+    if (id > CMD_SCEN && id <= CMD_SCEN + 8) {            /* scenario: load it and show its story, as the original does */
+        LoadScenario((short)(id - CMD_SCEN));
+        recenter();
+        notice_show(id - CMD_SCEN); notice_dirty = 1;
         return 1;
     }
     switch (id) {
@@ -937,6 +948,7 @@ static int real_main(int argc, char **argv)
     if (argc > 3 && !strncmp(argv[3], "scroll=", 7)) { dbg_scroll = atoi(argv[3] + 7); setSpeed(0); }   /* debug: scroll test */
     if (argc > 3 && !strncmp(argv[3], "jump=", 5)) { int jx = 0, jy = 0; sscanf(argv[3] + 5, "%d,%d", &jx, &jy); view_x = jx; view_y = jy; clamp_view(); setSpeed(0); }
     if (argc > 3 && !strncmp(argv[3], "sound=", 6)) sound_play(argv[3] + 6);               /* debug: play a sound at start */
+    if (argc > 3 && !strncmp(argv[3], "scen=", 5)) { int n = atoi(argv[3] + 5); LoadScenario((short)n); recenter(); notice_show(n); }   /* debug: start a scenario */
     if (argc > 3 && !strncmp(argv[3], "show=", 5)) debug_show = 1;
     if (argc > 3 && !strcmp(argv[3], "show=about")) show_about();
     if (argc > 3 && !strcmp(argv[3], "show=eval")) open_info_panel(P_EVAL);              /* debug: open a panel at start */
