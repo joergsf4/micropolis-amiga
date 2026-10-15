@@ -228,6 +228,7 @@ drawValve(void)
 }
 
 
+void
 SetDemand(float r, float c, float i)
 {
   char buf[256];
