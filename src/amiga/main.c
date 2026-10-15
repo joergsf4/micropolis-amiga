@@ -190,6 +190,11 @@ static void clamp_view(void);
 static SimView editor;                 /* the core's tools take a SimView; only tool_state/last_x/y are used */
 static int hover_x = -1, hover_y = -1; /* tile under the mouse, -1 = none */
 static int dragging;
+static int drag_x, drag_y;                 /* where the tool was last dragged (world pixels) */
+static void end_drag(void)                 /* the button went up somewhere else (a window opened over the map): finish the line where it was, do not let it follow the mouse */
+{
+    if (dragging) { ToolUp(&editor, drag_x, drag_y); dragging = 0; }
+}
 static int map_drag;
 static int sound_ui_ready;                /* set when the main loop runs: UI sounds (tool select, speed) only from then on */
 static int shake_frames, shake_bx, shake_by;   /* earthquake: the view jitters by a tile for about a second */
@@ -1638,6 +1643,7 @@ static int real_main(int argc, char **argv)
             struct Window *mw = m->IDCMPWindow;
             int pi = panel_index(mw);                             /* which panel window, or -1 = the game window */
             ReplyMsg((struct Message *)m);
+            if (dragging && mw != win) end_drag();                    /* a requester or window took the mouse while a road/rail/wire was being drawn */
             if (cls == IDCMP_MENUPICK) {
                 while (code != MENUNULL && menu) {
                     struct MenuItem *it = ItemAddress(menu, code);
@@ -1735,13 +1741,14 @@ static int real_main(int argc, char **argv)
                         }
                     } else if (inview) {
                         ToolDown(&editor, wx, wy);
-                        dragging = 1;
+                        dragging = 1; drag_x = wx; drag_y = wy;
                     }
                 } else if (cls == IDCMP_MOUSEBUTTONS && code == SELECTUP) {
-                    if (dragging && inview) ToolUp(&editor, wx, wy);
-                    dragging = 0;
+                    if (dragging) { ToolUp(&editor, inview ? wx : drag_x, inview ? wy : drag_y); dragging = 0; }
+                } else if (cls == IDCMP_MOUSEMOVE && dragging && !(qual & IEQUALIFIER_LEFTBUTTON)) {
+                    end_drag();                                          /* the button is up but we never saw it (it went up over another window) */
                 } else if (cls == IDCMP_MOUSEMOVE && dragging && inview) {
-                    ToolDrag(&editor, wx, wy);
+                    ToolDrag(&editor, wx, wy); drag_x = wx; drag_y = wy;
                 }
             }
             dirty = 1;
