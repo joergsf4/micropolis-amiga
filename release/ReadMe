@@ -2,7 +2,7 @@ Short:        Micropolis (open-source SimCity) with RTG graphics
 Author:       Electronic Arts / Will Wright / Don Hopkins (original), Amiga port: joergsf4
 Uploader:     joergsf4
 Type:         game/strategy
-Version:      0.3.2
+Version:      0.4.0
 Requires:     AmigaOS 3.x, 68020+, RTG card (Picasso96 or CyberGraphX), 2 MB Chip + 2 MB Fast
 Architecture: m68k-amigaos >= 3.0.0
 
@@ -45,6 +45,7 @@ and ListModes (lists all screen modes the system knows).
 
 CONTROLS
 --------
+Query          the Query tool opens a zone status box at the top right (click it or Esc to close)
 Tools          click a button on the left (Query, Doze, Road, Rail, Wire, Park, zones,
                Fire, Police, Stadium, power plants, Sea port, Airport)
 Build          click or drag on the map; the white frame shows the area
@@ -65,9 +66,9 @@ Warnings and events open a message window (Continue, Return or Space closes it).
 
 STATUS
 ------
-Works: simulation, building tools, animated map, overview map with overlays, budget, evaluation, graphs, sound effects,
+Works: simulation, building tools, animated map, overview map with overlays, budget, evaluation, graphs, sound effects, scenarios, zone query box, earthquake shake,
 load/save/new random city, menus, disasters, event messages.
-Missing: earthquake shake, looping sounds (bulldozer), terrain options for new cities.
+Missing: looping sounds (bulldozer), terrain options for new cities.
 An early crash on quitting seems fixed in 0.2 - if you still see it, please report the error number.
 
 micropolis.log is only written with the DEBUG option; attach it to bug reports.

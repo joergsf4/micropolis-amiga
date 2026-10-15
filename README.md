@@ -39,6 +39,7 @@ ToolTypes (icon information): `CITY=cities/bruce.cty` city to open at start, `DE
 
 | Action | How |
 |---|---|
+| Query | the Query tool shows zone, density, land value, crime, pollution and growth in a box at the top right (click it or Esc to close) |
 | Choose a tool | click the button on the left (Query, Bulldozer, Roads, Rails, Wires, Parks, zones, power plants, ...) |
 | Build | click or drag on the map; the white frame shows what will be built |
 | Scroll | W A S D, mouse wheel, or move the mouse to the screen edge. With the overview map open: click or drag in it |
@@ -60,8 +61,8 @@ You can load and save cities (`.cty`, the original Micropolis format; `cities/` 
 ## Status
 
 Works: simulation, building tools, map with animation and sprites, overview map with 14 overlays,
-budget, evaluation window, history graphs, sound effects, city load/save/new random city, menus, disasters, event messages.
-Missing: earthquake shake, looping sounds (bulldozer), terrain generator options for new cities.
+budget, evaluation window, history graphs, sound effects, scenarios, zone query box, earthquake shake, city load/save/new random city, menus, disasters, event messages.
+Missing: looping sounds (bulldozer), terrain generator options for new cities.
 See the [issues](../../issues).
 
 ## Troubleshooting

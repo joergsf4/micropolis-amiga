@@ -26,6 +26,7 @@ void sim_loop(int doSim);
 int  LoadCity(char *filename);
 int  CurrentYear(void);
 void animateTiles(void);
+void doZoneStatus(short x, short y);
 void LoadScenario(short s);
 void DoBudgetFromMenu(void);
 void ClearMes(void);

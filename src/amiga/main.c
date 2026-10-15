@@ -75,7 +75,9 @@ static char status_date[32] = "", status_funds[48] = "", status_msg[96] = "";
 extern int sim_loops;
 static int dirty = 1;
 static int map_dirty = 1;
-static int budget_dirty = 1, notice_dirty = 1, eval_dirty = 1, graph_dirty = 1;   /* a panel must be redrawn */
+static int budget_dirty = 1, notice_dirty = 1, eval_dirty = 1, graph_dirty = 1, query_dirty = 1;
+static int query_visible;
+static char query_f[6][24];                /* zone, density, value, crime, pollution, growth of the queried tile */   /* a panel must be redrawn */
 static int demand_r, demand_c, demand_i, demand_dirty = 1;   /* -15..15, from "UISetDemand" */
 static void clamp_view(void);
 #define MAP_X (SCR_W - MV_W - 6)
@@ -86,6 +88,7 @@ static int hover_x = -1, hover_y = -1; /* tile under the mouse, -1 = none */
 static int dragging;
 static int map_drag;
 static int sound_ui_ready;                /* set when the main loop runs: UI sounds (tool select, speed) only from then on */
+static int shake_frames, shake_bx, shake_by;   /* earthquake: the view jitters by a tile for about a second */
 static int dbg_scroll;                  /* test option scroll=N: scroll N tiles (x and y), then stop */
 static int debug_show;                  /* test option show=eval|graph: keep messages away so the panel can be photographed */
 static const int panning = 0;            /* (right button is the menu button now) */
@@ -118,14 +121,15 @@ int ui_eval(const char *cmd)
     if (!strncmp(cmd, "UISetDate ", 10))         { copy_braced(status_date, sizeof status_date, cmd); dirty = 1; }
     else if (!strncmp(cmd, "UISetFunds ", 11))   { copy_braced(status_funds, sizeof status_funds, cmd); dirty = 1; }
     else if (!strncmp(cmd, "UIShowZoneStatus ", 17)) {
-        char a[24] = "", b[24] = "", c[24] = "", d[24] = "", e[24] = "";
         const char *q = cmd;
-        char *dst[5] = { a, b, c, d, e };
-        for (int i = 0; i < 5 && (q = strchr(q, '{')); i++) { copy_braced(dst[i], 24, q); q = strchr(q, '}'); if (!q) break; }
-        sprintf(status_msg, "%s, %s, %s, %s", a, b, c, d);
-        dirty = 1;
+        for (int i = 0; i < 6; i++) {
+            query_f[i][0] = 0;
+            if (!(q = strchr(q, '{'))) break;
+            copy_braced(query_f[i], sizeof query_f[i], q);
+            if (!(q = strchr(q, '}'))) break;
+        }
+        query_visible = 1; query_dirty = 1; dirty = 1;
     }
-    else if (!strncmp(cmd, "UISetBudget ", 12))       { budget_set_totals(cmd); budget_dirty = 1; dirty = 1; }
     else if (!strncmp(cmd, "UISetEvaluation ", 16))  { eval_set(cmd); eval_dirty = 1; dirty = 1; }
     else if (!strncmp(cmd, "UISetBudgetValues ", 18)) { budget_set_values(cmd); dirty = 1; }
     else if (!strncmp(cmd, "UIShowBudgetAndWait", 19)) { budget_show(); budget_dirty = 1; dirty = 1; }
@@ -329,23 +333,41 @@ struct panel {
     void (*draw)(void);                      /* panel graphics + text into fb */
     int (*click)(int x, int y);
     void (*close)(void);                     /* Esc / Return / Space */
+    int modal;                               /* modal panels take all input; the query box does not */
 };
-enum { P_NOTICE, P_BUDGET, P_EVAL, P_GRAPH, NPANELS };
+enum { P_NOTICE, P_BUDGET, P_EVAL, P_GRAPH, P_QUERY, NPANELS };
+#define QUERY_X (SCR_W - 244)
+#define QUERY_Y (BAR_H + 8)
+#define QUERY_W 236
+#define QUERY_H 112
 static void draw_notice(void) { notice_draw(fb, SCR_W); notice_text(); }
 static void draw_budget(void) { budget_draw(fb, SCR_W); budget_text(); }
 static void draw_eval(void)   { eval_draw(fb, SCR_W); }
 static void draw_graph(void)  { graph_draw(fb, SCR_W); }
+static void draw_query(void)
+{
+    static const char *const label[6] = { "Zone", "Density", "Value", "Crime", "Pollution", "Growth" };
+    char b[48];
+    for (int y = 0; y < QUERY_H; y++) memset(fb + (QUERY_Y + y) * SCR_W + QUERY_X, (y < 2 || y >= QUERY_H - 2) ? PEN_TEXT : PEN_BAR, QUERY_W);
+    for (int y = 2; y < QUERY_H - 2; y++) { fb[(QUERY_Y + y) * SCR_W + QUERY_X] = PEN_TEXT; fb[(QUERY_Y + y) * SCR_W + QUERY_X + QUERY_W - 1] = PEN_TEXT; }
+    gfx_target(fb, SCR_W);
+    gfx_colors(PEN_TEXT, PEN_BAR);
+    gfx_print(QUERY_X + 8, QUERY_Y + 16, "Query zone status");
+    for (int i = 0; i < 6; i++) { sprintf(b, "%-10s %s", label[i], query_f[i]); gfx_print(QUERY_X + 8, QUERY_Y + 32 + i * 13, b); }
+}
+static void close_query(void) { query_visible = 0; }
 static void close_notice(void) { notice_close(); }
 static struct panel panels[NPANELS] = {
-    { &notice_visible, &notice_dirty, 0, 0, { NOTICE_X, NOTICE_Y, NOTICE_X + NOTICE_W - 1, NOTICE_Y + NOTICE_H - 1 }, draw_notice, notice_click, close_notice },
-    { &budget_visible, &budget_dirty, 0, 0, { BUDGET_X, BUDGET_Y, BUDGET_X + BUDGET_W - 1, BUDGET_Y + BUDGET_H - 1 }, draw_budget, budget_click, budget_key_close },
-    { &eval_visible,   &eval_dirty, 0, 0, { EVAL_X, EVAL_Y, EVAL_X + EVAL_W - 1, EVAL_Y + EVAL_H - 1 }, draw_eval, eval_click, eval_close },
-    { &graph_visible,  &graph_dirty, 0, 0, { GRAPH_X, GRAPH_Y, GRAPH_X + GRAPH_W - 1, GRAPH_Y + GRAPH_H - 1 }, draw_graph, graph_click, graph_close },
+    { &notice_visible, &notice_dirty, 0, 0, { NOTICE_X, NOTICE_Y, NOTICE_X + NOTICE_W - 1, NOTICE_Y + NOTICE_H - 1 }, draw_notice, notice_click, close_notice, 1 },
+    { &budget_visible, &budget_dirty, 0, 0, { BUDGET_X, BUDGET_Y, BUDGET_X + BUDGET_W - 1, BUDGET_Y + BUDGET_H - 1 }, draw_budget, budget_click, budget_key_close, 1 },
+    { &eval_visible,   &eval_dirty, 0, 0, { EVAL_X, EVAL_Y, EVAL_X + EVAL_W - 1, EVAL_Y + EVAL_H - 1 }, draw_eval, eval_click, eval_close, 1 },
+    { &graph_visible,  &graph_dirty, 0, 0, { GRAPH_X, GRAPH_Y, GRAPH_X + GRAPH_W - 1, GRAPH_Y + GRAPH_H - 1 }, draw_graph, graph_click, graph_close, 1 },
+    { &query_visible,  &query_dirty, 0, 0, { QUERY_X, QUERY_Y, QUERY_X + QUERY_W - 1, QUERY_Y + QUERY_H - 1 }, draw_query, NULL, close_query, 0 },
 };
 
 static int top_panel(void)                   /* the visible panel that gets the input, or -1 */
 {
-    for (int i = 0; i < NPANELS; i++) if (*panels[i].visible) return i;
+    for (int i = 0; i < NPANELS; i++) if (*panels[i].visible && panels[i].modal) return i;
     return -1;
 }
 
@@ -949,6 +971,8 @@ static int real_main(int argc, char **argv)
     if (argc > 3 && !strncmp(argv[3], "jump=", 5)) { int jx = 0, jy = 0; sscanf(argv[3] + 5, "%d,%d", &jx, &jy); view_x = jx; view_y = jy; clamp_view(); setSpeed(0); }
     if (argc > 3 && !strncmp(argv[3], "sound=", 6)) sound_play(argv[3] + 6);               /* debug: play a sound at start */
     if (argc > 3 && !strncmp(argv[3], "scen=", 5)) { int n = atoi(argv[3] + 5); LoadScenario((short)n); recenter(); notice_show(n); }   /* debug: start a scenario */
+    if (argc > 3 && !strncmp(argv[3], "query=", 6)) { int qx = 60, qy = 50; sscanf(argv[3] + 6, "%d,%d", &qx, &qy); doZoneStatus((short)qx, (short)qy); }   /* debug */
+    if (argc > 3 && !strcmp(argv[3], "quake")) { MakeEarthquake(); }   /* debug */
     if (argc > 3 && !strncmp(argv[3], "show=", 5)) debug_show = 1;
     if (argc > 3 && !strcmp(argv[3], "show=about")) show_about();
     if (argc > 3 && !strcmp(argv[3], "show=eval")) open_info_panel(P_EVAL);              /* debug: open a panel at start */
@@ -984,7 +1008,7 @@ static int real_main(int argc, char **argv)
                 case 0x21: view_y++; break;
                 case 0x22: view_x++; break;
                 case 0x20: view_x--; break;
-                case 0x45: { int tp = top_panel(); if (tp >= 0) panels[tp].close(); else running = 0; } break;   /* Esc */
+                case 0x45: { int tp = top_panel(); if (tp >= 0) panels[tp].close(); else if (query_visible) close_query(); else running = 0; } break;   /* Esc */
                 case 0x44: case 0x40: { int tp = top_panel(); if (tp >= 0) panels[tp].close(); } break;          /* Return, Space */
                 case 0x12: open_info_panel(P_EVAL); break;                    /* E */
                 case 0x24: open_info_panel(P_GRAPH); break;                   /* G */
@@ -1015,6 +1039,8 @@ static int real_main(int argc, char **argv)
                         continue;
                     }
                 }
+                if (query_visible && cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN &&
+                    mx >= QUERY_X && mx < QUERY_X + QUERY_W && my >= QUERY_Y && my < QUERY_Y + QUERY_H) { close_query(); dirty = 1; continue; }
                 if (inview) { hover_x = wx >> 4; hover_y = wy >> 4; } else hover_x = -1;
                 if (map_visible && ((cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) || (cls == IDCMP_MOUSEMOVE && map_drag))) {
                     int tx, ty;
@@ -1057,6 +1083,13 @@ static int real_main(int argc, char **argv)
             if (ox != view_x || oy != view_y) dirty = 1;
         }
         sound_poll();
+        if (ShakeNow > 0 && shake_frames == 0) { shake_frames = 50; shake_bx = view_x; shake_by = view_y; }
+        if (shake_frames > 0) {
+            shake_frames--;
+            if (shake_frames == 0) { view_x = shake_bx; view_y = shake_by; ShakeNow = 0; }
+            else { view_x = shake_bx + (rand() % 3) - 1; view_y = shake_by + (rand() % 3) - 1; }
+            clamp_view(); dirty = 1;
+        }
         if (debug_show && notice_visible && !(argc > 3 && !strcmp(argv[3], "show=about"))) notice_close();
         if (dbg_scroll > 0 && (frame & 3) == 0) { view_x++; if (dbg_scroll & 1) view_y++; dbg_scroll--; clamp_view(); dirty = 1; }
         if (SimSpeed && ++tick >= delay[SimSpeed]) {
