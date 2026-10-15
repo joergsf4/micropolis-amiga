@@ -90,10 +90,12 @@ static int pref_ask = 1;
 static ULONG pref_mode = 0xffffffffUL;          /* remembered RTG mode id, picture size and depth */
 static int pref_w, pref_h, pref_depth;
 static int pref_level;                          /* difficulty 0 easy, 1 medium, 2 hard */
-enum { O_BULLDOZE, O_BUDGET, O_DISASTERS, O_SOUND, O_AUTOGO, O_ANIM, O_MSGS, O_NOTICES, O_SPEAK, N_OPT };
+enum { O_BULLDOZE, O_BUDGET, O_DISASTERS, O_SOUND, O_AUTOGO, O_ANIM, O_MSGS, O_NOTICES, O_SPEAK, O_STARTMENU, N_OPT };
+static int start_pending;
+static int start_menu = 1;                       /* ask what to start with: new city, load, scenario */
 static int speak_tools;                          /* spoken tool names when a tool is chosen (off by default) */
-static const char *const opt_key[N_OPT] = { "AUTOBULLDOZE", "AUTOBUDGET", "DISASTERS", "SOUND", "AUTOGOTO", "ANIMATION", "MESSAGES", "MESSAGEWINDOWS", "SPEAKTOOLS" };
-static int pref_opt[N_OPT] = { -1, -1, -1, -1, -1, -1, -1, -1, -1 };     /* -1 = not saved yet: keep the default */
+static const char *const opt_key[N_OPT] = { "AUTOBULLDOZE", "AUTOBUDGET", "DISASTERS", "SOUND", "AUTOGOTO", "ANIMATION", "MESSAGES", "MESSAGEWINDOWS", "SPEAKTOOLS", "STARTMENU" };
+static int pref_opt[N_OPT] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };     /* -1 = not saved yet: keep the default */
 static int pref_speed = -1;
 #define N_WINPOS 6                              /* NPANELS */
 static int pref_wx[N_WINPOS] = { -1, -1, -1, -1, -1, -1 }, pref_wy[N_WINPOS] = { -1, -1, -1, -1, -1, -1 };   /* remembered window positions */
@@ -102,7 +104,7 @@ static int opt_get(int o)
     switch (o) {
     case O_BULLDOZE: return autoBulldoze;  case O_BUDGET: return autoBudget;  case O_DISASTERS: return !NoDisasters;
     case O_SOUND: return UserSoundOn;      case O_AUTOGO: return autoGo;      case O_ANIM: return DoAnimation;
-    case O_MSGS: return DoMessages;        case O_SPEAK: return speak_tools;   default: return DoNotices;
+    case O_MSGS: return DoMessages;        case O_SPEAK: return speak_tools;   case O_STARTMENU: return start_menu;   default: return DoNotices;
     }
 }
 static void opt_set(int o, int v)
@@ -110,7 +112,7 @@ static void opt_set(int o, int v)
     switch (o) {
     case O_BULLDOZE: autoBulldoze = v; break;  case O_BUDGET: autoBudget = v; break;  case O_DISASTERS: NoDisasters = !v; break;
     case O_SOUND: UserSoundOn = v; break;      case O_AUTOGO: autoGo = v; break;      case O_ANIM: DoAnimation = v; break;
-    case O_MSGS: DoMessages = v; break;        case O_SPEAK: speak_tools = v; break;   default: DoNotices = v; break;
+    case O_MSGS: DoMessages = v; break;        case O_SPEAK: speak_tools = v; break;   case O_STARTMENU: start_menu = v; break;   default: DoNotices = v; break;
     }
 }
 
@@ -877,7 +879,7 @@ static void render_frame(struct Window *win)
 /* ---------- menus and commands ---------- */
 enum { CMD_NEW = 1, CMD_LOAD, CMD_SAVE, CMD_SAVEAS, CMD_QUIT,
        CMD_PAUSE = 10, CMD_SLOW, CMD_MEDIUM, CMD_FAST,
-       CMD_AUTOBULLDOZE = 20, CMD_AUTOBUDGET, CMD_DISASTERS, CMD_SOUND, CMD_ASKMODE, CMD_AUTOGO, CMD_ANIM, CMD_MSGS, CMD_NOTICES, CMD_OVERLAY, CMD_LEVEL = 60, CMD_SPEAK = 65,
+       CMD_AUTOBULLDOZE = 20, CMD_AUTOBUDGET, CMD_DISASTERS, CMD_SOUND, CMD_ASKMODE, CMD_AUTOGO, CMD_ANIM, CMD_MSGS, CMD_NOTICES, CMD_OVERLAY, CMD_LEVEL = 60, CMD_SPEAK = 65, CMD_STARTMENU = 66,
        CMD_ABOUT = 44, CMD_HELP = 45, CMD_SCEN = 200, CMD_BUDGET = 40, CMD_MAP = 41, CMD_EVAL = 42, CMD_GRAPHS = 43, CMD_MAPMODE = 100,
        CMD_FIRE = 30, CMD_FLOOD, CMD_TORNADO, CMD_QUAKE, CMD_MONSTER, CMD_MELTDOWN };
 
@@ -926,6 +928,7 @@ static struct Menu *make_menus(struct Screen *scr, APTR *vi_out)
     mi(NM_ITEM, "Animation", NULL, CHECKIT | MENUTOGGLE | (DoAnimation ? CHECKED : 0), CMD_ANIM);
     mi(NM_ITEM, "Messages", NULL, CHECKIT | MENUTOGGLE | (DoMessages ? CHECKED : 0), CMD_MSGS);
     mi(NM_ITEM, "Speak tool names", NULL, CHECKIT | MENUTOGGLE | (speak_tools ? CHECKED : 0), CMD_SPEAK);
+    mi(NM_ITEM, "Start menu at launch", NULL, CHECKIT | MENUTOGGLE | (start_menu ? CHECKED : 0), CMD_STARTMENU);
     mi(NM_ITEM, "Message windows", NULL, CHECKIT | MENUTOGGLE | (DoNotices ? CHECKED : 0), CMD_NOTICES);
     mi(NM_ITEM, "Ask for screen mode at start", NULL, CHECKIT | MENUTOGGLE | (pref_ask ? CHECKED : 0), CMD_ASKMODE);
     mi(NM_TITLE, "Level", NULL, 0, 0);
@@ -1103,6 +1106,7 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
     case CMD_AUTOGO: autoGo = checked; MustUpdateOptions = 1; break;
     case CMD_ANIM: DoAnimation = checked; MustUpdateOptions = 1; full_redraw = 1; break;
     case CMD_MSGS: DoMessages = checked; MustUpdateOptions = 1; break;
+    case CMD_STARTMENU: start_menu = checked; break;
     case CMD_SPEAK: speak_tools = checked; break;
     case CMD_NOTICES: DoNotices = checked; MustUpdateOptions = 1; break;
     case CMD_OVERLAY: map_mode = (map_mode + 1) % MAP_MODES; map_visible = 1; map_dirty = 1; map_panel_dirty = 1; sprintf(status_msg, "Map: %s", map_names[map_mode]); break;
@@ -1124,6 +1128,42 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
     case CMD_MELTDOWN: MakeMeltdown(); break;
     }
     return 1;
+}
+
+
+static int easy(struct Window *win, const char *text, const char *gadgets)   /* 1..n for the buttons left to right, the last = 0 */
+{
+    struct EasyStruct es;
+    es.es_StructSize = sizeof(struct EasyStruct); es.es_Flags = 0;
+    es.es_Title = (CONST_STRPTR)"Micropolis"; es.es_TextFormat = (CONST_STRPTR)text; es.es_GadgetFormat = (CONST_STRPTR)gadgets;
+    return (int)EasyRequestArgs(win, &es, NULL, NULL);
+}
+
+static int pick_scenario(struct Window *win)             /* 1..8, 0 = back */
+{
+    static const char *const nm[8] = { "Dullsville 1900", "San Francisco 1906", "Hamburg 1944", "Bern 1965", "Tokyo 1957", "Detroit 1972", "Boston 2010", "Rio de Janeiro 2047" };
+    char g[160];
+    for (int page = 0; ; page = (page + 1) % 3) {
+        int r;
+        if (page == 0) sprintf(g, "%s|%s|%s|More...", nm[0], nm[1], nm[2]);
+        else if (page == 1) sprintf(g, "%s|%s|%s|More...", nm[3], nm[4], nm[5]);
+        else sprintf(g, "%s|%s|Back", nm[6], nm[7]);
+        r = easy(win, "Choose a scenario:", g);
+        if (page < 2) { if (r >= 1 && r <= 3) return page * 3 + r; }
+        else { if (r == 1) return 7; if (r == 2) return 8; return 0; }
+    }
+}
+
+static void start_choice(struct Window *win)             /* what to start with */
+{
+    char path[256];
+    for (;;) {
+        int r = easy(win, "Welcome to Micropolis!\nWhat do you want to start with?", "New city|Load city...|Scenario...|Current city");
+        if (r == 1) { do_command(CMD_NEW, win, NULL); return; }
+        if (r == 2) { if (ask_file(win, 0, path, sizeof path) && LoadCity(path)) { EraseOverlay(); recenter(); sprintf(status_msg, "Loaded %s", path); return; } }
+        else if (r == 3) { int sc = pick_scenario(win); if (sc) { do_command(CMD_SCEN + sc, win, NULL); return; } }
+        else return;                                       /* Current city (the default one) */
+    }
 }
 
 static void clamp_view(void)
@@ -1449,6 +1489,7 @@ static int real_main(int argc, char **argv)
         if (!strcmp(argv[3], "chalkerase")) { editor.tool_state = eraserState; ToolDown(&editor, bx + 100, by + 40); ToolUp(&editor, bx + 100, by + 40); }
         editor.tool_state = queryState;
     }   /* debug */
+    start_pending = start_menu && argc <= 2;                  /* not for test runs (debug arguments) */
     for (int ai = 1; ai < argc; ai++) if (!strncmp(argv[ai], "quit=", 5)) dbg_quit_loops = atoi(argv[ai] + 5) * 50;
     if (argc > 3 && !strncmp(argv[3], "show=", 5)) debug_show = 1;
     if (argc > 3 && !strcmp(argv[3], "show=about")) show_about();
@@ -1619,6 +1660,11 @@ static int real_main(int argc, char **argv)
             set_screen_title(t);
         }
         sync_panels();
+        if (start_pending && !dirty) {                                    /* the first picture is on the screen: ask what to start with */
+            start_pending = 0;
+            start_choice(win);
+            full_redraw = 1; dirty = 1;
+        }
         if (dbg_quit_loops && title_tick > dbg_quit_loops) running = 0;
         WaitTOF();
         gettimeofday(&now_time, NULL);
