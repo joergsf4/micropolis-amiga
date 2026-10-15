@@ -881,6 +881,7 @@ static void render_frame(struct Window *win)
         gfx_colors(PEN_TEXT, PEN_BAR);
         sprintf(line, " %-9s %-21s %s %-7ld %s %d%s", status_date, status_funds, T("Pop"), (long)CityPop, T("Speed"), (int)SimSpeed,
                 SimSpeed ? "" : T(" (Pause)"));
+        { char pad[200]; sprintf(pad, "%-66.66s", line); strcpy(line, pad); }     /* overwrite what an earlier, longer line (" (Pause)") left behind */
         if (strcmp(line, last_line1)) { gfx_print(4, 12, line); strcpy(last_line1, line); status_dirty = 1; }
         sprintf(line, " %-58.58s", status_msg);
         if (strcmp(line, last_line2)) { gfx_print(4, 27, line); strcpy(last_line2, line); status_dirty = 1; }
@@ -1203,7 +1204,7 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
     case CMD_HELP: show_help(); break;
     case CMD_ABOUT: show_about(); break;
     case CMD_NEW:
-        EraseOverlay(); GenerateNewCity(); SetGameLevelFunds((short)pref_level); setSpeed(3); recenter();
+        EraseOverlay(); GenerateNewCity(); SetGameLevelFunds((short)pref_level); setSpeed(2); recenter();
         sprintf(status_msg, T("New city generated.")); break;
     case CMD_LOAD:
         if (ask_file(win, 0, path, sizeof path)) {
@@ -1596,7 +1597,7 @@ static int real_main(int argc, char **argv)
     }
     editor.tool_state = queryState; editor.tool_state_save = -1;
     SetGameLevel((short)pref_level);
-    setSpeed(pref_speed >= 0 ? pref_speed : 3);
+    setSpeed(2);                                          /* medium: the fast speed was too quick for most cities */
     if (argc > 3 && !strncmp(argv[3], "scroll=", 7)) { dbg_scroll = atoi(argv[3] + 7); setSpeed(0); }   /* debug: scroll test */
     if (argc > 3 && !strncmp(argv[3], "jump=", 5)) { int jx = 0, jy = 0; sscanf(argv[3] + 5, "%d,%d", &jx, &jy); view_x = jx; view_y = jy; clamp_view(); setSpeed(0); }
     if (argc > 3 && !strncmp(argv[3], "sound=", 6)) sound_play(argv[3] + 6);               /* debug: play a sound at start */
@@ -1629,6 +1630,7 @@ static int real_main(int argc, char **argv)
     if (argc > 3 && !strcmp(argv[3], "show=eval")) open_info_panel(P_EVAL);              /* debug: open a panel at start */
     if (argc > 3 && !strcmp(argv[3], "show=graph")) open_info_panel(P_GRAPH);
     if (argc > 3 && !strcmp(argv[3], "show=budget")) DoBudgetFromMenu();
+    if (argc > 3 && !strncmp(argv[3], "speed=", 6)) do_command(CMD_PAUSE + atoi(argv[3] + 6), win, NULL);   /* debug: as the Speed menu */
     if (argc > 3 && !strcmp(argv[3], "show=map")) { open_info_panel(P_MAP); map_dirty = 1; }
     if (argc > 3 && !strncmp(argv[3], "notice=", 7)) { notice_show(atoi(argv[3] + 7)); notice_dirty = 1; }   /* debug */
     int running = 1, tick = 0, frame = 0, title_tick = 0;
