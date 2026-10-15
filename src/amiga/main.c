@@ -92,6 +92,7 @@ static int pref_w, pref_h, pref_depth;
 static int pref_level;                          /* difficulty 0 easy, 1 medium, 2 hard */
 enum { O_BULLDOZE, O_BUDGET, O_DISASTERS, O_SOUND, O_AUTOGO, O_ANIM, O_MSGS, O_NOTICES, O_SPEAK, O_STARTMENU, N_OPT };
 static int start_pending;
+static int refresh_full;                   /* the next window refresh must be followed by a complete redraw (the picture changed while a requester covered it) */
 static int start_menu = 1;                       /* ask what to start with: new city, load, scenario */
 static int speak_tools;                          /* spoken tool names when a tool is chosen (off by default) */
 static const char *const opt_key[N_OPT] = { "AUTOBULLDOZE", "AUTOBUDGET", "DISASTERS", "SOUND", "AUTOGOTO", "ANIMATION", "MESSAGES", "MESSAGEWINDOWS", "SPEAKTOOLS", "STARTMENU" };
@@ -1516,6 +1517,7 @@ static int real_main(int argc, char **argv)
                     struct MenuItem *it = ItemAddress(menu, code);
                     if (!it) break;
                     if (!do_command((int)(long)GTMENUITEM_USERDATA(it), win, it)) running = 0;
+                    refresh_full = 1;                                    /* a requester may have covered the map while the city changed */
                     code = it->NextSelect;
                 }
                 dirty = 1;
@@ -1531,6 +1533,7 @@ static int real_main(int argc, char **argv)
                 if (pi >= 0) panel_render(pi);
                 else { full_redraw = 1; first_present = 1; toolbar_dirty = status_dirty = demand_dirty = 1; last_line1[0] = last_line2[0] = 0; render_frame(win); }
                 EndRefresh(mw, TRUE);
+                if (refresh_full && pi < 0) { refresh_full = 0; full_redraw = 1; dirty = 1; }
                 continue;
             }
             if (cls == IDCMP_RAWKEY) {
@@ -1663,7 +1666,7 @@ static int real_main(int argc, char **argv)
         if (start_pending && !dirty) {                                    /* the first picture is on the screen: ask what to start with */
             start_pending = 0;
             start_choice(win);
-            full_redraw = 1; dirty = 1;
+            full_redraw = 1; dirty = 1; refresh_full = 1;
         }
         if (dbg_quit_loops && title_tick > dbg_quit_loops) running = 0;
         WaitTOF();
