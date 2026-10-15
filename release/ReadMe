@@ -77,6 +77,7 @@ Level          menu Level: Easy/Medium/Hard (start funds of a new city, saved in
 Options        Auto Goto, Animation, Messages, Message windows can be switched off
 Scenarios      menu Scenarios: 8 historic disasters/challenges with story and goal
 Help           Help key, or menu Project/Help (Micropolis.guide, AmigaGuide)
+Preferences    screen mode, options, speed, level and window positions are remembered (ENVARC:Micropolis.prefs)
 Quit           Esc, or Project/Quit
 About          Project/About Micropolis: version, build, CPU, screen mode, free memory
 

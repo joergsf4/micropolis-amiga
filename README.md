@@ -70,6 +70,7 @@ question on again. `SIZE=` (ToolType or argument) skips the question and uses th
 | Level | menu Level: Easy / Medium / Hard (start funds of a new city; saved in the preferences) |
 | Options | Auto Goto, Animation, Messages, Message windows can be switched off in the Options menu |
 | Help | `Help` key or Project > Help (AmigaGuide document `Micropolis.guide`) |
+| Preferences | screen mode, options, speed, level and window positions are remembered (ENVARC:Micropolis.prefs) |
 | Quit | Esc or Project > Quit |
 | Version | Project > About Micropolis (version, build, CPU, screen mode, free memory) |
 

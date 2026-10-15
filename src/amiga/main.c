@@ -90,6 +90,28 @@ static int pref_ask = 1;
 static ULONG pref_mode = 0xffffffffUL;          /* remembered RTG mode id, picture size and depth */
 static int pref_w, pref_h, pref_depth;
 static int pref_level;                          /* difficulty 0 easy, 1 medium, 2 hard */
+enum { O_BULLDOZE, O_BUDGET, O_DISASTERS, O_SOUND, O_AUTOGO, O_ANIM, O_MSGS, O_NOTICES, N_OPT };
+static const char *const opt_key[N_OPT] = { "AUTOBULLDOZE", "AUTOBUDGET", "DISASTERS", "SOUND", "AUTOGOTO", "ANIMATION", "MESSAGES", "MESSAGEWINDOWS" };
+static int pref_opt[N_OPT] = { -1, -1, -1, -1, -1, -1, -1, -1 };     /* -1 = not saved yet: keep the default */
+static int pref_speed = -1;
+#define N_WINPOS 6                              /* NPANELS */
+static int pref_wx[N_WINPOS] = { -1, -1, -1, -1, -1, -1 }, pref_wy[N_WINPOS] = { -1, -1, -1, -1, -1, -1 };   /* remembered window positions */
+static int opt_get(int o)
+{
+    switch (o) {
+    case O_BULLDOZE: return autoBulldoze;  case O_BUDGET: return autoBudget;  case O_DISASTERS: return !NoDisasters;
+    case O_SOUND: return UserSoundOn;      case O_AUTOGO: return autoGo;      case O_ANIM: return DoAnimation;
+    case O_MSGS: return DoMessages;        default: return DoNotices;
+    }
+}
+static void opt_set(int o, int v)
+{
+    switch (o) {
+    case O_BULLDOZE: autoBulldoze = v; break;  case O_BUDGET: autoBudget = v; break;  case O_DISASTERS: NoDisasters = !v; break;
+    case O_SOUND: UserSoundOn = v; break;      case O_AUTOGO: autoGo = v; break;      case O_ANIM: DoAnimation = v; break;
+    case O_MSGS: DoMessages = v; break;        default: DoNotices = v; break;
+    }
+}
 
 static void prefs_load(void)
 {
@@ -104,7 +126,17 @@ static void prefs_load(void)
             else if (sscanf(line, "MODE=%lx", &m) == 1) pref_mode = (ULONG)m;
             else if (!strncmp(line, "SIZE=", 5)) sscanf(line + 5, "%dx%d", &pref_w, &pref_h);
             else if (!strncmp(line, "DEPTH=", 6)) pref_depth = atoi(line + 6);
-            else if (!strncmp(line, "LEVEL=", 6)) { pref_level = atoi(line + 6); if (pref_level < 0 || pref_level > 2) pref_level = 0; }
+            else if (!strncmp(line, "SPEED=", 6)) { pref_speed = atoi(line + 6); if (pref_speed < 0 || pref_speed > 3) pref_speed = -1; }
+            else if (!strncmp(line, "WIN", 3) && line[3] >= '0' && line[3] < '0' + N_WINPOS && line[4] == '=') {
+                int x, y;
+                if (sscanf(line + 5, "%d,%d", &x, &y) == 2) { pref_wx[line[3] - '0'] = x; pref_wy[line[3] - '0'] = y; }
+            }
+            else {
+                int o;
+                for (o = 0; o < N_OPT; o++) { size_t n = strlen(opt_key[o]); if (!strncmp(line, opt_key[o], n) && line[n] == '=') { pref_opt[o] = atoi(line + n + 1) ? 1 : 0; break; } }
+                if (o < N_OPT) continue;
+            }
+            if (!strncmp(line, "LEVEL=", 6)) { pref_level = atoi(line + 6); if (pref_level < 0 || pref_level > 2) pref_level = 0; }
         }
         fclose(f);
         return;
@@ -118,6 +150,9 @@ static void prefs_save(void)
         FILE *f = fopen(files[i], "w");
         if (!f) continue;
         fprintf(f, "ASK=%d\nMODE=%lx\nSIZE=%dx%d\nDEPTH=%d\nLEVEL=%d\n", pref_ask, (unsigned long)pref_mode, pref_w, pref_h, pref_depth, pref_level);
+        for (int o = 0; o < N_OPT; o++) fprintf(f, "%s=%d\n", opt_key[o], pref_opt[o] >= 0 ? pref_opt[o] : opt_get(o));
+        fprintf(f, "SPEED=%d\n", pref_speed >= 0 ? pref_speed : 3);
+        for (int i = 0; i < N_WINPOS; i++) if (pref_wx[i] >= 0) fprintf(f, "WIN%d=%d,%d\n", i, pref_wx[i], pref_wy[i]);
         fclose(f);
     }
 }
@@ -520,6 +555,9 @@ static void panel_open(int i)
     if (p->placement == 1) { x = sw - p->w - 24; y = bar + 40; }
     else if (p->placement == 2) { x = sw - p->w - 24; y = sh - p->h - 40; }
     else { x = (sw - p->w - 8) / 2; y = bar + (sh - bar - p->h - 24) / 2; }
+    if (i < N_WINPOS && pref_wx[i] >= 0) { x = pref_wx[i]; y = pref_wy[i]; }      /* where the user left it */
+    if (x > sw - p->w - 8) x = sw - p->w - 8;
+    if (y > sh - p->h - 24) y = sh - p->h - 24;
     if (x < 0) x = 0;
     if (y < bar) y = bar;
     p->win = OpenWindowTags(NULL, WA_CustomScreen, (ULONG)g_scr, WA_Left, x, WA_Top, y,
@@ -540,6 +578,7 @@ static void panel_close(int i)
 {
     struct panel *p = &panels[i];
     if (!p->win) return;
+    if (i < N_WINPOS && i != P_NOTICE) { pref_wx[i] = p->win->LeftEdge; pref_wy[i] = p->win->TopEdge; }
     close_window_safely(p->win);
     p->win = NULL;
 }
@@ -1194,6 +1233,7 @@ static int real_main(int argc, char **argv)
     view_y = WORLD_Y / 2 - VIEW_ROWS / 2;
     clamp_view();
 
+    for (int o = 0; o < N_OPT; o++) if (pref_opt[o] >= 0) opt_set(o, pref_opt[o]);     /* saved options (before the menus are built) */
     logmsg("view set");
     if (test_mode) { logmsg("test mode: stop before opening the screen"); rc = 0; goto out; }
     check_filter();
@@ -1288,7 +1328,7 @@ static int real_main(int argc, char **argv)
     }
     editor.tool_state = queryState; editor.tool_state_save = -1;
     SetGameLevel((short)pref_level);
-    setSpeed(3);
+    setSpeed(pref_speed >= 0 ? pref_speed : 3);
     if (argc > 3 && !strncmp(argv[3], "scroll=", 7)) { dbg_scroll = atoi(argv[3] + 7); setSpeed(0); }   /* debug: scroll test */
     if (argc > 3 && !strncmp(argv[3], "jump=", 5)) { int jx = 0, jy = 0; sscanf(argv[3] + 5, "%d,%d", &jx, &jy); view_x = jx; view_y = jy; clamp_view(); setSpeed(0); }
     if (argc > 3 && !strncmp(argv[3], "sound=", 6)) sound_play(argv[3] + 6);               /* debug: play a sound at start */
@@ -1480,6 +1520,11 @@ out:
     sound_exit();
     logmsg("cleanup");
     for (int i = 0; i < NPANELS; i++) panel_close(i);
+    if (rc == 0 && !test_mode) {                                  /* remember options, speed and window positions */
+        for (int o = 0; o < N_OPT; o++) pref_opt[o] = opt_get(o);
+        if (SimSpeed) pref_speed = (int)SimSpeed;                  /* a paused game does not start paused next time */
+        prefs_save();
+    }
     if (win) close_window_safely(win);
     main_window_ptr = NULL;
     if (menu) FreeMenus(menu);
