@@ -256,6 +256,7 @@ int ui_eval(const char *cmd)
         query_visible = 1; query_dirty = 1; dirty = 1;
     }
     else if (!strncmp(cmd, "UISetEvaluation ", 16))  { eval_set(cmd); eval_dirty = 1; dirty = 1; }
+    else if (!strncmp(cmd, "UISetBudget ", 12))       { budget_set_totals(cmd); budget_dirty = 1; dirty = 1; }
     else if (!strncmp(cmd, "UISetBudgetValues ", 18)) { budget_set_values(cmd); dirty = 1; }
     else if (!strncmp(cmd, "UIShowBudgetAndWait", 19)) { budget_show(); budget_dirty = 1; dirty = 1; }
     else if (!strncmp(cmd, "UISetDemand ", 12)) {
@@ -1627,6 +1628,7 @@ static int real_main(int argc, char **argv)
     if (argc > 3 && !strcmp(argv[3], "show=about")) show_about();
     if (argc > 3 && !strcmp(argv[3], "show=eval")) open_info_panel(P_EVAL);              /* debug: open a panel at start */
     if (argc > 3 && !strcmp(argv[3], "show=graph")) open_info_panel(P_GRAPH);
+    if (argc > 3 && !strcmp(argv[3], "show=budget")) DoBudgetFromMenu();
     if (argc > 3 && !strcmp(argv[3], "show=map")) { open_info_panel(P_MAP); map_dirty = 1; }
     if (argc > 3 && !strncmp(argv[3], "notice=", 7)) { notice_show(atoi(argv[3] + 7)); notice_dirty = 1; }   /* debug */
     int running = 1, tick = 0, frame = 0, title_tick = 0;

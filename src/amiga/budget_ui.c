@@ -121,10 +121,10 @@ void budget_text(void)
     SetAPen(rp, PEN_TEXT);
     SetBPen(rp, PEN_BAR);
     gfx_print_c(PX + 200, PY + 22, T("B U D G E T"));
-    put(rp, PX + 16, PY + 52, T("Taxes collected")); gfx_print_r(PX + 16 + 28 * 8, PY + 52, collected);
-    put(rp, PX + 16, PY + 72, T("Cash flow")); gfx_print_r(PX + 16 + 28 * 8, PY + 72, flow);
-    put(rp, PX + 16, PY + 92, T("Previous funds")); gfx_print_r(PX + 16 + 28 * 8, PY + 92, previous);
-    put(rp, PX + 16, PY + 112, T("Current funds")); gfx_print_r(PX + 16 + 28 * 8, PY + 112, current);
+    put(rp, PX + 16, PY + 52, T("Taxes collected")); gfx_print_r(PX + 16 + 34 * 8, PY + 52, collected);
+    put(rp, PX + 16, PY + 72, T("Cash flow")); gfx_print_r(PX + 16 + 34 * 8, PY + 72, flow);
+    put(rp, PX + 16, PY + 92, T("Previous funds")); gfx_print_r(PX + 16 + 34 * 8, PY + 92, previous);
+    put(rp, PX + 16, PY + 112, T("Current funds")); gfx_print_r(PX + 16 + 34 * 8, PY + 112, current);
 
     SetBPen(rp, PEN_BTN);                            /* the +/- labels sit on the buttons */
     put(rp, MINUS_X + 10, ROW_TAX, "-");  put(rp, PLUS_X + 10, ROW_TAX, "+");
