@@ -2,7 +2,7 @@ Short:        Micropolis (open-source SimCity) with RTG graphics
 Author:       Electronic Arts / Will Wright / Don Hopkins (original), Amiga port: joergsf4
 Uploader:     joergsf4
 Type:         game/strategy
-Version:      0.6.0
+Version:      0.6.1
 Requires:     AmigaOS 3.x, 68020+, RTG card (Picasso96 or CyberGraphX), 2 MB Chip + 2 MB Fast
 Architecture: m68k-amigaos >= 3.0.0
 
@@ -19,8 +19,8 @@ REQUIREMENTS
 - AmigaOS 3.x, Kickstart 3.2 recommended, 68020 or better (68030/50 MHz is the speed target)
 - 2 MB Chip RAM and 2 MB Fast RAM or more (sound effects are played through the
   system sound.datatype from the res/sounds drawer; the Options menu has a Sound switch)
-- RTG graphics card with Picasso96 or CyberGraphX (cybergraphics.library 40+) and a screen mode of
-  at least 640x480 with 8, 15, 16, 24 or 32 bit (8 bit is used if available).
+- RTG graphics card with Picasso96 or CyberGraphX (cybergraphics.library 40+) and a screen mode between
+  640x480 and 800x600 (4:3 or 5:4 shape) with 8, 15, 16, 24 or 32 bit (8 bit is used if available).
   In FS-UAE: graphics_card = uaegfx-z3
 - LIBS: mathieeedoubbas.library, mathieeedoubtrans.library, gadtools.library, asl.library
   (all are part of a normal Workbench)
@@ -38,7 +38,7 @@ started from anywhere, also from a shell:
 
 ToolTypes of the icon (Information; remove the parentheses to switch one on):
   CITY=cities/bruce.cty   opens that city at start
-  SIZE=800x600            screen size, 640x480 up to 1024x768 (the view fills the screen: more city visible)
+  SIZE=800x600            screen size, 640x480 up to 800x600 (the view fills the screen: more city visible)
   DEBUG                   writes micropolis.log
 Command line: Micropolis [city] [SIZE=WxH] [ASK] [DEBUG]
 

@@ -13,7 +13,7 @@ C code; Tcl/Tk and X11 were replaced by an Amiga user interface.
 | **OS** | AmigaOS 3.x (developed and tested on 3.2 only). Kickstart 3.2 recommended |
 | **CPU** | 68020 or better (tested on an emulated 68040; a 68030/50 MHz is the performance target) |
 | **RAM** | 2 MB Chip + 2 MB Fast or more (the program itself takes about 1.5 MB) |
-| **Graphics** | RTG card with Picasso96 or CyberGraphX (`cybergraphics.library` 40+) and any screen mode of at least 640x480 (8, 15, 16, 24 or 32 bit; 8 bit is used when available) |
+| **Graphics** | RTG card with Picasso96 or CyberGraphX (`cybergraphics.library` 40+) and a screen mode between 640x480 and 800x600 (4:3 / 5:4 shape; 8, 15, 16, 24 or 32 bit; 8 bit is used when available) |
 | **System files** | `mathieeedoubbas.library`, `mathieeedoubtrans.library` (in `LIBS:` of any Workbench), `gadtools.library`, `asl.library` |
 | **Sound** | via the system `sound.datatype` (datatypes.library, OS 3.0+): the original sound effects as 8SVX samples; they are loaded when first played |
 | **CPU libraries** | the right `680x0.library` for your CPU (68030/68040/68060), as AmigaOS 3.2 asks for |
@@ -33,7 +33,7 @@ Work:Micropolis/Micropolis my.cty          ; opens a city file (path relative to
 ```
 
 ToolTypes (icon information; remove the parentheses to switch one on): `CITY=cities/bruce.cty` city to open at start,
-`SIZE=800x600` screen size (640x480 up to 1024x768; the tile view fills the screen, so more of the city is visible),
+`SIZE=800x600` screen size (640x480 up to 800x600; the tile view fills the screen, so more of the city is visible),
 `DEBUG` write `micropolis.log`.
 Command line: `Micropolis [city] [SIZE=WxH] [ASK] [DEBUG]`.
 

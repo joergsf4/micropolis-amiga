@@ -33,6 +33,7 @@
 #include <proto/asl.h>
 #include <proto/cybergraphics.h>
 #include <proto/icon.h>
+#include <utility/hooks.h>
 #include <workbench/startup.h>
 #include <workbench/workbench.h>
 
@@ -49,8 +50,8 @@ struct Library *IconBase;
 
 /* Screen size: 640x480 by default, up to MAX_W x MAX_H (ToolType SIZE=800x600, or MODE=ASK for a mode requester).
  * The tile view fills the screen, so a bigger screen shows more of the city. */
-#define MAX_W 1024
-#define MAX_H 768
+#define MAX_W 800                       /* largest picture: 800x600 (the useful range on RTG cards and emulators) */
+#define MAX_H 600
 static int scr_w = 640, scr_h = 480;
 #define SCR_W scr_w
 #define SCR_H scr_h
@@ -922,27 +923,47 @@ static void read_tooltypes(int argc, char **argv)
     }
 }
 
+/* Sensible modes only: RTG modes between 640x480 and 800x600 with a 4:3 / 5:4 shape and at least 8 bit. */
+static int mode_ok(ULONG id)
+{
+    long w, h, d;
+    if (id == INVALID_ID || !IsCyberModeID(id)) return 0;
+    w = (long)GetCyberIDAttr(CYBRIDATTR_WIDTH, id); h = (long)GetCyberIDAttr(CYBRIDATTR_HEIGHT, id);
+    d = (long)GetCyberIDAttr(CYBRIDATTR_DEPTH, id);
+    if (w < 640 || w > MAX_W || h < 480 || h > MAX_H || d < 8) return 0;
+    return w * 10 >= h * 12 && w * 10 <= h * 14;          /* aspect ratio 1.2 .. 1.4 */
+}
+
+/* asl filter hook: called with A0 = hook, A2 = requester, A1 = display mode id; TRUE = show the mode */
+static ULONG mode_filter(register struct Hook *h __asm("a0"), register APTR req __asm("a2"), register ULONG id __asm("a1"))
+{
+    return mode_ok(id) ? 1 : 0;
+}
+
 /* screen mode requester (asl.library): returns the chosen RTG mode id, its size and depth; INVALID_ID if cancelled */
 static ULONG ask_mode(int *w, int *h, int *depth)
 {
     ULONG id = INVALID_ID;
     struct ScreenModeRequester *sr;
+    static struct Hook filter_hook;
     if (!AslBase) return INVALID_ID;
+    filter_hook.h_Entry = (ULONG (*)())mode_filter;
     sr = (struct ScreenModeRequester *)AllocAslRequestTags(ASL_ScreenModeRequest,
-            ASLSM_TitleText, (ULONG)"Micropolis: choose an RTG screen mode (at least 640x480)",
+            ASLSM_TitleText, (ULONG)"Micropolis: choose an RTG screen mode (640x480 to 800x600)",
             ASLSM_MinWidth, 640, ASLSM_MinHeight, 480, ASLSM_MinDepth, 8,
-            ASLSM_InitialDisplayID, (pref_mode != 0xffffffffUL) ? pref_mode : 0, TAG_DONE);
+            ASLSM_InitialDisplayID, (pref_mode != 0xffffffffUL) ? pref_mode : 0,
+            ASLSM_FilterFunc, (ULONG)&filter_hook, TAG_DONE);
     if (sr) {
         for (int tries = 0; tries < 5; tries++) {
             if (!AslRequest(sr, NULL)) break;                      /* cancelled */
-            if (IsCyberModeID(sr->sm_DisplayID)) {
+            if (mode_ok(sr->sm_DisplayID)) {
                 id = sr->sm_DisplayID;
                 *w = sr->sm_DisplayWidth; *h = sr->sm_DisplayHeight; *depth = sr->sm_DisplayDepth;
                 break;
             }
             {   struct EasyStruct es;                              /* the list also holds the Amiga chipset modes */
                 es.es_StructSize = sizeof(struct EasyStruct); es.es_Flags = 0;
-                es.es_Title = (CONST_STRPTR)"Micropolis"; es.es_TextFormat = (CONST_STRPTR)"That is not an RTG mode.\nPlease choose one of the RTG modes (Picasso96 / CyberGraphX).";
+                es.es_Title = (CONST_STRPTR)"Micropolis"; es.es_TextFormat = (CONST_STRPTR)"That is not a usable RTG mode.\nPlease choose one of the listed RTG modes\n(640x480 up to 800x600).";
                 es.es_GadgetFormat = (CONST_STRPTR)"Choose again";
                 EasyRequestArgs(NULL, &es, NULL, NULL);
             }
@@ -1030,7 +1051,7 @@ static int real_main(int argc, char **argv)
     if (size_forced) {                                    /* SIZE= : exactly that, no questions */
         id = pick_mode(&depth);
     } else {
-        int use_saved = !ask_mode_flag && !pref_ask && pref_mode != 0xffffffffUL && IsCyberModeID(pref_mode);
+        int use_saved = !ask_mode_flag && !pref_ask && pref_mode != 0xffffffffUL && mode_ok(pref_mode);
         if (use_saved) {                                  /* "always use this mode" */
             id = pref_mode; req_w = pref_w; req_h = pref_h; depth = pref_depth ? pref_depth : 8;
         } else {
@@ -1100,6 +1121,13 @@ static int real_main(int argc, char **argv)
     if (argc > 3 && !strncmp(argv[3], "sound=", 6)) sound_play(argv[3] + 6);               /* debug: play a sound at start */
     if (argc > 3 && !strncmp(argv[3], "scen=", 5)) { int n = atoi(argv[3] + 5); LoadScenario((short)n); recenter(); notice_show(n); }   /* debug: start a scenario */
     if (argc > 3 && !strncmp(argv[3], "query=", 6)) { int qx = 60, qy = 50; sscanf(argv[3] + 6, "%d,%d", &qx, &qy); doZoneStatus((short)qx, (short)qy); }   /* debug */
+    if (argc > 3 && !strcmp(argv[3], "modes")) {               /* debug: which display modes pass the filter */
+        ULONG m = INVALID_ID; int n = 0;
+        while ((m = NextDisplayInfo(m)) != INVALID_ID) {
+            if (mode_ok(m)) { char lb[90]; sprintf(lb, "mode ok: 0x%08lx %ldx%ld %ld bit", (unsigned long)m, (long)GetCyberIDAttr(CYBRIDATTR_WIDTH, m), (long)GetCyberIDAttr(CYBRIDATTR_HEIGHT, m), (long)GetCyberIDAttr(CYBRIDATTR_DEPTH, m)); logmsg(lb); n++; }
+        }
+        { char lb[40]; sprintf(lb, "modes accepted: %d", n); logmsg(lb); }
+    }
     if (argc > 3 && !strcmp(argv[3], "quake")) { MakeEarthquake(); }   /* debug */
     if (argc > 3 && !strncmp(argv[3], "show=", 5)) debug_show = 1;
     if (argc > 3 && !strcmp(argv[3], "show=about")) show_about();
