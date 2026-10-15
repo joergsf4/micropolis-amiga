@@ -85,6 +85,7 @@ static SimView editor;                 /* the core's tools take a SimView; only 
 static int hover_x = -1, hover_y = -1; /* tile under the mouse, -1 = none */
 static int dragging;
 static int map_drag;
+static int sound_ui_ready;                /* set when the main loop runs: UI sounds (tool select, speed) only from then on */
 static int dbg_scroll;                  /* test option scroll=N: scroll N tiles (x and y), then stop */
 static int debug_show;                  /* test option show=eval|graph: keep messages away so the panel can be photographed */
 static const int panning = 0;            /* (right button is the menu button now) */
@@ -148,6 +149,7 @@ int ui_eval(const char *cmd)
                 if (debug_log) { char lb[80]; sprintf(lb, "sound: %s", id); logmsg(lb); } }
         }
     }
+    else if (!strncmp(cmd, "UISetSpeed ", 11))      { if (sound_ui_ready && UserSoundOn) sound_play("boing"); }
     else if (!strncmp(cmd, "UISetMessage ", 13)) { copy_braced(status_msg, sizeof status_msg, cmd); dirty = 1; }
     return 0;
 }
@@ -938,6 +940,7 @@ static int real_main(int argc, char **argv)
     if (argc > 3 && !strcmp(argv[3], "show=graph")) open_info_panel(P_GRAPH);
     if (argc > 3 && !strncmp(argv[3], "notice=", 7)) { notice_show(atoi(argv[3] + 7)); notice_dirty = 1; }   /* debug */
     int running = 1, tick = 0, frame = 0;
+    sound_ui_ready = 1;
     static const int delay[4] = { 0, 12, 4, 1 };      /* video frames per simulation step */
     while (running) {
         struct IntuiMessage *m;
@@ -1010,7 +1013,12 @@ static int real_main(int argc, char **argv)
                 if (cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) {
                     if (mx < TB_W && my >= BAR_H) {
                         int i = (my - BAR_H) / TB_BTN_H;
-                        if (i < 16) { editor.tool_state = toolbtn[i].state; toolbar_dirty = 1; }
+                        if (i < 16) {
+                            static const char *const tool_sound[18] = { "res", "com", "ind", "fire", "query", "police", "wire", "bulldozer", "rail",
+                                                                         "road", "chalk", "eraser", "stadium", "park", "seaport", "coal", "nuclear", "airport" };
+                            editor.tool_state = toolbtn[i].state; toolbar_dirty = 1;
+                            if (UserSoundOn && editor.tool_state >= 0 && editor.tool_state < 18) sound_play(tool_sound[editor.tool_state]);   /* like the original palette */
+                        }
                     } else if (inview) {
                         ToolDown(&editor, wx, wy);
                         dragging = 1;
