@@ -924,14 +924,28 @@ static void read_tooltypes(int argc, char **argv)
 }
 
 /* Sensible modes only: RTG modes between 640x480 and 800x600 with a 4:3 / 5:4 shape and at least 8 bit. */
+static int relax_filter;                  /* the card has no mode that passes the strict rules: accept any RTG mode >= 640x480 */
+
 static int mode_ok(ULONG id)
 {
     long w, h, d;
     if (id == INVALID_ID || !IsCyberModeID(id)) return 0;
     w = (long)GetCyberIDAttr(CYBRIDATTR_WIDTH, id); h = (long)GetCyberIDAttr(CYBRIDATTR_HEIGHT, id);
     d = (long)GetCyberIDAttr(CYBRIDATTR_DEPTH, id);
-    if (w < 640 || w > MAX_W || h < 480 || h > MAX_H || d < 8) return 0;
+    if (w < 640 || h < 480 || d < 8) return 0;
+    if (relax_filter) return 1;
+    if (w > MAX_W || h > MAX_H) return 0;
     return w * 10 >= h * 12 && w * 10 <= h * 14;          /* aspect ratio 1.2 .. 1.4 */
+}
+
+/* does the card offer any mode that passes the strict rules? (the names of the modes do not matter, only size and depth) */
+static void check_filter(void)
+{
+    ULONG m = INVALID_ID;
+    int n = 0;
+    relax_filter = 0;
+    while ((m = NextDisplayInfo(m)) != INVALID_ID) n += mode_ok(m);
+    if (!n) { relax_filter = 1; logmsg("no mode passes the strict screen mode rules: accepting any RTG mode >= 640x480"); }
 }
 
 /* asl filter hook: called with A0 = hook, A2 = requester, A1 = display mode id; TRUE = show the mode */
@@ -1048,6 +1062,7 @@ static int real_main(int argc, char **argv)
 
     logmsg("view set");
     if (test_mode) { logmsg("test mode: stop before opening the screen"); rc = 0; goto out; }
+    check_filter();
     if (size_forced) {                                    /* SIZE= : exactly that, no questions */
         id = pick_mode(&depth);
     } else {
@@ -1090,6 +1105,10 @@ static int real_main(int argc, char **argv)
     { char b[100]; sprintf(b, "screen mode 0x%08lx, depth %d", (unsigned long)id, depth); logmsg(b); }
     scr = OpenScreenTags(NULL, SA_DisplayID, id, SA_Width, SCR_W, SA_Height, SCR_H, SA_Depth, depth,
                          SA_Quiet, TRUE, SA_ShowTitle, FALSE, TAG_DONE);
+    if (!scr) {                                                   /* some drivers insist on the mode's own size */
+        logmsg("OpenScreen with our size failed: trying the mode's own size");
+        scr = OpenScreenTags(NULL, SA_DisplayID, id, SA_Depth, depth, SA_Quiet, TRUE, SA_ShowTitle, FALSE, TAG_DONE);
+    }
     if (!scr) { fail("Cannot open the RTG screen (mode 0x%08lx, %d bit).", (unsigned long)id, depth); goto out; }
     logmsg("screen open");
     if (true_color) {
