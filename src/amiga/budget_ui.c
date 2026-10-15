@@ -8,7 +8,7 @@
 #undef GetSprite
 #include <stdio.h>
 #include <string.h>
-#include <proto/graphics.h>
+#include "gfx.h"
 #include "budget_ui.h"
 
 extern float roadPercent, policePercent, firePercent;
@@ -105,14 +105,16 @@ void budget_draw(UBYTE *fb, int stride)
     rect(fb, stride, PX + 220, BTN_Y, 140, 24, PEN_BTN);
 }
 
-static void put(struct RastPort *rp, int x, int y, const char *s)
-{
-    Move(rp, x, y);
-    Text(rp, (CONST_STRPTR)s, strlen(s));
-}
+#define put(rp, x, y, s) gfx_print((x), (y), (s))
+#define SetAPen(rp, c) gfx_fg(c)
+#define SetBPen(rp, c) gfx_bg(c)
+static UBYTE cur_fg = PEN_TEXT, cur_bg = PEN_BAR;
+static void gfx_fg(UBYTE c) { cur_fg = c; gfx_colors(cur_fg, cur_bg); }
+static void gfx_bg(UBYTE c) { cur_bg = c; gfx_colors(cur_fg, cur_bg); }
 
-void budget_text(struct RastPort *rp)
+void budget_text(void)
 {
+    void *rp = 0; (void)rp;
     char b[60];
     if (!budget_visible) return;
     SetAPen(rp, PEN_TEXT);

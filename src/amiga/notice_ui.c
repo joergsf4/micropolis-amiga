@@ -11,7 +11,7 @@
 #include <string.h>
 #include <proto/dos.h>
 #include <proto/exec.h>
-#include <proto/graphics.h>
+#include "gfx.h"
 #include <exec/memory.h>
 #include "notice_ui.h"
 
@@ -30,7 +30,7 @@ static int nlines;
 
 int notice_load(void)
 {
-    BPTR f = Open((CONST_STRPTR)"res/notices.txt", MODE_OLDFILE);
+    BPTR f = Open((CONST_STRPTR)"PROGDIR:res/notices.txt", MODE_OLDFILE);
     char *buf, *p;
     LONG len;
     if (!f) return 0;
@@ -112,21 +112,15 @@ void notice_draw(UBYTE *fb, int stride)
     rect(fb, stride, NOTICE_X + NOTICE_W / 2 - 50, NOTICE_Y + NOTICE_H - 34, 100, 24, PEN_SEL);
 }
 
-void notice_text(struct RastPort *rp)
+void notice_text(void)
 {
     if (!notice_visible || !cur) return;
-    SetAPen(rp, PEN_TEXT);
-    SetBPen(rp, PEN_BTN);
-    Move(rp, NOTICE_X + 12, NOTICE_Y + 20);
-    Text(rp, (CONST_STRPTR)cur->title, strlen(cur->title));
-    SetBPen(rp, PEN_BAR);
-    for (int i = 0; i < nlines; i++) {
-        Move(rp, NOTICE_X + 12, NOTICE_Y + 46 + i * 14);
-        Text(rp, (CONST_STRPTR)lines[i], strlen(lines[i]));
-    }
-    SetBPen(rp, PEN_SEL);
-    Move(rp, NOTICE_X + NOTICE_W / 2 - 34, NOTICE_Y + NOTICE_H - 17);
-    Text(rp, (CONST_STRPTR)"Continue", 8);
+    gfx_colors(PEN_TEXT, PEN_BTN);
+    gfx_print(NOTICE_X + 12, NOTICE_Y + 20, cur->title);
+    gfx_colors(PEN_TEXT, PEN_BAR);
+    for (int i = 0; i < nlines; i++) gfx_print(NOTICE_X + 12, NOTICE_Y + 46 + i * 14, lines[i]);
+    gfx_colors(PEN_TEXT, PEN_SEL);
+    gfx_print(NOTICE_X + NOTICE_W / 2 - 34, NOTICE_Y + NOTICE_H - 17, "Continue");
 }
 
 int notice_click(int x, int y)

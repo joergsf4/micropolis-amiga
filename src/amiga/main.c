@@ -8,9 +8,13 @@
 #include "budget_ui.h"
 #include "mapview.h"
 #include "notice_ui.h"
+#include "gfx.h"
 #undef GetSprite
 #include <stdio.h>
+#include <stdarg.h>
+#include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <exec/types.h>
 #include <exec/memory.h>
 #include <intuition/intuition.h>
@@ -25,14 +29,18 @@
 #include <proto/gadtools.h>
 #include <proto/asl.h>
 #include <proto/cybergraphics.h>
+#include <proto/icon.h>
+#include <workbench/startup.h>
+#include <workbench/workbench.h>
 
-static const char verstag[] __attribute__((used)) = "$VER: Micropolis 0.1 (14.10.2026)";
+static const char verstag[] __attribute__((used)) = "$VER: Micropolis 0.2 (15.10.2026)";
 
 struct Library *CyberGfxBase;
 struct IntuitionBase *IntuitionBase;
 struct GfxBase *GfxBase;
 struct Library *GadToolsBase;
 struct Library *AslBase;
+struct Library *IconBase;
 
 #define SCR_W 640
 #define SCR_H 480
@@ -43,10 +51,12 @@ struct Library *AslBase;
 
 
 void app_log(const char *msg);
+static int debug_log;                  /* DEBUG tooltype / argument: write micropolis.log */
 static void logmsg(const char *msg) { app_log(msg); }
 void app_log(const char *msg)   /* progress log: when started from the Workbench there is no console */
 {
-    FILE *f = fopen("micropolis.log", "a");
+    if (!debug_log) return;
+    FILE *f = fopen("PROGDIR:micropolis.log", "a");
     if (f) { fputs(msg, f); fputc(10, f); fclose(f); }
 }
 
@@ -78,7 +88,7 @@ static const struct { const char *name; short state; } toolbtn[16] = {
     { "Query", queryState },       { "Doze 1", dozeState },       { "Road 10", roadState },
     { "Rail 20", rrState },        { "Wire 5", wireState },       { "Park 10", parkState },
     { "Resid 100", residentialState }, { "Comm 100", commercialState }, { "Indus 100", industrialState },
-    { "Fire 500", fireState },     { "Police 500", policeState }, { "Stadm 5k", stadiumState },
+    { "Fire 500", fireState },     { "Polic 500", policeState }, { "Stadm 5k", stadiumState },
     { "Coal 3k", powerState },     { "Nucl 5k", nuclearState },   { "Sea 3k", seaportState },
     { "Airp 10k", airportState },
 };
@@ -145,9 +155,9 @@ static UBYTE *load_file(const char *name, ULONG *size)
 
 static int load_assets(void)
 {
-    UBYTE *pal = load_file("res/palette.bin", NULL);
-    tiles = load_file("res/tiles.bin", NULL);
-    objects = load_file("res/objects.bin", NULL);
+    UBYTE *pal = load_file("PROGDIR:res/palette.bin", NULL);
+    tiles = load_file("PROGDIR:res/tiles.bin", NULL);
+    objects = load_file("PROGDIR:res/objects.bin", NULL);
     if (!pal || !tiles || !objects) {
         char b[100];
         sprintf(b, "Assets missing: palette %s tiles %s objects %s (IoErr %ld)", pal ? "ok" : "NO", tiles ? "ok" : "NO", objects ? "ok" : "NO", (long)IoErr());
@@ -180,7 +190,7 @@ struct rect { short x0, y0, x1, y1; };          /* inclusive, frame buffer pixel
 static short shown[VIEW_ROWS][VIEW_COLS];       /* tile id last drawn in each cell, -1 = unknown */
 static UBYTE redraw[VIEW_ROWS][VIEW_COLS];
 static int full_redraw = 1;                     /* start, scroll, panel closed: redraw all cells */
-static int toolbar_dirty = 1, first_present = 1;
+static int toolbar_dirty = 1, first_present = 1, status_dirty = 1;
 static int last_map_visible, last_budget_visible, last_notice_visible;
 static int last_view_x = -1, last_view_y = -1;
 #define MAX_SPR 48
@@ -298,16 +308,16 @@ static int overlaps(const struct rect *a, int x0, int y0, int x1, int y1)
     return !(a->x1 < x0 || a->x0 > x1 || a->y1 < y0 || a->y0 > y1);
 }
 
+static int true_color;                     /* screen deeper than 8 bit: blit through a colour table */
+static ULONG ctable[256];                  /* 0x00RRGGBB for each palette index */
+
 static void blit(struct RastPort *rp, int x, int y, int w, int h)
 {
-    WritePixelArray(fb, x, y, SCR_W, rp, x, y, w, h, RECTFMT_LUT8);
+    if (true_color)
+        WriteLUTPixelArray(fb + y * SCR_W + x, 0, 0, SCR_W, rp, ctable, x, y, w, h, CTABFMT_XRGB8);
+    else
+        WritePixelArray(fb, x, y, SCR_W, rp, x, y, w, h, RECTFMT_LUT8);
     stats.bytes += (long)w * h;
-}
-
-static void put_text(struct RastPort *rp, int x, int y, const char *s)
-{
-    Move(rp, x, y);
-    Text(rp, (CONST_STRPTR)s, strlen(s));
 }
 
 static struct timeval t_a;
@@ -421,15 +431,36 @@ static void render_frame(struct Window *win)
     n_prev_spr = n_spr;
     prev_cursor = cur; have_prev_cursor = have_cursor;
 
-    if (toolbar_dirty) draw_toolbar();
+    gfx_target(fb, SCR_W);
+    if (toolbar_dirty) {
+        draw_toolbar();
+        gfx_colors(PEN_TEXT, PEN_BTN);
+        for (int i = 0; i < 16; i++) {
+            gfx_colors(PEN_TEXT, toolbtn[i].state == editor.tool_state ? PEN_SEL : PEN_BTN);
+            gfx_print(4, BAR_H + i * TB_BTN_H + 17, toolbtn[i].name);
+        }
+    }
+    {   /* status lines (top left) */
+        char line[200];
+        gfx_colors(PEN_TEXT, PEN_BAR);
+        sprintf(line, " %-9s %-21s Pop %-7ld Speed %d%s", status_date, status_funds, (long)CityPop, (int)SimSpeed,
+                SimSpeed ? "" : " (Pause)");
+        if (strcmp(line, last_line1)) { gfx_print(4, 12, line); strcpy(last_line1, line); status_dirty = 1; }
+        sprintf(line, " %-58.58s", status_msg);
+        if (strcmp(line, last_line2)) { gfx_print(4, 27, line); strcpy(last_line2, line); status_dirty = 1; }
+    }
     if (map_visible) {
         static int last_loops = -1000;
         if (map_dirty || sim_loops - last_loops >= 16) { map_refresh(); map_dirty = 0; last_loops = sim_loops; map_need = 1; }
         if (map_need) map_blit(fb, SCR_W, MAP_X, MAP_Y, view_x, view_y, VIEW_COLS, VIEW_ROWS);
     }
-    if (budget_visible && budget_redraw) budget_draw(fb, SCR_W);
-    if (notice_visible && notice_redraw) notice_draw(fb, SCR_W);
-    if (demand_dirty) draw_demand();
+    if (budget_visible && budget_redraw) { budget_draw(fb, SCR_W); budget_text(); }
+    if (notice_visible && notice_redraw) { notice_draw(fb, SCR_W); notice_text(); }
+    if (demand_dirty) {
+        draw_demand();
+        gfx_colors(PEN_TEXT, PEN_BAR);
+        gfx_print(DEM_X + 10, DEM_Y + 30, "R"); gfx_print(DEM_X + 46, DEM_Y + 30, "C"); gfx_print(DEM_X + 82, DEM_Y + 30, "I");
+    }
     stats.render_us += elapsed_us();
 
     /* send the changes to the screen */
@@ -452,33 +483,12 @@ static void render_frame(struct Window *win)
         if (budget_visible && budget_redraw) blit(rp, budrect.x0, budrect.y0, BUDGET_W, BUDGET_H);
         if (notice_visible && notice_redraw) blit(rp, notrect.x0, notrect.y0, NOTICE_W, NOTICE_H);
         if (demand_dirty) blit(rp, DEM_X, DEM_Y, DEM_W, DEM_H);
+        if (status_dirty) blit(rp, 0, 0, DEM_X, BAR_H);
     }
 
-    /* text goes straight to the screen after the pixels under it were refreshed */
-    {
-        char line[200];
-        SetAPen(rp, PEN_TEXT);
-        SetBPen(rp, PEN_BAR);
-        sprintf(line, " %-9s %-21s Pop %-7ld Speed %d%s", status_date, status_funds, (long)CityPop, (int)SimSpeed,
-                SimSpeed ? "" : " (Pause)");
-        if (strcmp(line, last_line1)) { put_text(rp, 4, 12, line); strcpy(last_line1, line); }
-        sprintf(line, " %-58.58s", status_msg);
-        if (strcmp(line, last_line2)) { put_text(rp, 4, 27, line); strcpy(last_line2, line); }
-    }
-    if (toolbar_dirty) {
-        for (int i = 0; i < 16; i++) {
-            SetBPen(rp, toolbtn[i].state == editor.tool_state ? PEN_SEL : PEN_BTN);
-            put_text(rp, 4, BAR_H + i * TB_BTN_H + 17, toolbtn[i].name);
-        }
-        toolbar_dirty = 0;
-    }
-    if (budget_visible && budget_redraw) { budget_text(rp); budget_dirty = 0; }
-    if (notice_visible && notice_redraw) { notice_text(rp); notice_dirty = 0; }
-    if (demand_dirty) {
-        SetAPen(rp, PEN_TEXT); SetBPen(rp, PEN_BAR);
-        put_text(rp, DEM_X + 10, DEM_Y + 30, "R");  put_text(rp, DEM_X + 46, DEM_Y + 30, "C");  put_text(rp, DEM_X + 82, DEM_Y + 30, "I");
-        demand_dirty = 0;
-    }
+    toolbar_dirty = 0; status_dirty = 0; demand_dirty = 0;
+    if (budget_visible && budget_redraw) budget_dirty = 0;
+    if (notice_visible && notice_redraw) notice_dirty = 0;
 
     if (++stats.frames >= 200) {                     /* performance log for tuning on slow machines */
         char b[160];
@@ -556,7 +566,7 @@ static int ask_file(struct Window *win, int save, char *out, size_t n)
     if (!AslBase) return 0;
     struct FileRequester *fr = AllocAslRequestTags(ASL_FileRequest,
         ASLFR_Window, (ULONG)win, ASLFR_TitleText, (ULONG)(save ? "Save City" : "Load City"),
-        ASLFR_InitialDrawer, (ULONG)"cities", ASLFR_InitialPattern, (ULONG)"#?.cty",
+        ASLFR_InitialDrawer, (ULONG)"PROGDIR:cities", ASLFR_InitialPattern, (ULONG)"#?.cty",
         ASLFR_DoPatterns, TRUE, ASLFR_DoSaveMode, save, ASLFR_RejectIcons, TRUE, TAG_DONE);
     if (fr) {
         if (AslRequest(fr, NULL)) {
@@ -631,61 +641,153 @@ static void clamp_view(void)
     if (view_y < 0) view_y = 0;
 }
 
+/* ---------- errors, tooltypes, screen mode ---------- */
+static void fail(const char *fmt, ...)
+{
+    char msg[300];
+    va_list ap;
+    va_start(ap, fmt);
+    vsprintf(msg, fmt, ap);
+    va_end(ap);
+    printf("Micropolis: %s\n", msg);
+    logmsg(msg);
+    if (IntuitionBase) {
+        struct EasyStruct es;
+        es.es_StructSize = sizeof(struct EasyStruct); es.es_Flags = 0;
+        es.es_Title = (CONST_STRPTR)"Micropolis"; es.es_TextFormat = (CONST_STRPTR)"%s"; es.es_GadgetFormat = (CONST_STRPTR)"OK";
+        {   ULONG args[1];
+            args[0] = (ULONG)msg;
+            EasyRequestArgs(NULL, &es, NULL, (APTR)args);
+        }
+    }
+}
+
+/* ToolTypes of the program's icon (PROGDIR:Micropolis.info); CLI arguments work as well */
+static char tt_city[200];
+static int  tt_debug;
+static int  force_depth;                 /* depth=NN argument for testing other screen depths */
+
+static void read_tooltypes(int argc, char **argv)
+{
+    IconBase = OpenLibrary((CONST_STRPTR)"icon.library", 37);
+    if (IconBase) {
+        struct DiskObject *dobj = GetDiskObject((CONST_STRPTR)"PROGDIR:Micropolis");
+        if (dobj) {
+            STRPTR v;
+            if (dobj->do_ToolTypes) {
+                if ((v = FindToolType((CONST_STRPTR *)dobj->do_ToolTypes, (CONST_STRPTR)"CITY"))) { strncpy(tt_city, (char *)v, sizeof tt_city - 1); }
+                if (FindToolType((CONST_STRPTR *)dobj->do_ToolTypes, (CONST_STRPTR)"DEBUG")) tt_debug = 1;
+            }
+            FreeDiskObject(dobj);
+        }
+    }
+    for (int i = 1; i < argc; i++) {                     /* argc == 0 (Workbench): argv is not a string vector */
+        if (!strcasecmp(argv[i], "debug")) tt_debug = 1;
+        else if (!strncasecmp(argv[i], "depth=", 6)) force_depth = atoi(argv[i] + 6);
+    }
+}
+
+/* the best RTG mode for a 640x480 picture: 8 bit first (palette), otherwise a deeper one through a colour table */
+static ULONG pick_mode(int *depth_out)
+{
+    static const int order[] = { 8, 16, 15, 24, 32 };
+    for (int k = 0; k < 5; k++) {
+        int d = order[k];
+        ULONG id;
+        if (force_depth && d != force_depth) continue;
+        id = BestCModeIDTags(CYBRBIDTG_NominalWidth, SCR_W, CYBRBIDTG_NominalHeight, SCR_H, CYBRBIDTG_Depth, d, TAG_DONE);
+        if (id == INVALID_ID || !IsCyberModeID(id)) continue;
+        if (GetCyberIDAttr(CYBRIDATTR_WIDTH, id) < SCR_W || GetCyberIDAttr(CYBRIDATTR_HEIGHT, id) < SCR_H) continue;
+        *depth_out = (int)GetCyberIDAttr(CYBRIDATTR_DEPTH, id);
+        return id;
+    }
+    return INVALID_ID;
+}
+
 static int real_main(int argc, char **argv)
 {
     /* argc == 0: started from Workbench, argv is not a string vector */
-    const char *city = argc > 1 ? argv[1] : "cities/haight.cty";
-    int rc = 10;
+    const char *city;
+    char city_buf[220] = "";
+    int rc = 10, test_mode, depth = 8;
     struct Screen *scr = NULL;
     struct Window *win = NULL;
     struct Menu *menu = NULL;
     APTR vi = NULL;
+    ULONG id;
 
     IntuitionBase = (struct IntuitionBase *)OpenLibrary((CONST_STRPTR)"intuition.library", 39);
     GfxBase = (struct GfxBase *)OpenLibrary((CONST_STRPTR)"graphics.library", 39);
+    if (!IntuitionBase || !GfxBase) { printf("Micropolis needs AmigaOS 3.0 or newer.\n"); goto out; }
+    read_tooltypes(argc, argv);
+    debug_log = tt_debug;
+    if (argc > 1 && strcasecmp(argv[1], "debug") && strncasecmp(argv[1], "depth=", 6)) {
+        city = argv[1];                                  /* given on the command line: relative to the current directory */
+    } else {                                             /* default / CITY tooltype: relative to the program's drawer */
+        const char *c = tt_city[0] ? tt_city : "cities/haight.cty";
+        if (strchr(c, ':')) strncpy(city_buf, c, sizeof city_buf - 1);
+        else sprintf(city_buf, "PROGDIR:%.180s", c);
+        city = city_buf;
+    }
+    test_mode = argc > 2 && !strcmp(argv[2], "test");
     CyberGfxBase = OpenLibrary((CONST_STRPTR)"cybergraphics.library", 40);
     GadToolsBase = OpenLibrary((CONST_STRPTR)"gadtools.library", 37);
     AslBase = OpenLibrary((CONST_STRPTR)"asl.library", 37);
     { char b[80]; struct Task *t = FindTask(NULL);
       sprintf(b, "stack: %ld bytes", (long)((char *)t->tc_SPUpper - (char *)t->tc_SPLower)); logmsg(b); }
     logmsg("start");
+    if (!CyberGfxBase && !test_mode) {
+        fail("cybergraphics.library (version 40) not found.\nMicropolis needs an RTG graphics card with\nPicasso96 or CyberGraphX installed and running.");
+        goto out;
+    }
     logmsg("libs ok");
-    if (!load_assets()) goto out;
+    if (!load_assets()) {
+        fail("Cannot find the program data (res drawer).\nPlease keep the Micropolis program, its res and\ncities drawers together in one drawer.");
+        goto out;
+    }
     fb = AllocVec(SCR_W * SCR_H, MEMF_ANY | MEMF_CLEAR);
-    if (!fb) goto out;
+    if (!fb) { fail("Not enough memory."); goto out; }
 
     logmsg("assets ok");
-    HomeDir = ""; ResourceDir = "res"; HostName = "amiga";
+    HomeDir = ""; ResourceDir = "PROGDIR:res"; HostName = "amiga";
     sim = MakeNewSim();
     logmsg("sim made");
     sim_init();
     logmsg("sim_init done");
-    if (!LoadCity((char *)city)) { printf("Stadt nicht ladbar: %s\n", city); logmsg("LoadCity failed"); logmsg(city); goto out; }
+    if (!LoadCity((char *)city)) { fail("Cannot load the city file '%s'.", city); goto out; }
     logmsg("city loaded");
     view_x = WORLD_X / 2 - VIEW_COLS / 2;
     view_y = WORLD_Y / 2 - VIEW_ROWS / 2;
     clamp_view();
 
     logmsg("view set");
-    if (argc > 2 && !strcmp(argv[2], "test")) { logmsg("test mode: stop before opening the screen"); rc = 0; goto out; }
-    if (!CyberGfxBase) { printf("cybergraphics.library fehlt (Picasso96 nicht aktiv)\n"); logmsg("no cybergraphics.library"); goto out; }
-    ULONG id = BestCModeIDTags(CYBRBIDTG_NominalWidth, SCR_W, CYBRBIDTG_NominalHeight, SCR_H,
-                               CYBRBIDTG_Depth, 8, TAG_DONE);
-    if (id == INVALID_ID) { printf("kein RTG-Modus %dx%d gefunden\n", SCR_W, SCR_H); goto out; }
-    scr = OpenScreenTags(NULL, SA_DisplayID, id, SA_Width, SCR_W, SA_Height, SCR_H, SA_Depth, 8,
+    if (test_mode) { logmsg("test mode: stop before opening the screen"); rc = 0; goto out; }
+    id = pick_mode(&depth);
+    if (id == INVALID_ID) {
+        fail("No suitable RTG screen mode found.\nMicropolis needs a mode of at least %dx%d pixels\nwith 8, 15, 16, 24 or 32 bit colour.", SCR_W, SCR_H);
+        goto out;
+    }
+    true_color = depth > 8;
+    { char b[100]; sprintf(b, "screen mode 0x%08lx, depth %d", (unsigned long)id, depth); logmsg(b); }
+    scr = OpenScreenTags(NULL, SA_DisplayID, id, SA_Width, SCR_W, SA_Height, SCR_H, SA_Depth, depth,
                          SA_Quiet, TRUE, SA_ShowTitle, FALSE, TAG_DONE);
-    if (!scr) { printf("OpenScreen fehlgeschlagen\n"); goto out; }
+    if (!scr) { fail("Cannot open the RTG screen (mode 0x%08lx, %d bit).", (unsigned long)id, depth); goto out; }
     logmsg("screen open");
-    ULONG pal[2 + 256 * 3];
-    pal[0] = (256UL << 16);
-    for (int i = 0; i < 256 * 3; i++) pal[1 + i] = (ULONG)palette[i] * 0x01010101UL;
-    pal[1 + 256 * 3] = 0;
-    LoadRGB32(&scr->ViewPort, pal);
+    if (true_color) {
+        for (int i = 0; i < 256; i++)
+            ctable[i] = ((ULONG)palette[i * 3] << 16) | ((ULONG)palette[i * 3 + 1] << 8) | palette[i * 3 + 2];
+    } else {
+        ULONG pal[2 + 256 * 3];
+        pal[0] = (256UL << 16);
+        for (int i = 0; i < 256 * 3; i++) pal[1 + i] = (ULONG)palette[i] * 0x01010101UL;
+        pal[1 + 256 * 3] = 0;
+        LoadRGB32(&scr->ViewPort, pal);
+    }
     win = OpenWindowTags(NULL, WA_CustomScreen, (ULONG)scr, WA_Left, 0, WA_Top, 0, WA_Width, SCR_W,
                          WA_Height, SCR_H, WA_Borderless, TRUE, WA_Backdrop, TRUE, WA_Activate, TRUE,
                          WA_ReportMouse, TRUE,
                          WA_IDCMP, IDCMP_RAWKEY | IDCMP_MOUSEBUTTONS | IDCMP_MOUSEMOVE | IDCMP_MENUPICK, TAG_DONE);
-    if (!win) { printf("OpenWindow fehlgeschlagen\n"); goto out; }
+    if (!win) { fail("Cannot open the game window."); goto out; }
 
     logmsg("window open");
     if (GadToolsBase) {
@@ -829,6 +931,7 @@ out:
     if (CyberGfxBase) CloseLibrary(CyberGfxBase);
     if (GadToolsBase) CloseLibrary(GadToolsBase);
     if (AslBase) CloseLibrary(AslBase);
+    if (IconBase) CloseLibrary(IconBase);
     logmsg("cleanup done");
     return rc;
 }

@@ -26,7 +26,7 @@ static UBYTE mapbuf[MV_W * MV_H];
 
 int map_load(void)
 {
-    BPTR f = Open((CONST_STRPTR)"res/tilessm.bin", MODE_OLDFILE);
+    BPTR f = Open((CONST_STRPTR)"PROGDIR:res/tilessm.bin", MODE_OLDFILE);
     if (!f) return 0;
     smalltiles = AllocVec(TILE_COUNT * 12, MEMF_ANY);
     if (!smalltiles || Read(f, smalltiles, TILE_COUNT * 12) != TILE_COUNT * 12) {

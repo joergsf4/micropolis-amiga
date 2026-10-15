@@ -13,7 +13,7 @@ C code; Tcl/Tk and X11 were replaced by an Amiga user interface.
 | **OS** | AmigaOS 3.x (developed and tested on 3.2 only). Kickstart 3.2 recommended |
 | **CPU** | 68020 or better (tested on an emulated 68040; a 68030/50 MHz is the performance target) |
 | **RAM** | 2 MB Chip + 2 MB Fast or more (the program itself takes about 1.5 MB) |
-| **Graphics** | RTG card with Picasso96 or CyberGraphX (`cybergraphics.library` 40+) and a 640x480 8-bit screen mode |
+| **Graphics** | RTG card with Picasso96 or CyberGraphX (`cybergraphics.library` 40+) and any screen mode of at least 640x480 (8, 15, 16, 24 or 32 bit; 8 bit is used when available) |
 | **System files** | `mathieeedoubbas.library`, `mathieeedoubtrans.library` (in `LIBS:` of any Workbench), `gadtools.library`, `asl.library` |
 | **CPU libraries** | the right `680x0.library` for your CPU (68030/68040/68060), as AmigaOS 3.2 asks for |
 
@@ -22,16 +22,17 @@ There is no AGA/OCS version.
 
 ## Install
 
-Unpack the archive anywhere, e.g. `lha x Micropolis.lha Work:`, then double-click the `Micropolis`
-icon. From a shell:
+Unpack the archive anywhere, e.g. `lha x Micropolis-0.2.lha Work:`, then double-click the `Micropolis`
+icon. Nothing else has to be installed (besides the RTG system and the standard Workbench libraries above).
+The program finds its data (`res/`, `cities/`) next to itself, so it can be started from anywhere:
 
 ```
-cd Work:Micropolis
-Micropolis                      ; opens cities/haight.cty
-Micropolis cities/bruce.cty
+Work:Micropolis/Micropolis                 ; opens cities/haight.cty
+Work:Micropolis/Micropolis my.cty          ; opens a city file (path relative to the current directory)
 ```
 
-The program looks for its data (`res/`, `cities/`) in the **current directory**, so start it from its own drawer.
+ToolTypes (icon information): `CITY=cities/bruce.cty` city to open at start, `DEBUG` write `micropolis.log`
+(also a command line argument). Startup problems (no RTG, no suitable screen mode, missing data) are shown in a requester.
 
 ## Controls
 
@@ -55,15 +56,15 @@ You can load and save cities (`.cty`, the original Micropolis format; `cities/` 
 
 Works: simulation, building tools, map with animation and sprites, overview map with 14 overlays,
 budget, city load/save/new random city, menus, disasters, event messages.
-Missing: evaluation window and graphs, sound, scenario selection, earthquake shake, tooltypes.
+Missing: evaluation window and graphs, sound, scenario selection, earthquake shake.
 See the [issues](../../issues).
 
 ## Troubleshooting
 
-- *Nothing happens / the program ends at once:* start it from a shell to see the message. Typical causes:
-  `cybergraphics.library` missing (Picasso96 not active), no 640x480x8 RTG mode, or `res/` not found.
-- *Software failure when quitting:* please report the error number.
-- The program writes `micropolis.log` into its drawer. That is a debug log; you can delete it.
+- *A requester says no RTG / no screen mode:* Picasso96 or CyberGraphX is not running, or the card offers no mode of at least 640x480.
+- *"Cannot find the program data":* keep the `Micropolis` program together with its `res` and `cities` drawers.
+- *Software failure when quitting:* an early crash on quit seems fixed in 0.2; if you see it, please report the error number.
+- `micropolis.log` is only written with the DEBUG option; attach it to bug reports.
 
 ## Building from source
 
