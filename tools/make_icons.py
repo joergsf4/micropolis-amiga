@@ -112,7 +112,7 @@ def main():
     drawer = skyline(64, 36, drawer=True)
     doc = document(54, 30)
     files = {
-        'Micropolis.info':        disk_object(3, tool, inverted(tool), tooltypes=('CITY=cities/haight.cty', '(DEBUG)'), stack=16384),
+        'Micropolis.info':        disk_object(3, tool, inverted(tool), tooltypes=('CITY=cities/haight.cty', '(SIZE=800x600)', '(MODE=ASK)', '(DEBUG)'), stack=16384),
         'Micropolis-drawer.info': disk_object(2, drawer, inverted(drawer), drawer=True),
         'ReadMe.info':            disk_object(4, doc, inverted(doc), default_tool='SYS:Utilities/MultiView'),
     }

@@ -47,12 +47,20 @@ struct Library *GadToolsBase;
 struct Library *AslBase;
 struct Library *IconBase;
 
-#define SCR_W 640
-#define SCR_H 480
+/* Screen size: 640x480 by default, up to MAX_W x MAX_H (ToolType SIZE=800x600, or MODE=ASK for a mode requester).
+ * The tile view fills the screen, so a bigger screen shows more of the city. */
+#define MAX_W 1024
+#define MAX_H 768
+static int scr_w = 640, scr_h = 480;
+#define SCR_W scr_w
+#define SCR_H scr_h
 #define BAR_H 32                       /* status bar on top */
 #define TB_W 80                        /* tool palette on the left */
-#define VIEW_COLS ((SCR_W - TB_W) / 16) /* 35 */
-#define VIEW_ROWS ((SCR_H - BAR_H) / 16) /* 28 */
+#define MAX_COLS ((MAX_W - TB_W) / 16)
+#define MAX_ROWS ((MAX_H - BAR_H) / 16)
+static int view_cols = 35, view_rows = 28;
+#define VIEW_COLS view_cols            /* tiles visible: (SCR_W - TB_W) / 16 */
+#define VIEW_ROWS view_rows
 
 
 void app_log(const char *msg);
@@ -209,8 +217,8 @@ static int load_assets(void)
  * a Zorro II graphics card the bus is the bottleneck, so a full 640x480 blit per frame is far too much. */
 struct rect { short x0, y0, x1, y1; };          /* inclusive, frame buffer pixels */
 
-static short shown[VIEW_ROWS][VIEW_COLS];       /* tile id last drawn in each cell, -1 = unknown */
-static UBYTE redraw[VIEW_ROWS][VIEW_COLS];
+static short shown[MAX_ROWS][MAX_COLS];       /* tile id last drawn in each cell, -1 = unknown */
+static UBYTE redraw[MAX_ROWS][MAX_COLS];
 static int full_redraw = 1;                     /* start, scroll, panel closed: redraw all cells */
 static int toolbar_dirty = 1, first_present = 1, status_dirty = 1;
 static int last_map_visible;
@@ -336,7 +344,7 @@ struct panel {
     int modal;                               /* modal panels take all input; the query box does not */
 };
 enum { P_NOTICE, P_BUDGET, P_EVAL, P_GRAPH, P_QUERY, NPANELS };
-#define QUERY_X (SCR_W - 244)
+#define QUERY_X (SCR_W - 244)           /* moves with the screen width: the panel rect is set in layout_panels() */
 #define QUERY_Y (BAR_H + 8)
 #define QUERY_W 236
 #define QUERY_H 112
@@ -362,8 +370,14 @@ static struct panel panels[NPANELS] = {
     { &budget_visible, &budget_dirty, 0, 0, { BUDGET_X, BUDGET_Y, BUDGET_X + BUDGET_W - 1, BUDGET_Y + BUDGET_H - 1 }, draw_budget, budget_click, budget_key_close, 1 },
     { &eval_visible,   &eval_dirty, 0, 0, { EVAL_X, EVAL_Y, EVAL_X + EVAL_W - 1, EVAL_Y + EVAL_H - 1 }, draw_eval, eval_click, eval_close, 1 },
     { &graph_visible,  &graph_dirty, 0, 0, { GRAPH_X, GRAPH_Y, GRAPH_X + GRAPH_W - 1, GRAPH_Y + GRAPH_H - 1 }, draw_graph, graph_click, graph_close, 1 },
-    { &query_visible,  &query_dirty, 0, 0, { QUERY_X, QUERY_Y, QUERY_X + QUERY_W - 1, QUERY_Y + QUERY_H - 1 }, draw_query, NULL, close_query, 0 },
+    { &query_visible,  &query_dirty, 0, 0, { 0, 0, 0, 0 }, draw_query, NULL, close_query, 0 },
 };
+
+static void layout_panels(void)           /* panels that depend on the screen size */
+{
+    panels[P_QUERY].r.x0 = QUERY_X; panels[P_QUERY].r.y0 = QUERY_Y;
+    panels[P_QUERY].r.x1 = QUERY_X + QUERY_W - 1; panels[P_QUERY].r.y1 = QUERY_Y + QUERY_H - 1;
+}
 
 static int top_panel(void)                   /* the visible panel that gets the input, or -1 */
 {
@@ -429,7 +443,7 @@ static void draw_demand(void)
  * view, otherwise the whole view is redrawn (see render_frame). */
 static void scroll_by(struct RastPort *rp, int dx, int dy)
 {
-    short old[VIEW_ROWS][VIEW_COLS];
+    static short old[MAX_ROWS][MAX_COLS];
     int sx = TB_W, sy = BAR_H, w = VIEW_COLS * 16, h = VIEW_ROWS * 16, tx = sx, ty = sy;
     if (dx > 0) { sx += dx * 16; w -= dx * 16; } else if (dx < 0) { tx -= dx * 16; w += dx * 16; }
     if (dy > 0) { sy += dy * 16; h -= dy * 16; } else if (dy < 0) { ty -= dy * 16; h += dy * 16; }
@@ -544,7 +558,7 @@ static void render_frame(struct Window *win)
         gfx_colors(PEN_TEXT, PEN_BTN);
         for (int i = 0; i < 16; i++) {
             gfx_colors(PEN_TEXT, toolbtn[i].state == editor.tool_state ? PEN_SEL : PEN_BTN);
-            gfx_print(4, BAR_H + i * TB_BTN_H + 17, toolbtn[i].name);
+            gfx_print(4, BAR_H + i * TB_BTN_H + TB_BTN_H / 2 + 4, toolbtn[i].name);
         }
     }
     {   /* status lines (top left) */
@@ -714,7 +728,7 @@ static void show_about(void)
     char txt[800], cpu[40] = "68000", fpu[24] = "no FPU", modeline[60], snd[60];
     sound_status(snd);
     if (!UserSoundOn) strcpy(snd, "Sound: switched off (Options menu)");
-    sprintf(modeline, "Screen mode 0x%08lx, %d bit", (unsigned long)scr_mode_shown, scr_depth_shown);
+    sprintf(modeline, "Screen 0x%08lx, %dx%d, %d bit", (unsigned long)scr_mode_shown, scr_w, scr_h, scr_depth_shown);
     UWORD af = SysBase->AttnFlags;
     if (af & AFF_68010) strcpy(cpu, "68010");
     if (af & AFF_68020) strcpy(cpu, "68020");
@@ -830,6 +844,9 @@ static void fail(const char *fmt, ...)
     }
 }
 
+static int req_w = 640, req_h = 480;      /* wanted screen size: ToolType SIZE=WxH */
+static int ask_mode_flag;                 /* MODE=ASK / argument ASK: let the user choose in a screen mode requester */
+
 /* ToolTypes of the program's icon (PROGDIR:Micropolis.info); CLI arguments work as well */
 static char tt_city[200];
 static int  tt_debug;
@@ -845,6 +862,8 @@ static void read_tooltypes(int argc, char **argv)
             if (dobj->do_ToolTypes) {
                 if ((v = FindToolType((CONST_STRPTR *)dobj->do_ToolTypes, (CONST_STRPTR)"CITY"))) { strncpy(tt_city, (char *)v, sizeof tt_city - 1); }
                 if (FindToolType((CONST_STRPTR *)dobj->do_ToolTypes, (CONST_STRPTR)"DEBUG")) tt_debug = 1;
+                if ((v = FindToolType((CONST_STRPTR *)dobj->do_ToolTypes, (CONST_STRPTR)"SIZE"))) sscanf((char *)v, "%dx%d", &req_w, &req_h);
+                if ((v = FindToolType((CONST_STRPTR *)dobj->do_ToolTypes, (CONST_STRPTR)"MODE")) && !strcasecmp((char *)v, "ASK")) ask_mode_flag = 1;
             }
             FreeDiskObject(dobj);
         }
@@ -852,10 +871,31 @@ static void read_tooltypes(int argc, char **argv)
     for (int i = 1; i < argc; i++) {                     /* argc == 0 (Workbench): argv is not a string vector */
         if (!strcasecmp(argv[i], "debug")) tt_debug = 1;
         else if (!strncasecmp(argv[i], "depth=", 6)) force_depth = atoi(argv[i] + 6);
+        else if (!strncasecmp(argv[i], "size=", 5)) sscanf(argv[i] + 5, "%dx%d", &req_w, &req_h);
+        else if (!strcasecmp(argv[i], "ask")) ask_mode_flag = 1;
     }
 }
 
-/* the best RTG mode for a 640x480 picture: 8 bit first (palette), otherwise a deeper one through a colour table */
+/* screen mode requester (asl.library): returns the chosen RTG mode id, its size and depth; INVALID_ID if cancelled */
+static ULONG ask_mode(int *w, int *h, int *depth)
+{
+    ULONG id = INVALID_ID;
+    struct ScreenModeRequester *sr;
+    if (!AslBase) return INVALID_ID;
+    sr = (struct ScreenModeRequester *)AllocAslRequestTags(ASL_ScreenModeRequest,
+            ASLSM_TitleText, (ULONG)"Micropolis: choose an RTG screen mode (at least 640x480)",
+            ASLSM_MinWidth, 640, ASLSM_MinHeight, 480, ASLSM_MinDepth, 8, TAG_DONE);
+    if (sr) {
+        if (AslRequest(sr, NULL) && IsCyberModeID(sr->sm_DisplayID)) {
+            id = sr->sm_DisplayID;
+            *w = sr->sm_DisplayWidth; *h = sr->sm_DisplayHeight; *depth = sr->sm_DisplayDepth;
+        }
+        FreeAslRequest(sr);
+    }
+    return id;
+}
+
+/* the best RTG mode for the wanted picture size (640x480 unless SIZE= says otherwise): 8 bit first (palette), otherwise a deeper one through a colour table */
 static ULONG pick_mode(int *depth_out)
 {
     static const int order[] = { 8, 16, 15, 24, 32 };
@@ -863,9 +903,9 @@ static ULONG pick_mode(int *depth_out)
         int d = order[k];
         ULONG id;
         if (force_depth && d != force_depth) continue;
-        id = BestCModeIDTags(CYBRBIDTG_NominalWidth, SCR_W, CYBRBIDTG_NominalHeight, SCR_H, CYBRBIDTG_Depth, d, TAG_DONE);
+        id = BestCModeIDTags(CYBRBIDTG_NominalWidth, req_w, CYBRBIDTG_NominalHeight, req_h, CYBRBIDTG_Depth, d, TAG_DONE);
         if (id == INVALID_ID || !IsCyberModeID(id)) continue;
-        if (GetCyberIDAttr(CYBRIDATTR_WIDTH, id) < SCR_W || GetCyberIDAttr(CYBRIDATTR_HEIGHT, id) < SCR_H) continue;
+        if (GetCyberIDAttr(CYBRIDATTR_WIDTH, id) < req_w || GetCyberIDAttr(CYBRIDATTR_HEIGHT, id) < req_h) continue;
         *depth_out = (int)GetCyberIDAttr(CYBRIDATTR_DEPTH, id);
         return id;
     }
@@ -889,7 +929,7 @@ static int real_main(int argc, char **argv)
     if (!IntuitionBase || !GfxBase) { printf("Micropolis needs AmigaOS 3.0 or newer.\n"); goto out; }
     read_tooltypes(argc, argv);
     debug_log = tt_debug;
-    if (argc > 1 && strcasecmp(argv[1], "debug") && strncasecmp(argv[1], "depth=", 6)) {
+    if (argc > 1 && strcasecmp(argv[1], "debug") && strncasecmp(argv[1], "depth=", 6) && strncasecmp(argv[1], "size=", 5) && strcasecmp(argv[1], "ask")) {
         city = argv[1];                                  /* given on the command line: relative to the current directory */
     } else {                                             /* default / CITY tooltype: relative to the program's drawer */
         const char *c = tt_city[0] ? tt_city : "cities/haight.cty";
@@ -913,8 +953,6 @@ static int real_main(int argc, char **argv)
         fail("Cannot find the program data (res drawer).\nPlease keep the Micropolis program, its res and\ncities drawers together in one drawer.");
         goto out;
     }
-    fb = AllocVec(SCR_W * SCR_H, MEMF_ANY | MEMF_CLEAR);
-    if (!fb) { fail("Not enough memory."); goto out; }
 
     logmsg("assets ok");
     HomeDir = ""; ResourceDir = "PROGDIR:res"; HostName = "amiga";
@@ -931,11 +969,25 @@ static int real_main(int argc, char **argv)
 
     logmsg("view set");
     if (test_mode) { logmsg("test mode: stop before opening the screen"); rc = 0; goto out; }
-    id = pick_mode(&depth);
+    if (ask_mode_flag) {
+        int w = 0, h = 0;
+        id = ask_mode(&w, &h, &depth);
+        if (id == INVALID_ID) { logmsg("mode requester cancelled"); rc = 0; goto out; }
+        req_w = w; req_h = h;
+    } else {
+        id = pick_mode(&depth);
+    }
     if (id == INVALID_ID) {
         fail("No suitable RTG screen mode found.\nMicropolis needs a mode of at least %dx%d pixels\nwith 8, 15, 16, 24 or 32 bit colour.", SCR_W, SCR_H);
         goto out;
     }
+    scr_w = req_w < 640 ? 640 : req_w > MAX_W ? MAX_W : req_w;           /* the picture size we draw: 640x480 .. 1024x768 */
+    scr_h = req_h < 480 ? 480 : req_h > MAX_H ? MAX_H : req_h;
+    view_cols = (scr_w - TB_W) / 16; view_rows = (scr_h - BAR_H) / 16;
+    layout_panels();
+    fb = AllocVec(scr_w * scr_h, MEMF_ANY | MEMF_CLEAR);
+    if (!fb) { fail("Not enough memory for a %dx%d screen.", scr_w, scr_h); goto out; }
+    recenter(); clamp_view();
     true_color = depth > 8;
     scr_mode_shown = (int)id; scr_depth_shown = depth;
     { char b[100]; sprintf(b, "screen mode 0x%08lx, depth %d", (unsigned long)id, depth); logmsg(b); }
