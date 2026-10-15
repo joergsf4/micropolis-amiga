@@ -127,8 +127,6 @@ static int query_visible;
 static char query_f[6][24];                /* zone, density, value, crime, pollution, growth of the queried tile */   /* a panel must be redrawn */
 static int demand_r, demand_c, demand_i, demand_dirty = 1;   /* -15..15, from "UISetDemand" */
 static void clamp_view(void);
-#define MAP_X (SCR_W - MV_W - 6)
-#define MAP_Y (SCR_H - MV_H - 6)
 
 static SimView editor;                 /* the core's tools take a SimView; only tool_state/last_x/y are used */
 static int hover_x = -1, hover_y = -1; /* tile under the mouse, -1 = none */
@@ -136,6 +134,7 @@ static int dragging;
 static int map_drag;
 static int sound_ui_ready;                /* set when the main loop runs: UI sounds (tool select, speed) only from then on */
 static int shake_frames, shake_bx, shake_by;   /* earthquake: the view jitters by a tile for about a second */
+static int dbg_quit_loops;                 /* test option quit=N: leave the game after N seconds (checks the clean shutdown) */
 static int dbg_scroll;                  /* test option scroll=N: scroll N tiles (x and y), then stop */
 static int debug_show;                  /* test option show=eval|graph: keep messages away so the panel can be photographed */
 static const int panning = 0;            /* (right button is the menu button now) */
@@ -246,6 +245,7 @@ static int load_assets(void)
         for (int i = 0; i < 7; i++) memcpy(&palette[(PEN_V_LGRAY + i) * 3], v[i], 3);
     }
     palette[PEN_BTN * 3 + 0] = 0x40; palette[PEN_BTN * 3 + 1] = 0x48; palette[PEN_BTN * 3 + 2] = 0x70;
+    palette[PEN_GREY * 3 + 0] = 0xaa; palette[PEN_GREY * 3 + 1] = 0xaa; palette[PEN_GREY * 3 + 2] = 0xaa;
     return 1;
 }
 
@@ -260,7 +260,6 @@ static short shown[MAX_ROWS][MAX_COLS];       /* tile id last drawn in each cell
 static UBYTE redraw[MAX_ROWS][MAX_COLS];
 static int full_redraw = 1;                     /* start, scroll, panel closed: redraw all cells */
 static int toolbar_dirty = 1, first_present = 1, status_dirty = 1;
-static int last_map_visible;
 static int last_view_x = -1, last_view_y = -1;
 #define MAX_SPR 48
 static struct rect prev_spr[MAX_SPR];
@@ -372,82 +371,190 @@ static void mark_rect(const struct rect *r)
         for (int x = c0; x <= c1; x++) redraw[y][x] = 1;
 }
 
-/* Modal panels (messages, budget, evaluation, graphs). Index 0 is the topmost one. They are drawn over the map
- * into the frame buffer; the cells fully covered by a visible panel are not redrawn at all. */
+/* ---------- panel windows ----------
+ * Message, budget, evaluation, history graphs, query box and the overview map are ordinary Intuition windows on the
+ * game screen: title bar, drag bar, depth and close gadget; the user can move them (they cannot be resized). The
+ * modules (budget_ui.c, eval_ui.c, ...) draw their content into the scratch buffer at their own coordinates; this file
+ * blits that area into the window. A panel is open exactly while its *visible flag is set: modules and commands set
+ * and clear the flags, sync_panels() opens, redraws and closes the windows accordingly. */
+static UBYTE *scratch;                      /* MAX_W x MAX_H chunky buffer the panel modules draw into */
+#define SCRATCH_STRIDE MAX_W
+
 struct panel {
-    int *visible, *dirty, last_visible, redraw;
-    struct rect r;
-    void (*draw)(void);                      /* panel graphics + text into fb */
-    int (*click)(int x, int y);
-    void (*close)(void);                     /* Esc / Return / Space */
-    int modal;                               /* modal panels take all input; the query box does not */
+    const char *title;
+    int *visible, *dirty;
+    int ox, oy, w, h;                        /* content area in scratch coordinates (= the module's coordinates) */
+    void (*draw)(void);                      /* draws the content into scratch */
+    int (*click)(int x, int y);              /* left click, in scratch coordinates; may be NULL */
+    void (*close)(void);                     /* close gadget / Esc: closes the panel (budget: Continue) */
+    int placement;                           /* 0 centre, 1 top right, 2 bottom right */
+    int wants_move;                          /* also wants IDCMP_MOUSEMOVE (the map drags) */
+    struct Window *win;
 };
-enum { P_NOTICE, P_BUDGET, P_EVAL, P_GRAPH, P_QUERY, NPANELS };
-#define QUERY_X (SCR_W - 244)           /* moves with the screen width: the panel rect is set in layout_panels() */
-#define QUERY_Y (BAR_H + 8)
+enum { P_NOTICE, P_BUDGET, P_EVAL, P_GRAPH, P_QUERY, P_MAP, NPANELS };
+#define QUERY_X 0
+#define QUERY_Y 0
 #define QUERY_W 236
 #define QUERY_H 112
-static void draw_notice(void) { notice_draw(fb, SCR_W); notice_text(); }
-static void draw_budget(void) { budget_draw(fb, SCR_W); budget_text(); }
-static void draw_eval(void)   { eval_draw(fb, SCR_W); }
-static void draw_graph(void)  { graph_draw(fb, SCR_W); }
+#define MAPWIN_W (MV_W + 2)
+#define MAPWIN_H (MV_H + 2)
+static int map_panel_dirty = 1, map_view_x = -1, map_view_y = -1;
+
+static void draw_notice(void) { gfx_target(scratch, SCRATCH_STRIDE); notice_draw(scratch, SCRATCH_STRIDE); notice_text(); }
+static void draw_budget(void) { gfx_target(scratch, SCRATCH_STRIDE); budget_draw(scratch, SCRATCH_STRIDE); budget_text(); }
+static void draw_eval(void)   { gfx_target(scratch, SCRATCH_STRIDE); eval_draw(scratch, SCRATCH_STRIDE); }
+static void draw_graph(void)  { gfx_target(scratch, SCRATCH_STRIDE); graph_draw(scratch, SCRATCH_STRIDE); }
+static void draw_map(void)    { map_blit(scratch, SCRATCH_STRIDE, 1, 1, view_x, view_y, VIEW_COLS, VIEW_ROWS); }
 static void draw_query(void)
 {
     static const char *const label[6] = { "Zone", "Density", "Value", "Crime", "Pollution", "Growth" };
     char b[48];
-    for (int y = 0; y < QUERY_H; y++) memset(fb + (QUERY_Y + y) * SCR_W + QUERY_X, (y < 2 || y >= QUERY_H - 2) ? PEN_TEXT : PEN_BAR, QUERY_W);
-    for (int y = 2; y < QUERY_H - 2; y++) { fb[(QUERY_Y + y) * SCR_W + QUERY_X] = PEN_TEXT; fb[(QUERY_Y + y) * SCR_W + QUERY_X + QUERY_W - 1] = PEN_TEXT; }
-    gfx_target(fb, SCR_W);
+    for (int y = 0; y < QUERY_H; y++) memset(scratch + (QUERY_Y + y) * SCRATCH_STRIDE + QUERY_X, PEN_BAR, QUERY_W);
+    gfx_target(scratch, SCRATCH_STRIDE);
     gfx_colors(PEN_TEXT, PEN_BAR);
-    gfx_print(QUERY_X + 8, QUERY_Y + 16, "Query zone status");
-    for (int i = 0; i < 6; i++) { sprintf(b, "%-10s %s", label[i], query_f[i]); gfx_print(QUERY_X + 8, QUERY_Y + 32 + i * 13, b); }
+    gfx_print(QUERY_X + 8, QUERY_Y + 18, "Query zone status");
+    for (int i = 0; i < 6; i++) { sprintf(b, "%-10s %s", label[i], query_f[i]); gfx_print(QUERY_X + 8, QUERY_Y + 36 + i * 13, b); }
 }
 static void close_query(void) { query_visible = 0; }
 static void close_notice(void) { notice_close(); }
+static void close_map(void) { map_visible = 0; }
 static struct panel panels[NPANELS] = {
-    { &notice_visible, &notice_dirty, 0, 0, { NOTICE_X, NOTICE_Y, NOTICE_X + NOTICE_W - 1, NOTICE_Y + NOTICE_H - 1 }, draw_notice, notice_click, close_notice, 1 },
-    { &budget_visible, &budget_dirty, 0, 0, { BUDGET_X, BUDGET_Y, BUDGET_X + BUDGET_W - 1, BUDGET_Y + BUDGET_H - 1 }, draw_budget, budget_click, budget_key_close, 1 },
-    { &eval_visible,   &eval_dirty, 0, 0, { EVAL_X, EVAL_Y, EVAL_X + EVAL_W - 1, EVAL_Y + EVAL_H - 1 }, draw_eval, eval_click, eval_close, 1 },
-    { &graph_visible,  &graph_dirty, 0, 0, { GRAPH_X, GRAPH_Y, GRAPH_X + GRAPH_W - 1, GRAPH_Y + GRAPH_H - 1 }, draw_graph, graph_click, graph_close, 1 },
-    { &query_visible,  &query_dirty, 0, 0, { 0, 0, 0, 0 }, draw_query, NULL, close_query, 0 },
+    { "Message",             &notice_visible, &notice_dirty, NOTICE_X, NOTICE_Y, NOTICE_W, NOTICE_H, draw_notice, notice_click, close_notice, 0, 0, NULL },
+    { "Budget",              &budget_visible, &budget_dirty, BUDGET_X, BUDGET_Y, BUDGET_W, BUDGET_H, draw_budget, budget_click, budget_key_close, 0, 0, NULL },
+    { "City Evaluation",     &eval_visible,   &eval_dirty,   EVAL_X, EVAL_Y, EVAL_W, EVAL_H, draw_eval, eval_click, eval_close, 0, 0, NULL },
+    { "History",             &graph_visible,  &graph_dirty,  GRAPH_X, GRAPH_Y, GRAPH_W, GRAPH_H, draw_graph, graph_click, graph_close, 0, 0, NULL },
+    { "Query",               &query_visible,  &query_dirty,  QUERY_X, QUERY_Y, QUERY_W, QUERY_H, draw_query, NULL, close_query, 1, 0, NULL },
+    { "Overview map",        &map_visible,    &map_panel_dirty, 0, 0, MAPWIN_W, MAPWIN_H, draw_map, NULL, close_map, 2, 1, NULL },
 };
 
-static void layout_panels(void)           /* panels that depend on the screen size */
+static void open_info_panel(int which)       /* menu / key: show or hide a window */
 {
-    panels[P_QUERY].r.x0 = QUERY_X; panels[P_QUERY].r.y0 = QUERY_Y;
-    panels[P_QUERY].r.x1 = QUERY_X + QUERY_W - 1; panels[P_QUERY].r.y1 = QUERY_Y + QUERY_H - 1;
+    *panels[which].visible = !*panels[which].visible;
+    if (*panels[which].visible) *panels[which].dirty = 1;
 }
 
-static int top_panel(void)                   /* the visible panel that gets the input, or -1 */
+static int panels_open(void)
 {
-    for (int i = 0; i < NPANELS; i++) if (*panels[i].visible && panels[i].modal) return i;
-    return -1;
-}
-
-static void open_info_panel(int which)       /* evaluation / graphs: one at a time, not over a message or the budget */
-{
-    if (notice_visible || budget_visible) return;
-    if (*panels[which].visible) { panels[which].close(); return; }
-    eval_visible = graph_visible = 0;
-    *panels[which].visible = 1;
-    *panels[which].dirty = 1;
-}
-
-static int overlaps(const struct rect *a, int x0, int y0, int x1, int y1)
-{
-    return !(a->x1 < x0 || a->x0 > x1 || a->y1 < y0 || a->y0 > y1);
+    int n = 0;
+    for (int i = 0; i < NPANELS; i++) n += panels[i].win != NULL;
+    return n;
 }
 
 static int true_color;                     /* screen deeper than 8 bit: blit through a colour table */
 static ULONG ctable[256];                  /* 0x00RRGGBB for each palette index */
 
-static void blit(struct RastPort *rp, int x, int y, int w, int h)
+/* copy a rectangle of a chunky buffer into a window's rastport (palette screens: LUT8, deeper screens: colour table) */
+static void blit_buf(UBYTE *buf, int stride, int sx, int sy, struct RastPort *rp, int dx, int dy, int w, int h)
 {
     if (true_color)
-        WriteLUTPixelArray(fb + y * SCR_W + x, 0, 0, SCR_W, rp, ctable, x, y, w, h, CTABFMT_XRGB8);
+        WriteLUTPixelArray(buf + sy * stride + sx, 0, 0, stride, rp, ctable, dx, dy, w, h, CTABFMT_XRGB8);
     else
-        WritePixelArray(fb, x, y, SCR_W, rp, x, y, w, h, RECTFMT_LUT8);
+        WritePixelArray(buf, sx, sy, stride, rp, dx, dy, w, h, RECTFMT_LUT8);
     stats.bytes += (long)w * h;
+}
+
+static void blit(struct RastPort *rp, int x, int y, int w, int h)       /* main window: same coordinates */
+{
+    blit_buf(fb, SCR_W, x, y, rp, x, y, w, h);
+}
+
+/* ---- panel windows: open, close, redraw ---- */
+static struct Screen *g_scr;
+static struct Window *main_window_ptr;
+static int map_data_loops = -1000;
+static struct MsgPort *idcmp_port;           /* one message port for all windows */
+static struct Menu *g_menu;                  /* the menu strip is attached to every window */
+static char screen_title[120] = "Micropolis";
+
+static void close_window_safely(struct Window *w)
+{
+    struct IntuiMessage *m;
+    struct Node *succ;
+    if (g_menu) ClearMenuStrip(w);
+    Forbid();
+    for (m = (struct IntuiMessage *)w->UserPort->mp_MsgList.lh_Head; (succ = m->ExecMessage.mn_Node.ln_Succ);
+         m = (struct IntuiMessage *)succ) {
+        if (m->IDCMPWindow == w) { Remove((struct Node *)m); ReplyMsg((struct Message *)m); }
+    }
+    w->UserPort = NULL;
+    ModifyIDCMP(w, 0);
+    Permit();
+    CloseWindow(w);
+}
+
+static int panel_index(const struct Window *w)
+{
+    for (int i = 0; i < NPANELS; i++) if (panels[i].win == w) return i;
+    return -1;
+}
+
+static void panel_render(int i)
+{
+    struct panel *p = &panels[i];
+    struct Window *w = p->win;
+    if (!w) return;
+    if (i == P_MAP) {                                    /* keep the overlay data fresh */
+        if (map_dirty || sim_loops - map_data_loops >= 16) { map_refresh(); map_dirty = 0; map_data_loops = sim_loops; }
+        map_view_x = view_x; map_view_y = view_y;
+    }
+    p->draw();
+    blit_buf(scratch, SCRATCH_STRIDE, p->ox, p->oy, w->RPort, w->BorderLeft, w->BorderTop, p->w, p->h);
+}
+
+static void panel_open(int i)
+{
+    struct panel *p = &panels[i];
+    int sw = g_scr->Width, sh = g_scr->Height, bar = g_scr->BarHeight + 1;
+    int x, y;
+    if (p->placement == 1) { x = sw - p->w - 24; y = bar + 40; }
+    else if (p->placement == 2) { x = sw - p->w - 24; y = sh - p->h - 40; }
+    else { x = (sw - p->w - 8) / 2; y = bar + (sh - bar - p->h - 24) / 2; }
+    if (x < 0) x = 0;
+    if (y < bar) y = bar;
+    p->win = OpenWindowTags(NULL, WA_CustomScreen, (ULONG)g_scr, WA_Left, x, WA_Top, y,
+                            WA_InnerWidth, p->w, WA_InnerHeight, p->h, WA_Title, (ULONG)p->title,
+                            WA_DragBar, TRUE, WA_DepthGadget, TRUE, WA_CloseGadget, TRUE, WA_Activate, TRUE,
+                            WA_SimpleRefresh, TRUE, WA_ReportMouse, p->wants_move ? TRUE : FALSE,
+                            WA_IDCMP, 0, TAG_DONE);
+    if (!p->win) { *p->visible = 0; return; }
+    p->win->UserPort = idcmp_port;
+    ModifyIDCMP(p->win, IDCMP_RAWKEY | IDCMP_MOUSEBUTTONS | IDCMP_MENUPICK | IDCMP_CLOSEWINDOW | IDCMP_REFRESHWINDOW |
+                        (p->wants_move ? IDCMP_MOUSEMOVE : 0));
+    if (g_menu) SetMenuStrip(p->win, g_menu);
+    SetWindowTitles(p->win, (UBYTE *)-1, (UBYTE *)screen_title);
+    *p->dirty = 1;
+}
+
+static void panel_close(int i)
+{
+    struct panel *p = &panels[i];
+    if (!p->win) return;
+    close_window_safely(p->win);
+    p->win = NULL;
+}
+
+/* opens, closes and redraws the panel windows according to the flags; called every loop */
+static void sync_panels(void)
+{
+    for (int i = 0; i < NPANELS; i++) {
+        struct panel *p = &panels[i];
+        if (*p->visible && !p->win) panel_open(i);
+        else if (!*p->visible && p->win) panel_close(i);
+        if (i == P_MAP && p->win && (view_x != map_view_x || view_y != map_view_y || map_dirty || sim_loops - map_data_loops >= 16))
+            *p->dirty = 1;                               /* the view frame moved, or the data is old */
+        if (p->win && *p->dirty) { *p->dirty = 0; panel_render(i); }
+    }
+}
+
+static void set_screen_title(const char *t)
+{
+    if (!strcmp(t, screen_title)) return;
+    strncpy(screen_title, t, sizeof screen_title - 1);
+    screen_title[sizeof screen_title - 1] = 0;
+    if (g_scr) {
+        if (main_window_ptr) SetWindowTitles(main_window_ptr, (UBYTE *)-1, (UBYTE *)screen_title);
+        for (int i = 0; i < NPANELS; i++) if (panels[i].win) SetWindowTitles(panels[i].win, (UBYTE *)-1, (UBYTE *)screen_title);
+    }
 }
 
 static struct timeval t_a;
@@ -504,22 +611,12 @@ static void render_frame(struct Window *win)
     struct rect cur_spr[MAX_SPR], cur;
     const UBYTE *spr_px[MAX_SPR];
     int spr_w[MAX_SPR], spr_h[MAX_SPR], n_spr = 0;
-    int have_cursor, map_need = 0;
-    struct rect maprect = { MAP_X - 1, MAP_Y - 1, MAP_X + MV_W, MAP_Y + MV_H };
+    int have_cursor;
 
     gettimeofday(&t_a, NULL);
-    if (!map_visible && last_map_visible) full_redraw = 1;           /* cells under the panel are stale */
-    for (int i = 0; i < NPANELS; i++) {
-        struct panel *pn = &panels[i];
-        if (!*pn->visible && pn->last_visible) full_redraw = 1;
-        if (*pn->visible && !pn->last_visible) *pn->dirty = 1;
-        pn->last_visible = *pn->visible;
-        pn->redraw = *pn->visible && *pn->dirty;
-    }
-    last_map_visible = map_visible;
     if (view_x != last_view_x || view_y != last_view_y) {
         int ddx = view_x - last_view_x, ddy = view_y - last_view_y;
-        if (!full_redraw && !first_present && last_view_x >= 0 && !map_visible && top_panel() < 0 &&
+        if (!full_redraw && !first_present && last_view_x >= 0 && panels_open() == 0 &&
             ddx >= -6 && ddx <= 6 && ddy >= -6 && ddy <= 6)
             scroll_by(rp, ddx, ddy);
         else
@@ -531,7 +628,6 @@ static void render_frame(struct Window *win)
         memset(shown, 0xff, sizeof shown);
         have_prev_cursor = 0; n_prev_spr = 0;
         full_redraw = 0;
-        if (map_visible) map_need = 1;
     } else {
         memset(redraw, 0, sizeof redraw);
     }
@@ -562,27 +658,12 @@ static void render_frame(struct Window *win)
     if (have_cursor) mark_rect(&cur);
     if (have_prev_cursor) mark_rect(&prev_cursor);
 
-    /* draw the tiles; cells that lie completely under a panel are not drawn at all */
+    /* draw the tiles that changed */
     for (int row = 0; row < VIEW_ROWS; row++) {
         for (int col = 0; col < VIEW_COLS; col++) {
-            struct rect cell;
             if (!redraw[row][col]) continue;
-            cell.x0 = TB_W + col * 16; cell.y0 = BAR_H + row * 16; cell.x1 = cell.x0 + 15; cell.y1 = cell.y0 + 15;
-            if (map_visible && cell.x0 >= maprect.x0 && cell.x1 <= maprect.x1 && cell.y0 >= maprect.y0 && cell.y1 <= maprect.y1) {
-                redraw[row][col] = 0; shown[row][col] = -1; continue;
-            }
-            {   int covered = 0;
-                for (int i = 0; i < NPANELS; i++) {
-                    const struct rect *pr = &panels[i].r;
-                    if (*panels[i].visible && cell.x0 >= pr->x0 && cell.x1 <= pr->x1 && cell.y0 >= pr->y0 && cell.y1 <= pr->y1) covered = 1;
-                }
-                if (covered) { redraw[row][col] = 0; shown[row][col] = -1; continue; }
-            }
             draw_tile(col, row, shown[row][col]);
             stats.tiles++;
-            for (int i = 0; i < NPANELS; i++)
-                if (*panels[i].visible && overlaps(&cell, panels[i].r.x0, panels[i].r.y0, panels[i].r.x1, panels[i].r.y1)) panels[i].redraw = 1;
-            if (map_visible && overlaps(&cell, maprect.x0, maprect.y0, maprect.x1, maprect.y1)) map_need = 1;
         }
     }
     for (int i = 0; i < n_spr; i++) draw_sprite(&cur_spr[i], spr_px[i], spr_w[i], spr_h[i]);
@@ -609,18 +690,6 @@ static void render_frame(struct Window *win)
         sprintf(line, " %-58.58s", status_msg);
         if (strcmp(line, last_line2)) { gfx_print(4, 27, line); strcpy(last_line2, line); status_dirty = 1; }
     }
-    if (map_visible) {
-        static int last_loops = -1000;
-        if (map_dirty || sim_loops - last_loops >= 16) { map_refresh(); map_dirty = 0; last_loops = sim_loops; map_need = 1; }
-        if (map_need) map_blit(fb, SCR_W, MAP_X, MAP_Y, view_x, view_y, VIEW_COLS, VIEW_ROWS);
-    }
-    gfx_target(fb, SCR_W);
-    for (int i = NPANELS - 1; i >= 0; i--) {                 /* lowest first, so the topmost ends up on top */
-        if (!*panels[i].visible) continue;
-        for (int j = i + 1; j < NPANELS; j++)                 /* a lower panel that redraws forces the ones above it, too */
-            if (*panels[j].visible && panels[j].redraw && overlaps(&panels[i].r, panels[j].r.x0, panels[j].r.y0, panels[j].r.x1, panels[j].r.y1)) panels[i].redraw = 1;
-        if (panels[i].redraw) panels[i].draw();
-    }
     if (demand_dirty) {
         draw_demand();
         gfx_colors(PEN_TEXT, PEN_BAR);
@@ -644,16 +713,11 @@ static void render_frame(struct Window *win)
             }
         }
         if (toolbar_dirty) blit(rp, 0, BAR_H, TB_W, SCR_H - BAR_H);
-        if (map_visible && map_need) blit(rp, maprect.x0, maprect.y0, maprect.x1 - maprect.x0 + 1, maprect.y1 - maprect.y0 + 1);
-        for (int i = 0; i < NPANELS; i++)
-            if (*panels[i].visible && panels[i].redraw)
-                blit(rp, panels[i].r.x0, panels[i].r.y0, panels[i].r.x1 - panels[i].r.x0 + 1, panels[i].r.y1 - panels[i].r.y0 + 1);
         if (demand_dirty) blit(rp, DEM_X, DEM_Y, DEM_W, DEM_H);
         if (status_dirty) blit(rp, 0, 0, DEM_X, BAR_H);
     }
 
     toolbar_dirty = 0; status_dirty = 0; demand_dirty = 0;
-    for (int i = 0; i < NPANELS; i++) if (panels[i].redraw) *panels[i].dirty = 0;
 
     if (++stats.frames >= 200) {                     /* performance log for tuning on slow machines */
         char b[160];
@@ -717,7 +781,7 @@ static struct Menu *make_menus(struct Screen *scr, APTR *vi_out)
     mi(NM_ITEM, "Evaluation...", "E", 0, CMD_EVAL);
     mi(NM_ITEM, "Graphs...", "G", 0, CMD_GRAPHS);
     mi(NM_TITLE, "Map", NULL, 0, 0);
-    mi(NM_ITEM, "Show Map", "M", CHECKIT | MENUTOGGLE | (map_visible ? CHECKED : 0), CMD_MAP);
+    mi(NM_ITEM, "Map window on/off", "M", 0, CMD_MAP);
     mi(NM_ITEM, (const char *)NM_BARLABEL, NULL, 0, 0);
     for (int i = 0; i < MAP_MODES; i++) mi(NM_ITEM, map_names[i], NULL, 0, CMD_MAPMODE + i);
     mi(NM_TITLE, "Disasters", NULL, 0, 0);
@@ -803,7 +867,7 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
     char path[256];
     int checked = item && (item->Flags & CHECKED);
     if (id >= CMD_MAPMODE && id < CMD_MAPMODE + MAP_MODES) {
-        map_mode = id - CMD_MAPMODE; map_visible = 1; map_dirty = 1;
+        map_mode = id - CMD_MAPMODE; map_visible = 1; map_dirty = 1; map_panel_dirty = 1;
         sprintf(status_msg, "Map: %s", map_names[map_mode]);
         return 1;
     }
@@ -850,7 +914,7 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
     case CMD_BUDGET: DoBudgetFromMenu(); break;
     case CMD_EVAL: open_info_panel(P_EVAL); break;
     case CMD_GRAPHS: open_info_panel(P_GRAPH); break;
-    case CMD_MAP: map_visible = checked; map_dirty = 1; break;
+    case CMD_MAP: map_visible = !map_visible; map_dirty = 1; break;
     case CMD_FIRE: MakeFire(); break;
     case CMD_FLOOD: MakeFlood(); break;
     case CMD_TORNADO: MakeTornado(); break;
@@ -1093,44 +1157,61 @@ static int real_main(int argc, char **argv)
         fail("No suitable RTG screen mode found.\nMicropolis needs a mode of at least 640x480 pixels\nwith 8, 15, 16, 24 or 32 bit colour.");
         goto out;
     }
-    scr_w = req_w < 640 ? 640 : req_w > MAX_W ? MAX_W : req_w;           /* the picture size we draw: 640x480 .. 1024x768 */
-    scr_h = req_h < 480 ? 480 : req_h > MAX_H ? MAX_H : req_h;
-    view_cols = (scr_w - TB_W) / 16; view_rows = (scr_h - BAR_H) / 16;
-    layout_panels();
-    fb = AllocVec(scr_w * scr_h, MEMF_ANY | MEMF_CLEAR);
-    if (!fb) { fail("Not enough memory for a %dx%d screen.", scr_w, scr_h); goto out; }
-    recenter(); clamp_view();
+    scr_w = req_w < 640 ? 640 : req_w > MAX_W ? MAX_W : req_w;           /* requested screen size */
+    scr_h = req_h < 480 ? 480 : req_h > MAX_H + 16 ? MAX_H + 16 : req_h;
     true_color = depth > 8;
     scr_mode_shown = (int)id; scr_depth_shown = depth;
     { char b[100]; sprintf(b, "screen mode 0x%08lx, depth %d", (unsigned long)id, depth); logmsg(b); }
-    scr = OpenScreenTags(NULL, SA_DisplayID, id, SA_Width, SCR_W, SA_Height, SCR_H, SA_Depth, depth,
-                         SA_Quiet, TRUE, SA_ShowTitle, FALSE, TAG_DONE);
-    if (!scr) {                                                   /* some drivers insist on the mode's own size */
-        logmsg("OpenScreen with our size failed: trying the mode's own size");
-        scr = OpenScreenTags(NULL, SA_DisplayID, id, SA_Depth, depth, SA_Quiet, TRUE, SA_ShowTitle, FALSE, TAG_DONE);
+    {   /* palette screens get Workbench-like window pens from our palette (grey borders, blue title bars) */
+        static UWORD pens[] = { 0, PEN_GREY, 0, PEN_TEXT, 0, PEN_BTN, PEN_TEXT, PEN_GREY, PEN_TEXT, 0, PEN_GREY, 0, (UWORD)~0 };
+        ULONG pen_tag = true_color ? TAG_IGNORE : SA_Pens;
+        scr = OpenScreenTags(NULL, SA_DisplayID, id, SA_Width, scr_w, SA_Height, scr_h, SA_Depth, depth,
+                             SA_Title, (ULONG)"Micropolis", SA_ShowTitle, TRUE, SA_Draggable, TRUE,
+                             pen_tag, (ULONG)pens, TAG_DONE);
+        if (!scr) {                                               /* some drivers insist on the mode's own size */
+            logmsg("OpenScreen with our size failed: trying the mode's own size");
+            scr = OpenScreenTags(NULL, SA_DisplayID, id, SA_Depth, depth, SA_Title, (ULONG)"Micropolis",
+                                 SA_ShowTitle, TRUE, SA_Draggable, TRUE, pen_tag, (ULONG)pens, TAG_DONE);
+        }
     }
     if (!scr) { fail("Cannot open the RTG screen (mode 0x%08lx, %d bit).", (unsigned long)id, depth); goto out; }
+    g_scr = scr;
     logmsg("screen open");
-    if (true_color) {
-        for (int i = 0; i < 256; i++)
-            ctable[i] = ((ULONG)palette[i * 3] << 16) | ((ULONG)palette[i * 3 + 1] << 8) | palette[i * 3 + 2];
-    } else {
-        ULONG pal[2 + 256 * 3];
-        pal[0] = (256UL << 16);
-        for (int i = 0; i < 256 * 3; i++) pal[1 + i] = (ULONG)palette[i] * 0x01010101UL;
-        pal[1 + 256 * 3] = 0;
-        LoadRGB32(&scr->ViewPort, pal);
+    {   /* the game picture fills the screen below the title bar */
+        int top = scr->BarHeight + 1;
+        scr_w = scr->Width > MAX_W ? MAX_W : scr->Width;
+        scr_h = scr->Height - top > MAX_H ? MAX_H : scr->Height - top;
+        view_cols = (scr_w - TB_W) / 16; view_rows = (scr_h - BAR_H) / 16;
+        fb = AllocVec(scr_w * scr_h, MEMF_ANY | MEMF_CLEAR);
+        scratch = AllocVec(SCRATCH_STRIDE * MAX_H, MEMF_ANY | MEMF_CLEAR);
+        if (!fb || !scratch) { fail("Not enough memory for a %dx%d screen.", scr_w, scr_h); goto out; }
+        recenter(); clamp_view();
+        if (true_color) {
+            for (int i = 0; i < 256; i++)
+                ctable[i] = ((ULONG)palette[i * 3] << 16) | ((ULONG)palette[i * 3 + 1] << 8) | palette[i * 3 + 2];
+        } else {
+            ULONG pal[2 + 256 * 3];
+            pal[0] = (256UL << 16);
+            for (int i = 0; i < 256 * 3; i++) pal[1 + i] = (ULONG)palette[i] * 0x01010101UL;
+            pal[1 + 256 * 3] = 0;
+            LoadRGB32(&scr->ViewPort, pal);
+        }
+        idcmp_port = CreateMsgPort();
+        if (!idcmp_port) { fail("Cannot create a message port."); goto out; }
+        win = OpenWindowTags(NULL, WA_CustomScreen, (ULONG)scr, WA_Left, 0, WA_Top, top, WA_Width, scr_w,
+                             WA_Height, scr_h, WA_Borderless, TRUE, WA_Backdrop, TRUE, WA_Activate, TRUE,
+                             WA_ReportMouse, TRUE, WA_SimpleRefresh, TRUE, WA_IDCMP, 0, TAG_DONE);
+        if (!win) { fail("Cannot open the game window."); goto out; }
+        win->UserPort = idcmp_port;
+        ModifyIDCMP(win, IDCMP_RAWKEY | IDCMP_MOUSEBUTTONS | IDCMP_MOUSEMOVE | IDCMP_MENUPICK | IDCMP_REFRESHWINDOW);
+        main_window_ptr = win;
     }
-    win = OpenWindowTags(NULL, WA_CustomScreen, (ULONG)scr, WA_Left, 0, WA_Top, 0, WA_Width, SCR_W,
-                         WA_Height, SCR_H, WA_Borderless, TRUE, WA_Backdrop, TRUE, WA_Activate, TRUE,
-                         WA_ReportMouse, TRUE,
-                         WA_IDCMP, IDCMP_RAWKEY | IDCMP_MOUSEBUTTONS | IDCMP_MOUSEMOVE | IDCMP_MENUPICK, TAG_DONE);
-    if (!win) { fail("Cannot open the game window."); goto out; }
 
     logmsg("window open");
     sound_init();
     if (GadToolsBase) {
         menu = make_menus(scr, &vi);
+        g_menu = menu;
         if (menu) SetMenuStrip(win, menu);
     }
     editor.tool_state = queryState;
@@ -1148,20 +1229,24 @@ static int real_main(int argc, char **argv)
         { char lb[40]; sprintf(lb, "modes accepted: %d", n); logmsg(lb); }
     }
     if (argc > 3 && !strcmp(argv[3], "quake")) { MakeEarthquake(); }   /* debug */
+    for (int ai = 1; ai < argc; ai++) if (!strncmp(argv[ai], "quit=", 5)) dbg_quit_loops = atoi(argv[ai] + 5) * 50;
     if (argc > 3 && !strncmp(argv[3], "show=", 5)) debug_show = 1;
     if (argc > 3 && !strcmp(argv[3], "show=about")) show_about();
     if (argc > 3 && !strcmp(argv[3], "show=eval")) open_info_panel(P_EVAL);              /* debug: open a panel at start */
     if (argc > 3 && !strcmp(argv[3], "show=graph")) open_info_panel(P_GRAPH);
+    if (argc > 3 && !strcmp(argv[3], "show=map")) { open_info_panel(P_MAP); map_dirty = 1; }
     if (argc > 3 && !strncmp(argv[3], "notice=", 7)) { notice_show(atoi(argv[3] + 7)); notice_dirty = 1; }   /* debug */
-    int running = 1, tick = 0, frame = 0;
+    int running = 1, tick = 0, frame = 0, title_tick = 0;
     sound_ui_ready = 1;
     static const int delay[4] = { 0, 12, 4, 1 };      /* video frames per simulation step */
     while (running) {
         struct IntuiMessage *m;
-        while ((m = (struct IntuiMessage *)GetMsg(win->UserPort))) {
+        while ((m = (struct IntuiMessage *)GetMsg(idcmp_port))) {
             ULONG cls = m->Class;
             UWORD code = m->Code;
             int mx = m->MouseX, my = m->MouseY;
+            struct Window *mw = m->IDCMPWindow;
+            int pi = panel_index(mw);                             /* which panel window, or -1 = the game window */
             ReplyMsg((struct Message *)m);
             if (cls == IDCMP_MENUPICK) {
                 while (code != MENUNULL && menu) {
@@ -1171,6 +1256,18 @@ static int real_main(int argc, char **argv)
                     code = it->NextSelect;
                 }
                 dirty = 1;
+                continue;
+            }
+            if (cls == IDCMP_CLOSEWINDOW) {                      /* close gadget of a panel window */
+                if (pi >= 0) panels[pi].close();
+                dirty = 1;
+                continue;
+            }
+            if (cls == IDCMP_REFRESHWINDOW) {                    /* part of a window was uncovered: draw it again */
+                BeginRefresh(mw);
+                if (pi >= 0) panel_render(pi);
+                else { full_redraw = 1; first_present = 1; toolbar_dirty = status_dirty = demand_dirty = 1; last_line1[0] = last_line2[0] = 0; render_frame(win); }
+                EndRefresh(mw, TRUE);
                 continue;
             }
             if (cls == IDCMP_RAWKEY) {
@@ -1183,8 +1280,8 @@ static int real_main(int argc, char **argv)
                 case 0x21: view_y++; break;
                 case 0x22: view_x++; break;
                 case 0x20: view_x--; break;
-                case 0x45: { int tp = top_panel(); if (tp >= 0) panels[tp].close(); else if (query_visible) close_query(); else running = 0; } break;   /* Esc */
-                case 0x44: case 0x40: { int tp = top_panel(); if (tp >= 0) panels[tp].close(); } break;          /* Return, Space */
+                case 0x45: if (pi >= 0) panels[pi].close(); else running = 0; break;   /* Esc: closes the active panel window, else quits */
+                case 0x44: case 0x40: if (pi >= 0) panels[pi].close(); break;          /* Return, Space */
                 case 0x12: open_info_panel(P_EVAL); break;                    /* E */
                 case 0x24: open_info_panel(P_GRAPH); break;                   /* G */
                 case 0x4c: view_y--; break;                               /* cursor keys scroll */
@@ -1197,35 +1294,33 @@ static int real_main(int argc, char **argv)
                 case 0x03: setSpeed(3); break;
                 case 0x19: setSpeed(SimMetaSpeed ? 0 : 3); break;        /* P */
                 case 0x35: DoBudgetFromMenu(); break;                      /* B */
-                case 0x37: map_visible = !map_visible; map_dirty = 1; break;   /* M */
+                case 0x37: open_info_panel(P_MAP); map_dirty = 1; break;   /* M */
                 case 0x36: if (map_visible) { map_mode = (map_mode + 1) % MAP_MODES; map_dirty = 1; sprintf(status_msg, "Map: %s", map_names[map_mode]); } break;   /* C: next overlay */
                 }
                 clamp_view();
+            } else if (pi >= 0) {
+                /* mouse in a panel window: window coordinates -> the panel's own coordinates */
+                struct panel *pn = &panels[pi];
+                int ax = mx - mw->BorderLeft + pn->ox, ay = my - mw->BorderTop + pn->oy;
+                mouse_x = -1; hover_x = -1;                        /* the mouse left the game window: no edge scrolling, no cursor */
+                if (pi == P_MAP) {                                 /* click or drag in the overview map: scroll there */
+                    int tx, ty;
+                    if (cls == IDCMP_MOUSEBUTTONS && code == SELECTUP) map_drag = 0;
+                    else if (((cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) || (cls == IDCMP_MOUSEMOVE && map_drag)) &&
+                             map_hit(ax, ay, 1, 1, &tx, &ty)) {
+                        view_x = tx - VIEW_COLS / 2; view_y = ty - VIEW_ROWS / 2; clamp_view();
+                        map_drag = 1;
+                    }
+                } else if (cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN && pn->click) {
+                    pn->click(ax, ay);
+                    *pn->dirty = 1;
+                }
             } else {
-                /* mouse: window coordinates -> tile / world pixel */
+                /* mouse in the game window: window coordinates -> tile / world pixel */
                 int inview = mx >= TB_W && my >= BAR_H;
                 int wx = (view_x << 4) + (mx - TB_W), wy = (view_y << 4) + (my - BAR_H);
                 mouse_x = mx; mouse_y = my;
-                {   int tp = top_panel();
-                    if (tp >= 0) {                                    /* a panel is open: it gets all clicks */
-                        hover_x = -1;
-                        if (cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) { panels[tp].click(mx, my); *panels[tp].dirty = 1; }
-                        dirty = 1;
-                        continue;
-                    }
-                }
-                if (query_visible && cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN &&
-                    mx >= QUERY_X && mx < QUERY_X + QUERY_W && my >= QUERY_Y && my < QUERY_Y + QUERY_H) { close_query(); dirty = 1; continue; }
                 if (inview) { hover_x = wx >> 4; hover_y = wy >> 4; } else hover_x = -1;
-                if (map_visible && ((cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) || (cls == IDCMP_MOUSEMOVE && map_drag))) {
-                    int tx, ty;
-                    if (map_hit(mx, my, MAP_X, MAP_Y, &tx, &ty)) {          /* click on the map: scroll there */
-                        view_x = tx - VIEW_COLS / 2; view_y = ty - VIEW_ROWS / 2; clamp_view();
-                        map_drag = 1;
-                        continue;
-                    }
-                }
-                if (cls == IDCMP_MOUSEBUTTONS && code == SELECTUP) map_drag = 0;
                 if (cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) {
                     if (mx < TB_W && my >= BAR_H) {
                         int i = (my - BAR_H) / TB_BTN_H;
@@ -1283,6 +1378,14 @@ static int real_main(int argc, char **argv)
             render_frame(win);
             dirty = 0;
         }
+        if ((++title_tick & 7) == 0) {                                    /* the screen title bar shows the city's numbers */
+            char t[120];
+            sprintf(t, "Micropolis %s   %s   %s   Pop %ld   %s", VERSION, status_date, status_funds, (long)CityPop,
+                    SimSpeed ? "" : "(paused)");
+            set_screen_title(t);
+        }
+        sync_panels();
+        if (dbg_quit_loops && title_tick > dbg_quit_loops) running = 0;
         WaitTOF();
         gettimeofday(&now_time, NULL);
         flagBlink = (now_time.tv_usec < 500000) ? 1 : -1;
@@ -1291,14 +1394,17 @@ static int real_main(int argc, char **argv)
 out:
     sound_exit();
     logmsg("cleanup");
-    if (win && menu) ClearMenuStrip(win);
+    for (int i = 0; i < NPANELS; i++) panel_close(i);
+    if (win) close_window_safely(win);
+    main_window_ptr = NULL;
     if (menu) FreeMenus(menu);
     if (vi) FreeVisualInfo(vi);
-    if (win) CloseWindow(win);
+    if (idcmp_port) DeleteMsgPort(idcmp_port);
     logmsg("window closed");
     if (scr) CloseScreen(scr);
     logmsg("screen closed");
     if (fb) FreeVec(fb);
+    if (scratch) FreeVec(scratch);
     if (CyberGfxBase) CloseLibrary(CyberGfxBase);
     if (GadToolsBase) CloseLibrary(GadToolsBase);
     if (AslBase) CloseLibrary(AslBase);

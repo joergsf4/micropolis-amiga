@@ -42,6 +42,15 @@ Command line: `Micropolis [city] [SIZE=WxH] [ASK] [DEBUG]`.
 `ENVARC:Micropolis.prefs` and used without asking; the menu *Options > Ask for screen mode at start* switches the
 question on again. `SIZE=` (ToolType or argument) skips the question and uses that size, `ASK` forces the question once. Startup problems (no RTG, no suitable screen mode, missing data) are shown in a requester.
 
+## Looks and feels like an Amiga program
+
+- The game runs on its own **screen with a title bar**: drag the title bar down to see the Workbench behind it, use the depth gadget
+  (top right) to send the screen back. The title bar shows version, date, funds, population and speed.
+- Messages, budget, city evaluation, history graphs, the query box and the overview map are **ordinary Amiga windows** on the game
+  screen: drag them by their title bar, close them with the close gadget (the budget window's close gadget means *Continue*), bring
+  them to the front with the depth gadget. They cannot be resized. Several can be open at once.
+- The usual menus (right mouse button) work in every window.
+
 ## Controls
 
 | Action | How |
@@ -55,7 +64,7 @@ question on again. `SIZE=` (ToolType or argument) skips the question and uses th
 | Budget | `B` or Windows > Budget (taxes, road/fire/police funding; Continue / Cancel) |
 | Evaluation | `E` or Windows > Evaluation (public opinion, worst problems, score) |
 | Graphs | `G` or Windows > Graphs (residential, commercial, industrial, money, crime, pollution; 10 or 120 years) |
-| Overview map | `M` on/off, `C` next overlay (power, traffic, pollution, crime, land value, ...) |
+| Overview map | `M` opens/closes the map window, `C` next overlay (power, traffic, pollution, crime, land value, ...); click or drag in it to scroll |
 | Scenarios | menu Scenarios: Dullsville 1900, San Francisco 1906, Hamburg 1944, Bern 1965, Tokyo 1957, Detroit 1972, Boston 2010, Rio de Janeiro 2047 (each with its story and goal) |
 | Quit | Esc or Project > Quit |
 | Version | Project > About Micropolis (version, build, CPU, screen mode, free memory) |

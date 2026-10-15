@@ -12,6 +12,7 @@
 #define PEN_V_DGREEN 40
 #define PEN_V_LGREEN 41
 #define PEN_V_LBLUE  42
+#define PEN_GREY     43               /* window gadgets and borders (Workbench look) */
 #define UI_MAPS    1
 #define UI_EDITORS 2
 int  ui_eval(const char *cmd);

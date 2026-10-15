@@ -2,7 +2,7 @@ Short:        Micropolis (open-source SimCity) with RTG graphics
 Author:       Electronic Arts / Will Wright / Don Hopkins (original), Amiga port: joergsf4
 Uploader:     joergsf4
 Type:         game/strategy
-Version:      0.6.2
+Version:      0.7.0
 Requires:     AmigaOS 3.x, 68020+, RTG card (Picasso96 or CyberGraphX), 2 MB Chip + 2 MB Fast
 Architecture: m68k-amigaos >= 3.0.0
 
@@ -51,6 +51,14 @@ The Tools drawer has RTGTest (shows a colour gradient in a RTG screen - to check
 and ListModes (lists all screen modes the system knows).
 
 
+LOOKS LIKE AN AMIGA PROGRAM
+---------------------------
+The game has its own screen with a title bar (drag it down to see the Workbench; depth gadget top right). The title bar
+shows version, date, funds, population and speed. Messages, budget, evaluation, graphs, query box and overview map are
+normal Amiga windows on that screen: move them by their title bar, close them with the close gadget (the budget
+window's close gadget means "Continue"). They cannot be resized. Menus (right mouse button) work in every window.
+
+
 CONTROLS
 --------
 Query          the Query tool opens a zone status box at the top right (click it or Esc to close)
@@ -63,7 +71,7 @@ Speed          0 pause, 1 slow, 2 medium, 3 fast, P toggles pause
 Budget         B, or menu Windows/Budget (Continue or Cancel)
 Evaluation     E, or menu Windows/Evaluation (opinion, problems, score)
 Graphs         G, or menu Windows/Graphs (6 histories, 10 or 120 years)
-Overview map   M on/off, C next overlay (14 overlays in the Map menu)
+Overview map   M opens/closes the map window, C next overlay (14 overlays in the Map menu); click/drag in it to scroll
 Scenarios      menu Scenarios: 8 historic disasters/challenges with story and goal
 Quit           Esc, or Project/Quit
 About          Project/About Micropolis: version, build, CPU, screen mode, free memory
