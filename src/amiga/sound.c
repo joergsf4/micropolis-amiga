@@ -10,6 +10,7 @@
 #include <devices/audio.h>
 #include <proto/exec.h>
 #include <proto/dos.h>
+#include <sys/time.h>
 #include "sound.h"
 #include "stack.h"             /* app_log() */
 
@@ -27,8 +28,9 @@ static struct MsgPort *port;
 static struct IOAudio *io[NCH];
 static int open_ok[NCH], in_flight[NCH];
 static int open_err[NCH];                 /* OpenDevice result per channel (0 = ok) */
-static int played_count;
+static int played_count, done_ok, done_err, last_err;   /* completed writes, and how they ended */
 static struct cached *playing[NCH];
+static struct timeval started[NCH];      /* when each write was sent: to check that playback takes as long as the sample */
 
 static int open_channel(int side)
 {
@@ -63,6 +65,23 @@ static void reap(int side)
 {
     if (in_flight[side] && CheckIO((struct IORequest *)io[side])) {
         WaitIO((struct IORequest *)io[side]);
+        if (io[side]->ioa_Request.io_Error) {
+            char lb[80];
+            done_err++; last_err = io[side]->ioa_Request.io_Error;
+            sprintf(lb, "sound: channel %d write ended with error %d", side, last_err);
+            app_log(lb);
+        } else {
+            struct timeval now;
+            long ms;
+            gettimeofday(&now, NULL);
+            ms = (now.tv_sec - started[side].tv_sec) * 1000L + (now.tv_usec - started[side].tv_usec) / 1000L;
+            done_ok++;
+            if (playing[side]) {
+                char lb[100];
+                sprintf(lb, "sound: ch %d done after %ld ms (sample %ld ms)", side, ms, (long)(playing[side]->len * 1000L / RATE));
+                app_log(lb);
+            }
+        }
         in_flight[side] = 0;
         if (playing[side]) playing[side]->busy--;
         playing[side] = NULL;
@@ -136,6 +155,7 @@ void sound_play(const char *id)
         a->ioa_Period = PERIOD;
         a->ioa_Volume = 64;
         a->ioa_Cycles = 1;
+        gettimeofday(&started[side], NULL);
         SendIO((struct IORequest *)a);
         in_flight[side] = 1; playing[side] = c; c->busy++;
     }
@@ -160,7 +180,8 @@ const char *sound_status(char *buf)            /* one line for the About box */
 {
     int n = 0;
     for (int i = 0; i < NCH; i++) n += open_ok[i];
-    if (n == NCH) sprintf(buf, "Sound: 4 channels, %d played", played_count);
+    sound_poll();
+    if (n == NCH) sprintf(buf, "Sound: 4 ch, %d played, %d done, %d failed (%d)", played_count, done_ok, done_err, last_err);
     else if (n) sprintf(buf, "Sound: %d of 4 channels, %d played", n, played_count);
     else sprintf(buf, "Sound: audio.device unavailable (error %d)", open_err[0]);
     return buf;

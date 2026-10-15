@@ -131,6 +131,9 @@ def convert_sounds(src_dir, out_dir, rate=11025):
         name = os.path.splitext(os.path.basename(f))[0].lower() + '.snd'
         open(os.path.join(out_dir, name), 'wb').write(data)
         total += len(data)
+    import math                                                  # a test tone for diagnosing sound problems (argument sound=tone)
+    tone = bytes((int(round(127 * math.sin(2 * math.pi * 1000 * i / rate))) & 255) for i in range(rate * 2))
+    open(os.path.join(out_dir, 'tone.snd'), 'wb').write(tone)
     print('sounds: %d files, %d KB at %d Hz' % (len(glob.glob(os.path.join(out_dir, '*.snd'))), total // 1024, rate))
 
 def main():

@@ -9,9 +9,9 @@ UP       = upstream
 CORE_SRC = $(wildcard src/core/*.c)
 CORE_OBJ = $(patsubst src/%.c,out/obj/%.o,$(CORE_SRC))
 
-all: out/micropolis out/headless out/rtgtest out/listmodes data
+all: out/micropolis out/headless out/rtgtest out/listmodes out/tonetest data
 	mkdir -p $(DEST)
-	cp out/micropolis out/headless out/rtgtest out/listmodes $(DEST)/
+	cp out/micropolis out/headless out/rtgtest out/listmodes out/tonetest $(DEST)/
 	# icons like in the release (the drawer icon lives next to the drawer)
 	cp out/icons/Micropolis.info $(DEST)/micropolis.info
 	cp out/icons/Micropolis-drawer.info $(DEST)/../Micropolis.info
@@ -33,6 +33,10 @@ out/micropolis: $(CORE_OBJ) out/obj/amiga/ui_core.o out/obj/amiga/stack.o out/ob
 	$(CC) $(ARCH) -o $@ $^ -lm
 
 out/listmodes: src/amiga/listmodes.c
+	@mkdir -p out
+	$(CC) $(AMIFLAGS) -o $@ $<
+
+out/tonetest: src/amiga/tonetest.c
 	@mkdir -p out
 	$(CC) $(AMIFLAGS) -o $@ $<
 
