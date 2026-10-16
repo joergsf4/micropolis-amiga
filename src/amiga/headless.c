@@ -2,6 +2,7 @@
  * usage: headless <city.cty> [months]   (default 24 months) */
 #include "sim.h"
 #include "ui.h"
+extern int SeedRand();
 extern float EMarket;
 #include "stack.h"
 #include "mapview.h"

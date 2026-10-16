@@ -1,0 +1,23 @@
+# Core notifications ("UI..." commands the original code sends to its Tcl interface) that the Amiga front end deliberately does not handle.
+# check_handlers.py fails when a notification is neither handled in src/amiga nor listed here. Format: name  reason
+UIDidGenerateNewCity   informational; the front end generates cities itself and redraws
+UIDidLoadCity          informational; LoadCity()'s return value is used
+UIDidLoadScenario      informational
+UIDidTool              informational (after a tool was used)
+UIDidntLoadCity        the front end reports the failure itself from LoadCity()'s return value
+UIInitializeSound      sound is started by the front end
+UIShutDownSound        sound is stopped by the front end
+UISoundOff             sound is controlled by the Options menu
+UIStartSound           looping sounds are not used (see #19)
+UIStopSound            looping sounds are not used (see #19)
+UINewGame              the start flow is the front end's start menu
+UIPlayNewCity          the start flow is the front end's start menu
+UIReallyStartGame      the start flow is the front end's start menu
+UIStartLoad            loading is driven by the front end (menu Project > Load)
+UIStartScenario        scenarios are driven by the front end (menu Scenarios)
+UISaveCityAs           the front end asks for the file name itself (menu Project > Save City As)
+UIPopUpMessage         defined in the core (DoPopUpMessage) but never called
+UISetCityName          the city name is not shown
+UISetMapState          the overview map keeps its own state
+UISetToolState         the tool state is read from the editor (ui_update_heads)
+UIUpdateBudget         the budget window reads the core's globals each time it is drawn

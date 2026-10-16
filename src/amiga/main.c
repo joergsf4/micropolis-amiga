@@ -176,6 +176,7 @@ static UBYTE palette[256 * 3];
 static int view_x, view_y;             /* top-left tile of the view */
 static char status_date[32] = "", status_funds[48] = "", status_msg[96] = "";
 extern int sim_loops;
+static int menu_sync_pending;              /* set by UISetOptions / UISetGameLevel: the menu check marks must follow the game state */
 static int save_state;                     /* 1 = the core saved the city, 2 = it could not (save_msg) */
 static char save_msg[300];
 static int dirty = 1;
@@ -198,6 +199,8 @@ static void end_drag(void)                 /* the button went up somewhere else 
 static int map_drag;
 static int sound_ui_ready;                /* set when the main loop runs: UI sounds (tool select, speed) only from then on */
 static int shake_frames, shake_bx, shake_by;   /* earthquake: the view jitters by a tile for about a second */
+static int dbg_about, dbg_det;                 /* test options: keep the About box open / deterministic picture (no blinking, no animation, no ambient sound) */
+static char dbg_dump[120];                  /* test option dump=PATH: write the frame buffer and the panel scratch buffer at exit */
 static int dbg_quit_loops;                 /* test option quit=N: leave the game after N seconds (checks the clean shutdown) */
 static int dbg_scroll;                  /* test option scroll=N: scroll N tiles (x and y), then stop */
 static int debug_show;                  /* test option show=eval|graph: keep messages away so the panel can be photographed */
@@ -256,6 +259,7 @@ int ui_eval(const char *cmd)
         query_visible = 1; query_dirty = 1; dirty = 1;
     }
     else if (!strncmp(cmd, "UISetEvaluation ", 16))  { eval_set(cmd); eval_dirty = 1; dirty = 1; }
+    else if (!strncmp(cmd, "UISetOptions ", 13) || !strncmp(cmd, "UISetGameLevel ", 15)) { menu_sync_pending = 1; dirty = 1; }   /* a loaded city brings its own options and level: show them in the menu */
     else if (!strncmp(cmd, "UISetBudget ", 12))       { budget_set_totals(cmd); budget_dirty = 1; dirty = 1; }
     else if (!strncmp(cmd, "UISetBudgetValues ", 18)) { budget_set_values(cmd); dirty = 1; }
     else if (!strncmp(cmd, "UIShowBudgetAndWait", 19)) { budget_show(); budget_dirty = 1; dirty = 1; }
@@ -1170,6 +1174,33 @@ static void save_city(struct Window *win, const char *path)
     }
 }
 
+static void menu_sync(void)                                  /* make the check marks of the menu match the game's variables (after loading a city) */
+{
+    struct Window *w[1 + NPANELS]; int n = 0;
+    if (!g_menu) return;
+    if (main_window_ptr) w[n++] = main_window_ptr;
+    for (int i = 0; i < NPANELS; i++) if (panels[i].win) w[n++] = panels[i].win;
+    for (int i = 0; i < n; i++) ClearMenuStrip(w[i]);
+    for (struct Menu *m = g_menu; m; m = m->NextMenu)
+        for (struct MenuItem *it = m->FirstItem; it; it = it->NextItem) {
+            int id = (int)(long)GTMENUITEM_USERDATA(it), want = -1;
+            switch (id) {
+            case CMD_AUTOBULLDOZE: want = autoBulldoze; break;
+            case CMD_AUTOBUDGET: want = autoBudget; break;
+            case CMD_DISASTERS: want = !NoDisasters; break;
+            case CMD_SOUND: want = UserSoundOn; break;
+            case CMD_AUTOGO: want = autoGo; break;
+            case CMD_ANIM: want = DoAnimation; break;
+            case CMD_MSGS: want = DoMessages; break;
+            case CMD_NOTICES: want = DoNotices; break;
+            default:
+                if (id >= CMD_LEVEL && id < CMD_LEVEL + 3) want = (GameLevel == id - CMD_LEVEL);
+            }
+            if (want >= 0) { if (want) it->Flags |= CHECKED; else it->Flags &= ~CHECKED; }
+        }
+    for (int i = 0; i < n; i++) ResetMenuStrip(w[i], g_menu);
+}
+
 static int easy(struct Window *win, const char *text, const char *gadgets);
 static int do_command(int id, struct Window *win, struct MenuItem *item)
 {
@@ -1598,42 +1629,47 @@ static int real_main(int argc, char **argv)
     editor.tool_state = queryState; editor.tool_state_save = -1;
     SetGameLevel((short)pref_level);
     setSpeed(2);                                          /* medium: the fast speed was too quick for most cities */
-    if (argc > 3 && !strncmp(argv[3], "scroll=", 7)) { dbg_scroll = atoi(argv[3] + 7); setSpeed(0); }   /* debug: scroll test */
-    if (argc > 3 && !strncmp(argv[3], "jump=", 5)) { int jx = 0, jy = 0; sscanf(argv[3] + 5, "%d,%d", &jx, &jy); view_x = jx; view_y = jy; clamp_view(); setSpeed(0); }
-    if (argc > 3 && !strncmp(argv[3], "sound=", 6)) sound_play(argv[3] + 6);               /* debug: play a sound at start */
-    if (argc > 3 && !strncmp(argv[3], "scen=", 5)) { int n = atoi(argv[3] + 5); LoadScenario((short)n); recenter(); notice_show(n); }   /* debug: start a scenario */
-    if (argc > 3 && !strncmp(argv[3], "query=", 6)) { int qx = 60, qy = 50; sscanf(argv[3] + 6, "%d,%d", &qx, &qy); doZoneStatus((short)qx, (short)qy); }   /* debug */
-    if (argc > 3 && !strcmp(argv[3], "modes")) {               /* debug: which display modes pass the filter */
-        ULONG m = INVALID_ID; int n = 0;
-        while ((m = NextDisplayInfo(m)) != INVALID_ID) {
-            if (mode_ok(m)) { char lb[90]; sprintf(lb, "mode ok: 0x%08lx %ldx%ld %ld bit", (unsigned long)m, (long)GetCyberIDAttr(CYBRIDATTR_WIDTH, m), (long)GetCyberIDAttr(CYBRIDATTR_HEIGHT, m), (long)GetCyberIDAttr(CYBRIDATTR_DEPTH, m)); logmsg(lb); n++; }
-        }
-        { char lb[40]; sprintf(lb, "modes accepted: %d", n); logmsg(lb); }
-    }
-    if (argc > 3 && !strcmp(argv[3], "quake")) { MakeEarthquake(); }   /* debug */
-    if (argc > 3 && !strcmp(argv[3], "help")) show_help();
-    if (argc > 3 && !strcmp(argv[3], "savetest")) { save_city(win, "PROGDIR:cities/savetest.cty"); logmsg(status_msg); }   /* debug */
-    if (argc > 3 && !strncmp(argv[3], "hover=", 6)) tool_hover = atoi(argv[3] + 6);   /* debug */
-    if (argc > 3 && !strncmp(argv[3], "chalk", 5)) {                 /* debug: a note on the map */
-        int bx = (view_x + 8) << 4, by = (view_y + 6) << 4;
-        editor.tool_state = chalkState;
-        ToolDown(&editor, bx, by);
-        for (int k = 1; k <= 40; k++) ToolDrag(&editor, bx + k * 5, by + (k % 10) * 6 + k);
-        ToolUp(&editor, bx + 200, by + 60);
-        if (!strcmp(argv[3], "chalkerase")) { editor.tool_state = eraserState; ToolDown(&editor, bx + 100, by + 40); ToolUp(&editor, bx + 100, by + 40); }
-        editor.tool_state = queryState;
-    }   /* debug */
-    start_pending = start_menu && argc <= 2;                  /* not for test runs (debug arguments) */
     for (int ai = 1; ai < argc; ai++) if (!strncmp(argv[ai], "quit=", 5)) dbg_quit_loops = atoi(argv[ai] + 5) * 50;
-    if (argc > 3 && !strncmp(argv[3], "show=", 5)) debug_show = 1;
-    if (argc > 3 && !strcmp(argv[3], "show=about")) show_about();
-    if (argc > 3 && !strcmp(argv[3], "show=eval")) open_info_panel(P_EVAL);              /* debug: open a panel at start */
-    if (argc > 3 && !strcmp(argv[3], "show=graph")) open_info_panel(P_GRAPH);
-    if (argc > 3 && !strcmp(argv[3], "show=budget")) DoBudgetFromMenu();
-    if (argc > 3 && !strncmp(argv[3], "at=", 3)) { int jx = 0, jy = 0; sscanf(argv[3] + 3, "%d,%d", &jx, &jy); view_x = jx; view_y = jy; clamp_view(); }   /* debug: scroll there, keep the speed */
-    if (argc > 3 && !strncmp(argv[3], "speed=", 6)) do_command(CMD_PAUSE + atoi(argv[3] + 6), win, NULL);   /* debug: as the Speed menu */
-    if (argc > 3 && !strcmp(argv[3], "show=map")) { open_info_panel(P_MAP); map_dirty = 1; }
-    if (argc > 3 && !strncmp(argv[3], "notice=", 7)) { notice_show(atoi(argv[3] + 7)); notice_dirty = 1; }   /* debug */
+    for (int di = 3; di < argc; di++) {                          /* debug options, any number, any order (arguments 3 and up) */
+        const char *a = argv[di];
+        if (!strncmp(a, "scroll=", 7)) { dbg_scroll = atoi(a + 7); setSpeed(0); }   /* debug: scroll test */
+        if (!strncmp(a, "jump=", 5)) { int jx = 0, jy = 0; sscanf(a + 5, "%d,%d", &jx, &jy); view_x = jx; view_y = jy; clamp_view(); setSpeed(0); }
+        if (!strncmp(a, "sound=", 6)) sound_play(a + 6);               /* debug: play a sound at start */
+        if (!strncmp(a, "scen=", 5)) { int n = atoi(a + 5); LoadScenario((short)n); recenter(); notice_show(n); }   /* debug: start a scenario */
+        if (!strncmp(a, "query=", 6)) { int qx = 60, qy = 50; sscanf(a + 6, "%d,%d", &qx, &qy); doZoneStatus((short)qx, (short)qy); }   /* debug */
+        if (!strcmp(a, "modes")) {               /* debug: which display modes pass the filter */
+            ULONG m = INVALID_ID; int n = 0;
+            while ((m = NextDisplayInfo(m)) != INVALID_ID) {
+                if (mode_ok(m)) { char lb[90]; sprintf(lb, "mode ok: 0x%08lx %ldx%ld %ld bit", (unsigned long)m, (long)GetCyberIDAttr(CYBRIDATTR_WIDTH, m), (long)GetCyberIDAttr(CYBRIDATTR_HEIGHT, m), (long)GetCyberIDAttr(CYBRIDATTR_DEPTH, m)); logmsg(lb); n++; }
+            }
+            { char lb[40]; sprintf(lb, "modes accepted: %d", n); logmsg(lb); }
+        }
+        if (!strcmp(a, "quake")) { MakeEarthquake(); }   /* debug */
+        if (!strcmp(a, "help")) show_help();
+        if (!strcmp(a, "savetest")) { save_city(win, "PROGDIR:cities/savetest.cty"); logmsg(status_msg); }   /* debug */
+        if (!strncmp(a, "hover=", 6)) tool_hover = atoi(a + 6);   /* debug */
+        if (!strncmp(a, "chalk", 5)) {                 /* debug: a note on the map */
+            int bx = (view_x + 8) << 4, by = (view_y + 6) << 4;
+            editor.tool_state = chalkState;
+            ToolDown(&editor, bx, by);
+            for (int k = 1; k <= 40; k++) ToolDrag(&editor, bx + k * 5, by + (k % 10) * 6 + k);
+            ToolUp(&editor, bx + 200, by + 60);
+            if (!strcmp(a, "chalkerase")) { editor.tool_state = eraserState; ToolDown(&editor, bx + 100, by + 40); ToolUp(&editor, bx + 100, by + 40); }
+            editor.tool_state = queryState;
+        }   /* debug */
+        start_pending = start_menu && argc <= 2;                  /* not for test runs (debug arguments) */
+        if (!strncmp(a, "show=", 5)) debug_show = 1;
+        if (!strcmp(a, "show=about")) { show_about(); dbg_about = 1; }
+        if (!strcmp(a, "det")) { dbg_det = 1; DoAnimation = 0; ambient_on = 0; }
+        if (!strncmp(a, "dump=", 5)) strncpy(dbg_dump, a + 5, sizeof dbg_dump - 1);
+        if (!strcmp(a, "show=eval")) open_info_panel(P_EVAL);              /* debug: open a panel at start */
+        if (!strcmp(a, "show=graph")) open_info_panel(P_GRAPH);
+        if (!strcmp(a, "show=budget")) DoBudgetFromMenu();
+        if (!strncmp(a, "at=", 3)) { int jx = 0, jy = 0; sscanf(a + 3, "%d,%d", &jx, &jy); view_x = jx; view_y = jy; clamp_view(); }   /* debug: scroll there, keep the speed */
+        if (!strncmp(a, "speed=", 6)) do_command(CMD_PAUSE + atoi(a + 6), win, NULL);   /* debug: as the Speed menu */
+        if (!strcmp(a, "show=map")) { open_info_panel(P_MAP); map_dirty = 1; }
+        if (!strncmp(a, "notice=", 7)) { notice_show(atoi(a + 7)); notice_dirty = 1; }   /* debug */
+    }
     int running = 1, tick = 0, frame = 0, title_tick = 0;
     sound_ui_ready = 1;
     static const int delay[4] = { 0, 12, 4, 1 };      /* video frames per simulation step */
@@ -1777,7 +1813,7 @@ static int real_main(int argc, char **argv)
             else { view_x = shake_bx + (rand() % 3) - 1; view_y = shake_by + (rand() % 3) - 1; }
             clamp_view(); dirty = 1;
         }
-        if (debug_show && notice_visible && !(argc > 3 && !strcmp(argv[3], "show=about"))) notice_close();
+        if (debug_show && notice_visible && !dbg_about) notice_close();
         if (dbg_scroll > 0 && (frame & 3) == 0) { view_x++; if (dbg_scroll & 1) view_y++; dbg_scroll--; clamp_view(); dirty = 1; }
         if (SimSpeed && ++tick >= delay[SimSpeed]) {
             struct timeval t0, t1;
@@ -1802,6 +1838,7 @@ static int real_main(int argc, char **argv)
             set_screen_title(t);
         }
         sync_panels();
+        if (menu_sync_pending) { menu_sync_pending = 0; menu_sync(); }
         if (start_pending && !dirty) {                                    /* the first picture is on the screen: ask what to start with */
             start_pending = 0;
             start_choice(win);
@@ -1810,7 +1847,18 @@ static int real_main(int argc, char **argv)
         if (dbg_quit_loops && title_tick > dbg_quit_loops) running = 0;
         WaitTOF();
         gettimeofday(&now_time, NULL);
-        flagBlink = (now_time.tv_usec < 500000) ? 1 : -1;
+        flagBlink = dbg_det ? -1 : (now_time.tv_usec < 500000) ? 1 : -1;
+    }
+    if (dbg_dump[0]) {                                      /* test support: the exact picture (fb, panel scratch, palette), see tools/test */
+        FILE *df = fopen(dbg_dump, "wb");
+        if (df) {
+            UWORD hdr[6] = { 0x4d50, (UWORD)SCR_W, (UWORD)SCR_H, (UWORD)SCRATCH_STRIDE, (UWORD)MAX_H, 0 };
+            fwrite(hdr, 2, 6, df);
+            fwrite(fb, 1, (size_t)SCR_W * SCR_H, df);
+            fwrite(scratch, 1, (size_t)SCRATCH_STRIDE * MAX_H, df);
+            fwrite(palette, 1, 768, df);
+            fclose(df);
+        }
     }
     rc = 0;
 out:

@@ -119,3 +119,11 @@ The graphics, sounds and texts come from the original Micropolis distribution
 ([osgcc/simcity](https://github.com/osgcc/simcity)) and are © Electronic Arts.
 Original game design by Will Wright, Unix/X11 version and open-sourcing by Don Hopkins.
 Amiga port by this repository's authors. No Kickstart or Workbench files are included.
+
+## Tests
+
+`tools/test/run_tests.sh [--quick]` (Docker must be running):
+
+- **Notifications:** every `UI...` notification the simulation core sends must have a handler in `src/amiga/main.c` or a reason in `tools/test/ui_ignored.txt` (this would have caught the lost budget handler).
+- **Screens:** the game is started in the emulator with debug arguments (`show=budget`, `lang=deutsch`, `speed=0`, `hover=N`, ...; `det` makes the picture deterministic) and writes its exact frame buffer (`dump=`); the test finds texts in it by rendering them with the game's own font. 10 cases, about 40 s each.
+- **Core parity:** the simulation core is run for 12 months in the Amiga build and in a native build of the same code and the results are compared with tolerances (the original Micropolis code is only reliable with `-O1`, see the Makefile).
