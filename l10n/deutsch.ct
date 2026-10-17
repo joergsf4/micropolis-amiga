@@ -439,6 +439,12 @@ Der Bildschirmmodus wird beim nächsten Start gefragt.
 S_7BC0ABC0
 Dieser Bildschirmmodus wird ab jetzt verwendet.
 ; This screen mode is used from now on.
+S_54B969C7
+Micropolis beenden?\nDie Stadt wurde seit dem letzten Speichern verändert.
+; Quit Micropolis?\nThe city has changed since it was last saved.
+S_2D384CE7
+Speichern und beenden|Beenden|Abbrechen
+; Save and quit|Quit|Cancel
 S_5D4CC186
 Weitere...
 ; More...

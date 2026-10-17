@@ -90,13 +90,17 @@ CASES = [
     ('graph-pl', 'show=graph lang=polski', [('scr', 'Wykresy', True), ('scr', 'Zamknij', True)]),
     ('status-de', 'show=none lang=deutsch', [('fb', 'Tempo 2', True), ('fb', 'Geld:', True), ('fb', 'Abfrage', True)]),
     ('save', 'show=none savetest', [('log', 'Saved PROGDIR:cities/savetest.cty', True)]),
+    ('tax-new', 'newcity show=budget', [('scr', '  7%', True)]),
 ]
-QUICK = ['start-en', 'budget-en', 'status-de']
+# the menu bar must fit into the screen in every language (a title beyond the right edge cannot be opened)
+MENU_CASES = [('menu-en', 'show=none'), ('menu-de', 'show=none lang=deutsch'), ('menu-pl', 'show=none lang=polski')]
+QUICK = ['start-en', 'budget-en', 'status-de', 'menu-de']
 
 
 def main():
     names = [a for a in sys.argv[1:] if not a.startswith('--')]
-    cases = [c for c in CASES if (not names and ('--quick' not in sys.argv or c[0] in QUICK)) or c[0] in names]
+    cases = [(n, a, [('menu', None, True)]) for n, a in MENU_CASES] + CASES
+    cases = [c for c in cases if (not names and ('--quick' not in sys.argv or c[0] in QUICK)) or c[0] in names]
     failed = 0
     for name, args, checks in cases:
         fb, scr, log = run_case(args)
@@ -104,7 +108,12 @@ def main():
         if 'main() is returning' not in log:
             problems.append('no clean shutdown in the log')
         for plane, text, present in checks:
-            if plane == 'log':
+            if plane == 'menu':
+                m = re.search(r'menus: right edge (\d+) of (\d+) pixels', log)
+                found = bool(m) and int(m.group(1)) <= int(m.group(2))
+                if not found and m: problems.append('menu bar ends at %s but the screen is %s wide' % (m.group(1), m.group(2)))
+                found = True
+            elif plane == 'log':
                 found = text in log
             elif fb is None:
                 found = False

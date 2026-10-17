@@ -176,6 +176,8 @@ static UBYTE palette[256 * 3];
 static int view_x, view_y;             /* top-left tile of the view */
 static char status_date[32] = "", status_funds[48] = "", status_msg[96] = "";
 extern int sim_loops;
+static long clean_time;                    /* CityTime when the city was loaded, created or saved */
+static int tool_used;                      /* a building tool was used since then */
 static int menu_sync_pending;              /* set by UISetOptions / UISetGameLevel: the menu check marks must follow the game state */
 static int save_state;                     /* 1 = the core saved the city, 2 = it could not (save_msg) */
 static char save_msg[300];
@@ -350,6 +352,7 @@ static short shown[MAX_ROWS][MAX_COLS];       /* tile id last drawn in each cell
 static UBYTE redraw[MAX_ROWS][MAX_COLS];
 static int full_redraw = 1;                     /* start, scroll, panel closed: redraw all cells */
 static int toolbar_dirty = 1, first_present = 1, status_dirty = 1;
+static int tb_label_only;                  /* only the name/cost label at the top of the palette changed (mouse over an icon): send just that part */
 static int last_view_x = -1, last_view_y = -1;
 #define MAX_SPR 48
 static struct rect prev_spr[MAX_SPR];
@@ -875,7 +878,7 @@ static void render_frame(struct Window *win)
     n_prev_spr = n_spr;
     prev_cursor = cur; have_prev_cursor = have_cursor;
 
-    if (toolbar_dirty_ext) { toolbar_dirty = 1; toolbar_dirty_ext = 0; }
+    if (toolbar_dirty_ext) { toolbar_dirty = 1; tb_label_only = 0; toolbar_dirty_ext = 0; }
     gfx_target(fb, SCR_W);
     if (toolbar_dirty) {
         draw_toolbar();
@@ -912,12 +915,12 @@ static void render_frame(struct Window *win)
                 blit(rp, TB_W + c0 * 16, BAR_H + row * 16, (col - c0) * 16, 16);
             }
         }
-        if (toolbar_dirty) blit(rp, 0, BAR_H, TB_W, SCR_H - BAR_H);
+        if (toolbar_dirty) blit(rp, 0, BAR_H, TB_W, tb_label_only ? 56 : SCR_H - BAR_H);
         if (demand_dirty) blit(rp, DEM_X, DEM_Y, DEM_W, DEM_H);
         if (status_dirty) blit(rp, 0, 0, DEM_X, BAR_H);
     }
 
-    toolbar_dirty = 0; status_dirty = 0; demand_dirty = 0;
+    toolbar_dirty = 0; tb_label_only = 0; status_dirty = 0; demand_dirty = 0;
 
     if (++stats.frames >= 200) {                     /* performance log for tuning on slow machines */
         char b[160];
@@ -986,15 +989,16 @@ static struct Menu *make_menus(struct Screen *scr, APTR *vi_out)
     mi(NM_ITEM, T("Classic tool icons"), NULL, CHECKIT | MENUTOGGLE | (classic_icons ? CHECKED : 0), CMD_CLASSIC);
     mi(NM_ITEM, T("Message windows"), NULL, CHECKIT | MENUTOGGLE | (DoNotices ? CHECKED : 0), CMD_NOTICES);
     mi(NM_ITEM, T("Ask for screen mode at start"), NULL, CHECKIT | MENUTOGGLE | (pref_ask ? CHECKED : 0), CMD_ASKMODE);
-    mi(NM_TITLE, T("Level"), NULL, 0, 0);
-    mi_excl = 6; mi(NM_ITEM, T("Easy ($20,000 start)"),   NULL, CHECKIT | (pref_level == 0 ? CHECKED : 0), CMD_LEVEL + 0);
-    mi_excl = 5; mi(NM_ITEM, T("Medium ($10,000 start)"), NULL, CHECKIT | (pref_level == 1 ? CHECKED : 0), CMD_LEVEL + 1);
-    mi_excl = 3; mi(NM_ITEM, T("Hard ($5,000 start)"),    NULL, CHECKIT | (pref_level == 2 ? CHECKED : 0), CMD_LEVEL + 2);
-    mi(NM_TITLE, T("Language"), NULL, 0, 0);
+    mi(NM_ITEM, (const char *)NM_BARLABEL, NULL, 0, 0);
+    mi(NM_ITEM, T("Level"), NULL, 0, 0);                     /* level and language are sub menus: nine menu titles do not fit into 640 pixels */
+    mi_excl = 6; mi(NM_SUB, T("Easy ($20,000 start)"),   NULL, CHECKIT | (pref_level == 0 ? CHECKED : 0), CMD_LEVEL + 0);
+    mi_excl = 5; mi(NM_SUB, T("Medium ($10,000 start)"), NULL, CHECKIT | (pref_level == 1 ? CHECKED : 0), CMD_LEVEL + 1);
+    mi_excl = 3; mi(NM_SUB, T("Hard ($5,000 start)"),    NULL, CHECKIT | (pref_level == 2 ? CHECKED : 0), CMD_LEVEL + 2);
+    mi(NM_ITEM, T("Language"), NULL, 0, 0);
     {   static const char *const code[4] = { "", "english", "deutsch", "polski" };
         const char *label[4] = { T("Automatic (system setting)"), "English", "Deutsch", "Polski" };
         static const int ex[4] = { 14, 13, 11, 7 };                  /* the other three items of the group */
-        for (int i = 0; i < 4; i++) { mi_excl = ex[i]; mi(NM_ITEM, label[i], NULL, CHECKIT | (strcmp(pref_lang, code[i]) == 0 ? CHECKED : 0), CMD_LANG + i); }
+        for (int i = 0; i < 4; i++) { mi_excl = ex[i]; mi(NM_SUB, label[i], NULL, CHECKIT | (strcmp(pref_lang, code[i]) == 0 ? CHECKED : 0), CMD_LANG + i); }
     }
     mi(NM_TITLE, T("Windows"), NULL, 0, 0);
     mi(NM_ITEM, T("Budget..."), "B", 0, CMD_BUDGET);
@@ -1017,6 +1021,11 @@ static struct Menu *make_menus(struct Screen *scr, APTR *vi_out)
     if (!vi) return NULL;
     menu = CreateMenusA(newmenu, NULL);
     if (menu && !LayoutMenusA(menu, vi, NULL)) { FreeMenus(menu); menu = NULL; }
+    if (menu) {                                               /* every title must be reachable: the last one has to end inside the screen */
+        int right = 0; char lb[80];
+        for (struct Menu *m = menu; m; m = m->NextMenu) if (m->LeftEdge + m->Width > right) right = m->LeftEdge + m->Width;
+        sprintf(lb, "menus: right edge %d of %d pixels", right, (int)scr->Width); logmsg(lb);
+    }
     return menu;
 }
 
@@ -1167,7 +1176,7 @@ static void save_city(struct Window *win, const char *path)
     strncpy(name, path, sizeof name - 1); name[sizeof name - 1] = 0;     /* SaveCityAs takes ownership of its own copy and cuts the name it is given */
     save_state = 0;
     SaveCityAs(name);
-    if (save_state == 1) sprintf(status_msg, T("Saved %s"), path);
+    if (save_state == 1) { sprintf(status_msg, T("Saved %s"), path); clean_time = (long)CityTime; tool_used = 0; }
     else {
         sprintf(status_msg, T("Could not save %s"), path);
         fail(T("Cannot save the city:\n%s"), save_state == 2 ? save_msg : T("unknown error"));
@@ -1182,7 +1191,8 @@ static void menu_sync(void)                                  /* make the check m
     for (int i = 0; i < NPANELS; i++) if (panels[i].win) w[n++] = panels[i].win;
     for (int i = 0; i < n; i++) ClearMenuStrip(w[i]);
     for (struct Menu *m = g_menu; m; m = m->NextMenu)
-        for (struct MenuItem *it = m->FirstItem; it; it = it->NextItem) {
+        for (struct MenuItem *top = m->FirstItem; top; top = top->NextItem)
+         for (struct MenuItem *it = top; it; it = (it == top) ? top->SubItem : it->NextItem) {
             int id = (int)(long)GTMENUITEM_USERDATA(it), want = -1;
             switch (id) {
             case CMD_AUTOBULLDOZE: want = autoBulldoze; break;
@@ -1202,6 +1212,7 @@ static void menu_sync(void)                                  /* make the check m
 }
 
 static int easy(struct Window *win, const char *text, const char *gadgets);
+static int ask_quit(struct Window *win);
 static int do_command(int id, struct Window *win, struct MenuItem *item)
 {
     char path[256];
@@ -1212,7 +1223,7 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
         return 1;
     }
     if (id > CMD_SCEN && id <= CMD_SCEN + 8) {            /* scenario: load it and show its story, as the original does */
-        EraseOverlay(); LoadScenario((short)(id - CMD_SCEN));
+        EraseOverlay(); LoadScenario((short)(id - CMD_SCEN)); clean_time = (long)CityTime; tool_used = 0;
         recenter();
         notice_show(id - CMD_SCEN); notice_dirty = 1;
         return 1;
@@ -1235,11 +1246,11 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
     case CMD_HELP: show_help(); break;
     case CMD_ABOUT: show_about(); break;
     case CMD_NEW:
-        EraseOverlay(); GenerateNewCity(); SetGameLevelFunds((short)pref_level); setSpeed(2); recenter();
+        EraseOverlay(); GenerateNewCity(); CityTax = 7; SetGameLevelFunds((short)pref_level); setSpeed(2); clean_time = (long)CityTime; tool_used = 0; recenter();
         sprintf(status_msg, T("New city generated.")); break;
     case CMD_LOAD:
         if (ask_file(win, 0, path, sizeof path)) {
-            if (LoadCity(path)) { EraseOverlay(); recenter(); sprintf(status_msg, T("Loaded %s"), path); }
+            if (LoadCity(path)) { EraseOverlay(); recenter(); clean_time = (long)CityTime; tool_used = 0; sprintf(status_msg, T("Loaded %s"), path); }
             else sprintf(status_msg, T("Could not load %s"), path);
         }
         break;
@@ -1253,7 +1264,7 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
             save_city(win, path);
         }
         break;
-    case CMD_QUIT: return 0;
+    case CMD_QUIT: return ask_quit(win) ? 0 : 1;
     case CMD_PAUSE: setSpeed(0); break;
     case CMD_SLOW: setSpeed(1); break;
     case CMD_MEDIUM: setSpeed(2); break;
@@ -1266,7 +1277,7 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
     case CMD_ANIM: DoAnimation = checked; MustUpdateOptions = 1; full_redraw = 1; break;
     case CMD_MSGS: DoMessages = checked; MustUpdateOptions = 1; break;
     case CMD_AMBIENT: ambient_on = checked; break;
-    case CMD_CLASSIC: classic_icons = checked; toolbar_dirty = 1; break;
+    case CMD_CLASSIC: classic_icons = checked; toolbar_dirty = 1; tb_label_only = 0; break;
     case CMD_STARTMENU: start_menu = checked; break;
     case CMD_SPEAK: speak_tools = checked; break;
     case CMD_NOTICES: DoNotices = checked; MustUpdateOptions = 1; break;
@@ -1298,6 +1309,21 @@ static int easy(struct Window *win, const char *text, const char *gadgets)   /* 
     es.es_StructSize = sizeof(struct EasyStruct); es.es_Flags = 0;
     es.es_Title = (CONST_STRPTR)"Micropolis"; es.es_TextFormat = (CONST_STRPTR)text; es.es_GadgetFormat = (CONST_STRPTR)gadgets;
     return (int)EasyRequestArgs(win, &es, NULL, NULL);
+}
+
+static int ask_quit(struct Window *win)                 /* 1 = quit now, 0 = stay */
+{
+    char path[256];
+    int r;
+    if (!tool_used && (long)CityTime == clean_time) return 1;       /* nothing to lose */
+    r = easy(win, T("Quit Micropolis?\nThe city has changed since it was last saved."), T("Save and quit|Quit|Cancel"));
+    if (r == 2) return 1;
+    if (r != 1) return 0;
+    if (CityFileName) { strncpy(path, CityFileName, sizeof path - 1); path[sizeof path - 1] = 0; }
+    else if (!ask_file(win, 1, path, sizeof path)) return 0;
+    else { size_t l = strlen(path); if (l < 4 || strcasecmp(path + l - 4, ".cty")) strncat(path, ".cty", sizeof path - l - 1); }
+    save_city(win, path);
+    return save_state == 1;
 }
 
 static int pick_scenario(struct Window *win)             /* 1..8, 0 = back */
@@ -1528,6 +1554,8 @@ static int real_main(int argc, char **argv)
     logmsg("sim_init done");
     if (!LoadCity((char *)city)) { fail(T("Cannot load the city file '%s'."), city); goto out; }
     logmsg("city loaded");
+    clean_time = (long)CityTime; tool_used = 0;
+    if (CityTax == 0) CityTax = 7;                        /* the default city (haight.cty) was saved with 0 %; the original starts with 7 % */
     sprintf(status_msg, "Micropolis %s (%s)", VERSION, BUILD_REV);
     view_x = WORLD_X / 2 - VIEW_COLS / 2;
     view_y = WORLD_Y / 2 - VIEW_ROWS / 2;
@@ -1660,6 +1688,7 @@ static int real_main(int argc, char **argv)
         start_pending = start_menu && argc <= 2;                  /* not for test runs (debug arguments) */
         if (!strncmp(a, "show=", 5)) debug_show = 1;
         if (!strcmp(a, "show=about")) { show_about(); dbg_about = 1; }
+        if (!strcmp(a, "newcity")) do_command(CMD_NEW, win, NULL);
         if (!strcmp(a, "det")) { dbg_det = 1; DoAnimation = 0; ambient_on = 0; }
         if (!strncmp(a, "dump=", 5)) strncpy(dbg_dump, a + 5, sizeof dbg_dump - 1);
         if (!strcmp(a, "show=eval")) open_info_panel(P_EVAL);              /* debug: open a panel at start */
@@ -1704,7 +1733,7 @@ static int real_main(int argc, char **argv)
             if (cls == IDCMP_REFRESHWINDOW) {                    /* part of a window was uncovered: draw it again */
                 BeginRefresh(mw);
                 if (pi >= 0) panel_render(pi);
-                else { full_redraw = 1; first_present = 1; toolbar_dirty = status_dirty = demand_dirty = 1; last_line1[0] = last_line2[0] = 0; render_frame(win); }
+                else { full_redraw = 1; first_present = 1; toolbar_dirty = status_dirty = demand_dirty = 1; tb_label_only = 0; last_line1[0] = last_line2[0] = 0; render_frame(win); }
                 EndRefresh(mw, TRUE);
                 if (refresh_full && pi < 0) { refresh_full = 0; full_redraw = 1; dirty = 1; }
                 continue;
@@ -1733,7 +1762,7 @@ static int real_main(int argc, char **argv)
                 case 0x22: view_x++; break;
                 case 0x20: view_x--; break;
                 case 0x5f: show_help(); break;                                       /* Help key */
-                case 0x45: if (pi >= 0) panels[pi].close(); else running = 0; break;   /* Esc: closes the active panel window, else quits */
+                case 0x45: if (pi >= 0) panels[pi].close(); else if (ask_quit(win)) running = 0; break;   /* Esc: closes the active panel window, else quits */
                 case 0x44: case 0x40: if (pi >= 0) panels[pi].close(); break;          /* Return, Space */
                 case 0x4c: view_y--; break;                               /* cursor keys scroll */
                 case 0x4d: view_y++; break;
@@ -1768,7 +1797,7 @@ static int real_main(int argc, char **argv)
                 int wx = (view_x << 4) + (mx - TB_W), wy = (view_y << 4) + (my - BAR_H);
                 mouse_x = mx; mouse_y = my;
                 {   int th = tool_at(mx, my);
-                    if (th != tool_hover) { tool_hover = th; toolbar_dirty = 1; }
+                    if (th != tool_hover) { tool_hover = th; if (!toolbar_dirty) tb_label_only = 1; toolbar_dirty = 1; }
                 }
                 if (inview) { hover_x = wx >> 4; hover_y = wy >> 4; } else hover_x = -1;
                 if (cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) {
@@ -1777,11 +1806,12 @@ static int real_main(int argc, char **argv)
                         if (i >= 0) {
                             static const char *const tool_sound[18] = { "res", "com", "ind", "fire", "query", "police", "wire", "bulldozer", "rail",
                                                                          "road", "chalk", "eraser", "stadium", "park", "seaport", "coal", "nuclear", "airport" };
-                            editor.tool_state = i; toolbar_dirty = 1;
+                            editor.tool_state = i; toolbar_dirty = 1; tb_label_only = 0;
                             if (UserSoundOn && speak_tools && editor.tool_state >= 0 && editor.tool_state < 18) sound_play(tool_sound[editor.tool_state]);   /* like the original palette */
                         }
                     } else if (inview) {
                         ToolDown(&editor, wx, wy);
+                        if (editor.tool_state != queryState && editor.tool_state != chalkState && editor.tool_state != eraserState) tool_used = 1;
                         dragging = 1; drag_x = wx; drag_y = wy;
                     }
                 } else if (cls == IDCMP_MOUSEBUTTONS && code == SELECTUP) {
