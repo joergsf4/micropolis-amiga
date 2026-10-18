@@ -87,6 +87,8 @@ CASES = [
     ('budget-de', 'show=budget lang=deutsch', [('scr', 'Steuereinnahmen', True), ('scr', '$1,000,000', True), ('scr', 'Weiter', True)]),
     ('eval-en', 'show=eval', [('scr', 'City Evaluation', True), ('scr', 'Population', True), ('scr', 'Statistics:', True)]),
     ('eval-de', 'show=eval lang=deutsch', [('scr', 'Stadtbewertung', True), ('scr', 'Einwohner', True)]),
+    ('sound-en', 'show=sound', [('scr', 'Effects volume', True), ('scr', 'Ambient sounds', True), ('scr', 'Speak tool names', True), ('scr', 'Close', True)]),
+    ('sound-de', 'show=sound lang=deutsch', [('scr', 'Lautst\xe4rke Effekte', True), ('scr', 'Hintergrundger\xe4usche', True), ('scr', 'Schlie\xdfen', True)]),
     ('graph-pl', 'show=graph lang=polski', [('scr', 'Wykresy', True), ('scr', 'Zamknij', True)]),
     ('status-de', 'show=none lang=deutsch', [('fb', 'Tempo 2', True), ('fb', 'Geld:', True), ('fb', 'Abfrage', True)]),
     ('save', 'show=none savetest', [('log', 'Saved PROGDIR:cities/savetest.cty', True)]),

@@ -181,6 +181,9 @@ Verlauf
 S_27CDC1E8
 Übersichtskarte
 ; Overview map
+S_4086C042
+Toneinstellungen
+; Sound options
 S_36386070
 Einw.
 ; Pop
@@ -265,9 +268,9 @@ Auto-Haushalt
 S_6C7CAA7F
 Katastrophen
 ; Disasters
-S_33CA9A34
-Ton
-; Sound
+S_5F6C2B90
+Toneinstellungen...
+; Sound options...
 S_12929962
 Auto-Sprung (zu Ereignissen)
 ; Auto Goto (jump to events)
@@ -277,12 +280,6 @@ Animation
 S_78611FD5
 Meldungen
 ; Messages
-S_4D91B961
-Hintergrundgeräusche
-; Ambient sounds
-S_7AF7D57D
-Werkzeugnamen sprechen
-; Speak tool names
 S_4732F292
 Startmenü beim Start
 ; Start menu at launch
@@ -535,6 +532,21 @@ Ton: datatypes.library fehlt
 S_1B092D66
 Ton: Datatype, %d abgespielt, %d nicht ladbar
 ; Sound: datatype, %d played, %d not loadable
+S_33CA9A34
+Ton
+; Sound
+S_4D91B961
+Hintergrundgeräusche
+; Ambient sounds
+S_7AF7D57D
+Werkzeugnamen sprechen
+; Speak tool names
+S_7F5A0A99
+Lautstärke Effekte
+; Effects volume
+S_1B98141B
+Lautstärke Hintergrund
+; Ambient volume
 S_31DD9521
 Niedrig
 ; Low

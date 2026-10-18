@@ -181,6 +181,9 @@ Wykresy
 S_27CDC1E8
 Mapa przegladowa
 ; Overview map
+S_4086C042
+Ustawienia dzwieku
+; Sound options
 S_36386070
 Ludn.
 ; Pop
@@ -265,9 +268,9 @@ Auto-budzet
 S_6C7CAA7F
 Katastrofy
 ; Disasters
-S_33CA9A34
-Dzwiek
-; Sound
+S_5F6C2B90
+Ustawienia dzwieku...
+; Sound options...
 S_12929962
 Auto-skok (do zdarzen)
 ; Auto Goto (jump to events)
@@ -277,12 +280,6 @@ Animacja
 S_78611FD5
 Komunikaty
 ; Messages
-S_4D91B961
-Dzwieki tla
-; Ambient sounds
-S_7AF7D57D
-Nazwy narzedzi glosem
-; Speak tool names
 S_4732F292
 Menu startowe
 ; Start menu at launch
@@ -535,6 +532,21 @@ Dzwiek: brak datatypes.library
 S_1B092D66
 Dzwiek: datatype, odtworzono %d, nie wczytano %d
 ; Sound: datatype, %d played, %d not loadable
+S_33CA9A34
+Dzwiek
+; Sound
+S_4D91B961
+Dzwieki tla
+; Ambient sounds
+S_7AF7D57D
+Nazwy narzedzi glosem
+; Speak tool names
+S_7F5A0A99
+Glosnosc efektow
+; Effects volume
+S_1B98141B
+Glosnosc tla
+; Ambient volume
 S_31DD9521
 Niski
 ; Low

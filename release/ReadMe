@@ -77,8 +77,8 @@ Tool keys      b bulldozer, r road, p park, t wire, x rail, z query (as in the o
 Start          at launch you choose: New city, Load city, Scenario or the default city (Options/Start menu at launch)
 Tool icons     uniform 32x32 set by default; Options/Classic tool icons switches to the original pictures
 Level          menu Level: Easy/Medium/Hard (start funds of a new city, saved in the preferences)
-Ambient sounds quiet sea / city / nature loops that follow the visible part of the map (Options menu)
-Options        Auto Goto, Animation, Messages, Message windows can be switched off; "Speak tool names" is off by default
+Ambient sounds quiet sea / city / nature loops that follow the visible part of the map (Options > Sound options)
+Options        Auto Goto, Animation, Messages, Message windows can be switched off; sound switches, volume sliders and "Speak tool names" (off by default) are in Options > Sound options
 Scenarios      menu Scenarios: 8 historic disasters/challenges with story and goal
 Help           Help key, or menu Project/Help (Micropolis.guide, AmigaGuide)
 Preferences    screen mode, options, speed, level and window positions are remembered (ENVARC:Micropolis.prefs)

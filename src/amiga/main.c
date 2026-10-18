@@ -12,6 +12,7 @@
 #include "graph_ui.h"
 #include "gfx.h"
 #include "sound.h"
+#include "sound_ui.h"
 #include "l10n.h"
 #undef GetSprite
 #include <stdio.h>
@@ -92,19 +93,18 @@ static ULONG pref_mode = 0xffffffffUL;          /* remembered RTG mode id, pictu
 static int pref_w, pref_h, pref_depth;
 static int pref_level;                          /* difficulty 0 easy, 1 medium, 2 hard */
 enum { O_BULLDOZE, O_BUDGET, O_DISASTERS, O_SOUND, O_AUTOGO, O_ANIM, O_MSGS, O_NOTICES, O_SPEAK, O_STARTMENU, O_CLASSIC, O_AMBIENT, N_OPT };
-static int ambient_on = 1;                       /* background sounds that follow the visible part of the map */
 static int classic_icons;                        /* 1 = the original tool palette pictures, 0 = the uniform 32x32 set */
 static int start_pending;
 static int refresh_full;                   /* the next window refresh must be followed by a complete redraw (the picture changed while a requester covered it) */
 static int start_menu = 1;                       /* ask what to start with: new city, load, scenario */
-static int speak_tools;                          /* spoken tool names when a tool is chosen (off by default) */
 static const char *const opt_key[N_OPT] = { "AUTOBULLDOZE", "AUTOBUDGET", "DISASTERS", "SOUND", "AUTOGOTO", "ANIMATION", "MESSAGES", "MESSAGEWINDOWS", "SPEAKTOOLS", "STARTMENU", "CLASSICICONS", "AMBIENT" };
 static int pref_opt[N_OPT] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };     /* -1 = not saved yet: keep the default */
 static int pref_speed = -1;
+static int pref_fxvol = -1, pref_ambvol = -1;      /* volume sliders of the sound window (-1 = default) */
 static char pref_lang[24];                       /* "" = the system's preferred language, else "english" "deutsch" "polski" */
 static char arg_lang[24];                        /* lang= argument or LANGUAGE tooltype: wins over the preferences */
-#define N_WINPOS 6                              /* NPANELS */
-static int pref_wx[N_WINPOS] = { -1, -1, -1, -1, -1, -1 }, pref_wy[N_WINPOS] = { -1, -1, -1, -1, -1, -1 };   /* remembered window positions */
+#define N_WINPOS 7                              /* NPANELS */
+static int pref_wx[N_WINPOS] = { -1, -1, -1, -1, -1, -1, -1 }, pref_wy[N_WINPOS] = { -1, -1, -1, -1, -1, -1, -1 };   /* remembered window positions */
 static int opt_get(int o)
 {
     switch (o) {
@@ -137,6 +137,8 @@ static void prefs_load(void)
             else if (!strncmp(line, "DEPTH=", 6)) pref_depth = atoi(line + 6);
             else if (!strncmp(line, "LANGUAGE=", 9)) { strncpy(pref_lang, line + 9, sizeof pref_lang - 1); pref_lang[strcspn(pref_lang, "\r\n")] = 0; }
             else if (!strncmp(line, "SPEED=", 6)) { pref_speed = atoi(line + 6); if (pref_speed < 0 || pref_speed > 3) pref_speed = -1; }
+            else if (!strncmp(line, "SFXVOL=", 7)) { pref_fxvol = atoi(line + 7); if (pref_fxvol < 0 || pref_fxvol > 100) pref_fxvol = -1; }
+            else if (!strncmp(line, "AMBVOL=", 7)) { pref_ambvol = atoi(line + 7); if (pref_ambvol < 0 || pref_ambvol > 100) pref_ambvol = -1; }
             else if (!strncmp(line, "WIN", 3) && line[3] >= '0' && line[3] < '0' + N_WINPOS && line[4] == '=') {
                 int x, y;
                 if (sscanf(line + 5, "%d,%d", &x, &y) == 2) { pref_wx[line[3] - '0'] = x; pref_wy[line[3] - '0'] = y; }
@@ -162,6 +164,7 @@ static void prefs_save(void)
         fprintf(f, "ASK=%d\nMODE=%lx\nSIZE=%dx%d\nDEPTH=%d\nLEVEL=%d\n", pref_ask, (unsigned long)pref_mode, pref_w, pref_h, pref_depth, pref_level);
         for (int o = 0; o < N_OPT; o++) fprintf(f, "%s=%d\n", opt_key[o], pref_opt[o] >= 0 ? pref_opt[o] : opt_get(o));
         fprintf(f, "SPEED=%d\n", pref_speed >= 0 ? pref_speed : 3);
+        fprintf(f, "SFXVOL=%d\nAMBVOL=%d\n", sound_fx_vol, sound_amb_vol);
         fprintf(f, "LANGUAGE=%s\n", pref_lang);
         for (int i = 0; i < N_WINPOS; i++) if (pref_wx[i] >= 0) fprintf(f, "WIN%d=%d,%d\n", i, pref_wx[i], pref_wy[i]);
         fclose(f);
@@ -184,6 +187,7 @@ static char save_msg[300];
 static int dirty = 1;
 static int toolbar_dirty_ext;              /* set by ui_update_heads(), picked up by the renderer */
 static int map_dirty = 1;
+static int sound_dirty = 1;
 static int budget_dirty = 1, notice_dirty = 1, eval_dirty = 1, graph_dirty = 1, query_dirty = 1;
 static int query_visible;
 static char query_f[6][24];                /* zone, density, value, crime, pollution, growth of the queried tile */   /* a panel must be redrawn */
@@ -597,7 +601,7 @@ struct panel {
     int wants_move;                          /* also wants IDCMP_MOUSEMOVE (the map drags) */
     struct Window *win;
 };
-enum { P_NOTICE, P_BUDGET, P_EVAL, P_GRAPH, P_QUERY, P_MAP, NPANELS };
+enum { P_NOTICE, P_BUDGET, P_EVAL, P_GRAPH, P_QUERY, P_MAP, P_SOUND, NPANELS };
 #define QUERY_X 0
 #define QUERY_Y 0
 #define QUERY_W 236
@@ -609,6 +613,7 @@ static int map_panel_dirty = 1, map_view_x = -1, map_view_y = -1;
 static void draw_notice(void) { gfx_target(scratch, SCRATCH_STRIDE); notice_draw(scratch, SCRATCH_STRIDE); notice_text(); }
 static void draw_budget(void) { gfx_target(scratch, SCRATCH_STRIDE); budget_draw(scratch, SCRATCH_STRIDE); budget_text(); }
 static void draw_eval(void)   { gfx_target(scratch, SCRATCH_STRIDE); eval_draw(scratch, SCRATCH_STRIDE); }
+static void draw_sound(void) { gfx_target(scratch, SCRATCH_STRIDE); sound_ui_draw(scratch, SCRATCH_STRIDE); }
 static void draw_graph(void)  { gfx_target(scratch, SCRATCH_STRIDE); graph_draw(scratch, SCRATCH_STRIDE); }
 static void draw_map(void)    { map_blit(scratch, SCRATCH_STRIDE, 1, 1, view_x, view_y, VIEW_COLS, VIEW_ROWS); }
 static void draw_query(void)
@@ -630,6 +635,7 @@ static struct panel panels[NPANELS] = {
     { N_("History"),             &graph_visible,  &graph_dirty,  GRAPH_X, GRAPH_Y, GRAPH_W, GRAPH_H, draw_graph, graph_click, graph_close, 0, 0, NULL },
     { N_("Query"),               &query_visible,  &query_dirty,  QUERY_X, QUERY_Y, QUERY_W, QUERY_H, draw_query, NULL, close_query, 1, 0, NULL },
     { N_("Overview map"),        &map_visible,    &map_panel_dirty, 0, 0, MAPWIN_W, MAPWIN_H, draw_map, NULL, close_map, 2, 1, NULL },
+    { N_("Sound options"),       &sound_visible,  &sound_dirty,  SND_X, SND_Y, SND_W, SND_H, draw_sound, NULL, sound_ui_close, 0, 1, NULL },
 };
 
 static void open_info_panel(int which)       /* menu / key: show or hide a window */
@@ -941,7 +947,7 @@ static void render_frame(struct Window *win)
 /* ---------- menus and commands ---------- */
 enum { CMD_NEW = 1, CMD_LOAD, CMD_SAVE, CMD_SAVEAS, CMD_QUIT,
        CMD_PAUSE = 10, CMD_SLOW, CMD_MEDIUM, CMD_FAST,
-       CMD_AUTOBULLDOZE = 20, CMD_AUTOBUDGET, CMD_DISASTERS, CMD_SOUND, CMD_ASKMODE, CMD_AUTOGO, CMD_ANIM, CMD_MSGS, CMD_NOTICES, CMD_OVERLAY, CMD_LEVEL = 60, CMD_SPEAK = 65, CMD_STARTMENU = 66, CMD_CLASSIC = 67, CMD_LANG = 70, CMD_AMBIENT = 75,
+       CMD_AUTOBULLDOZE = 20, CMD_AUTOBUDGET, CMD_DISASTERS, CMD_SOUND, CMD_ASKMODE, CMD_AUTOGO, CMD_ANIM, CMD_MSGS, CMD_NOTICES, CMD_OVERLAY, CMD_LEVEL = 60, CMD_SPEAK = 65, CMD_STARTMENU = 66, CMD_CLASSIC = 67, CMD_LANG = 70, CMD_AMBIENT = 75, CMD_SOUNDWIN = 76,
        CMD_ABOUT = 44, CMD_HELP = 45, CMD_SCEN = 200, CMD_BUDGET = 40, CMD_MAP = 41, CMD_EVAL = 42, CMD_GRAPHS = 43, CMD_MAPMODE = 100,
        CMD_FIRE = 30, CMD_FLOOD, CMD_TORNADO, CMD_QUAKE, CMD_MONSTER, CMD_MELTDOWN };
 
@@ -985,12 +991,10 @@ static struct Menu *make_menus(struct Screen *scr, APTR *vi_out)
     mi(NM_ITEM, T("Auto Bulldoze"), NULL, CHECKIT | MENUTOGGLE | (autoBulldoze ? CHECKED : 0), CMD_AUTOBULLDOZE);
     mi(NM_ITEM, T("Auto Budget"), NULL, CHECKIT | MENUTOGGLE | (autoBudget ? CHECKED : 0), CMD_AUTOBUDGET);
     mi(NM_ITEM, T("Disasters"), NULL, CHECKIT | MENUTOGGLE | (NoDisasters ? 0 : CHECKED), CMD_DISASTERS);
-    mi(NM_ITEM, T("Sound"), NULL, CHECKIT | MENUTOGGLE | (UserSoundOn ? CHECKED : 0), CMD_SOUND);
+    mi(NM_ITEM, T("Sound options..."), NULL, 0, CMD_SOUNDWIN);
     mi(NM_ITEM, T("Auto Goto (jump to events)"), NULL, CHECKIT | MENUTOGGLE | (autoGo ? CHECKED : 0), CMD_AUTOGO);
     mi(NM_ITEM, T("Animation"), NULL, CHECKIT | MENUTOGGLE | (DoAnimation ? CHECKED : 0), CMD_ANIM);
     mi(NM_ITEM, T("Messages"), NULL, CHECKIT | MENUTOGGLE | (DoMessages ? CHECKED : 0), CMD_MSGS);
-    mi(NM_ITEM, T("Ambient sounds"), NULL, CHECKIT | MENUTOGGLE | (ambient_on ? CHECKED : 0), CMD_AMBIENT);
-    mi(NM_ITEM, T("Speak tool names"), NULL, CHECKIT | MENUTOGGLE | (speak_tools ? CHECKED : 0), CMD_SPEAK);
     mi(NM_ITEM, T("Start menu at launch"), NULL, CHECKIT | MENUTOGGLE | (start_menu ? CHECKED : 0), CMD_STARTMENU);
     mi(NM_ITEM, T("Classic tool icons"), NULL, CHECKIT | MENUTOGGLE | (classic_icons ? CHECKED : 0), CMD_CLASSIC);
     mi(NM_ITEM, T("Message windows"), NULL, CHECKIT | MENUTOGGLE | (DoNotices ? CHECKED : 0), CMD_NOTICES);
@@ -1063,7 +1067,7 @@ static void ambient_update(void)
 {
     long water = 0, built = 0, infra = 0, total;
     int sea_dom, city_dom, nat;
-    if (!ambient_on || !UserSoundOn || SimSpeed == 0) { ambient_set(0, 0, 0); return; }
+    if (!ambient_on || !UserSoundOn) { ambient_set(0, 0, 0); return; }          /* it keeps playing while the game is paused */
     for (int row = 0; row < VIEW_ROWS; row++) {
         for (int col = 0; col < VIEW_COLS; col++) {
             int mx = view_x + col, my = view_y + row, w, t;
@@ -1091,7 +1095,9 @@ static void ambient_update(void)
         city_dom = (int)(cd < 0 ? 0 : cd > 100 ? 100 : cd);
     }
     nat = 100 - (sea_dom > city_dom ? sea_dom : city_dom);                          /* nature fills in what neither dominates */
-    ambient_set(sea_dom * AMB_MAX / 100, city_dom * AMB_MAX / 100, nat * AMB_MAX / 100);
+    {   int mx = AMB_MAX * 2 * sound_amb_vol / 100;                 /* slider 50 % = the old default level */
+        ambient_set(sea_dom * mx / 100, city_dom * mx / 100, nat * mx / 100);
+    }
     if (debug_log) { static int last[3] = { -1, -1, -1 }; if (last[0] != sea_dom || last[1] != city_dom || last[2] != nat) {
         char b[96]; sprintf(b, "ambient: sea %d city %d nature %d (water %ld%%, built %ld%%, infra %ld%%)", sea_dom, city_dom, nat, water * 100 / total, built * 100 / total, infra * 100 / total);
         logmsg(b); last[0] = sea_dom; last[1] = city_dom; last[2] = nat; } }
@@ -1295,6 +1301,7 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
         sprintf(status_msg, pref_ask ? T("The screen mode will be asked at the next start.") : T("This screen mode is used from now on."));
         break;
     case CMD_BUDGET: DoBudgetFromMenu(); break;
+    case CMD_SOUNDWIN: open_info_panel(P_SOUND); break;
     case CMD_EVAL: open_info_panel(P_EVAL); break;
     case CMD_GRAPHS: open_info_panel(P_GRAPH); break;
     case CMD_MAP: map_visible = !map_visible; map_dirty = 1; break;
@@ -1567,6 +1574,8 @@ static int real_main(int argc, char **argv)
     view_y = WORLD_Y / 2 - VIEW_ROWS / 2;
     clamp_view();
 
+    if (pref_fxvol >= 0) sound_fx_vol = pref_fxvol;
+    if (pref_ambvol >= 0) sound_amb_vol = pref_ambvol;
     for (int o = 0; o < N_OPT; o++) if (pref_opt[o] >= 0) opt_set(o, pref_opt[o]);     /* saved options (before the menus are built) */
     logmsg("view set");
     if (test_mode) { logmsg("test mode: stop before opening the screen"); rc = 0; goto out; }
@@ -1699,6 +1708,7 @@ static int real_main(int argc, char **argv)
         if (!strncmp(a, "dump=", 5)) strncpy(dbg_dump, a + 5, sizeof dbg_dump - 1);
         if (!strcmp(a, "show=eval")) open_info_panel(P_EVAL);              /* debug: open a panel at start */
         if (!strcmp(a, "show=graph")) open_info_panel(P_GRAPH);
+        if (!strcmp(a, "show=sound")) open_info_panel(P_SOUND);
         if (!strcmp(a, "show=budget")) DoBudgetFromMenu();
         if (!strncmp(a, "at=", 3)) { int jx = 0, jy = 0; sscanf(a + 3, "%d,%d", &jx, &jy); view_x = jx; view_y = jy; clamp_view(); }   /* debug: scroll there, keep the speed */
         if (!strncmp(a, "speed=", 6)) do_command(CMD_PAUSE + atoi(a + 6), win, NULL);   /* debug: as the Speed menu */
@@ -1794,6 +1804,10 @@ static int real_main(int argc, char **argv)
                         view_x = tx - VIEW_COLS / 2; view_y = ty - VIEW_ROWS / 2; clamp_view();
                         map_drag = 1;
                     }
+                } else if (pi == P_SOUND) {                        /* sliders: press, drag, release */
+                    int kind = cls == IDCMP_MOUSEMOVE ? 1 : code == SELECTDOWN ? 0 : code == SELECTUP ? 2 : -1;
+                    if (cls == IDCMP_MOUSEMOVE || (cls == IDCMP_MOUSEBUTTONS && kind >= 0))
+                        if (sound_ui_mouse(ax, ay, kind)) sound_dirty = 1;
                 } else if (cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN && pn->click) {
                     pn->click(ax, ay);
                     *pn->dirty = 1;

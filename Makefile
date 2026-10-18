@@ -31,7 +31,7 @@ out/obj/amiga/%.o: src/amiga/%.c $(wildcard src/core/*.h src/amiga/*.h) out/buil
 out/headless: $(CORE_OBJ) out/obj/amiga/ui_core.o out/obj/amiga/stack.o out/obj/amiga/mapview.o out/obj/amiga/headless.o
 	$(CC) $(ARCH) -o $@ $^ -lm
 
-out/micropolis: $(CORE_OBJ) out/obj/amiga/ui_core.o out/obj/amiga/stack.o out/obj/amiga/gfx.o out/obj/amiga/l10n.o out/obj/amiga/sound.o out/obj/amiga/budget_ui.o out/obj/amiga/notice_ui.o out/obj/amiga/eval_ui.o out/obj/amiga/graph_ui.o out/obj/amiga/mapview.o out/obj/amiga/main.o
+out/micropolis: $(CORE_OBJ) out/obj/amiga/ui_core.o out/obj/amiga/stack.o out/obj/amiga/gfx.o out/obj/amiga/l10n.o out/obj/amiga/sound.o out/obj/amiga/sound_ui.o out/obj/amiga/budget_ui.o out/obj/amiga/notice_ui.o out/obj/amiga/eval_ui.o out/obj/amiga/graph_ui.o out/obj/amiga/mapview.o out/obj/amiga/main.o
 	$(CC) $(ARCH) -o $@ $^ -lm
 
 out/listmodes: src/amiga/listmodes.c

@@ -121,6 +121,8 @@ S_7D96597F (2107005311//)
 History
 S_27CDC1E8 (667795944//)
 Overview map
+S_4086C042 (1082572866//)
+Sound options
 S_36386070 (909664368//)
 Pop
 S_0A6B8020 (174817312//)
@@ -177,18 +179,14 @@ S_566DEBE3 (1450044387//)
 Auto Budget
 S_6C7CAA7F (1820109439//)
 Disasters
-S_33CA9A34 (868915764//)
-Sound
+S_5F6C2B90 (1600924560//)
+Sound options...
 S_12929962 (311597410//)
 Auto Goto (jump to events)
 S_41E389FD (1105431037//)
 Animation
 S_78611FD5 (2019631061//)
 Messages
-S_4D91B961 (1301395809//)
-Ambient sounds
-S_7AF7D57D (2063062397//)
-Speak tool names
 S_4732F292 (1194521234//)
 Start menu at launch
 S_3539FD2D (892992813//)
@@ -357,6 +355,16 @@ S_365AA42E (911909934//)
 Sound: datatypes.library missing
 S_1B092D66 (453586278//)
 Sound: datatype, %d played, %d not loadable
+S_33CA9A34 (868915764//)
+Sound
+S_4D91B961 (1301395809//)
+Ambient sounds
+S_7AF7D57D (2063062397//)
+Speak tool names
+S_7F5A0A99 (2136607385//)
+Effects volume
+S_1B98141B (462951451//)
+Ambient volume
 S_31DD9521 (836605217//)
 Low
 S_3E0A061D (1040844317//)
