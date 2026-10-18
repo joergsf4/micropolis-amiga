@@ -42,37 +42,36 @@ void hwy_make_tiles(UBYTE *dst)
     }
 }
 
-/* Cars: little 2x3 pixel cars, one every 44 pixels per lane (two thirds of the slots), 2 pixels per step; the left carriageway runs one way, the right
- * one the other, two lanes each. The pattern hangs on the world position, so the cars run on across tile borders. Only plain
- * asphalt is painted over. (A "mouse cinema" like the traffic on the ordinary roads, not big blocks.) */
+/* Cars: the same little cars as on the ordinary roads (tiles 80 and 81 of the original: 5x3 pixels across, 3x5 lengthwise,
+ * white / grey / light grey with a black shadow edge), one lane per carriageway, one car every 24 pixels, a quarter of the
+ * places empty. The left carriageway runs one way, the right one the other. The pattern hangs on the world position, so the
+ * cars run on across tile borders. */
 void hwy_cars(UBYTE *dst, int stride, int tile, int wx, int wy, int tick)
 {
-    static const UBYTE col[2] = { 10, 14 };                         /* white and light grey: no colours, like the traffic on the roads */
+    static const UBYTE H[3][5] = { { 10, 7, 7, 14, 3 }, { 10, 7, 7, 14, 3 }, { 3, 3, 3, 3, 3 } };       /* across: 5 wide, 3 high */
+    static const UBYTE V[5][3] = { { 10, 10, 3 }, { 7, 7, 3 }, { 7, 7, 3 }, { 14, 14, 3 }, { 3, 3, 3 } };  /* lengthwise: 3 wide, 5 high */
     int mask = tile - 960, arms = mask ? mask : 5;
     int junction = ((arms & 5) && (arms & 10));
-    int off = (tick & 0xFFFFF) * 2 % 44;                              /* how far the cars have moved, never negative */
+    int off = (tick & 0xFFFFF) * 2 % 24;                              /* how far the cars have moved, never negative */
     for (int y = 0; y < 16; y++)
         for (int x = 0; x < 16; x++) {
-            int px = wx + x, py = wy + y, pos, c, lane = -1, a;
+            int px = wx + x, py = wy + y, a, u, c, col, row;
             UBYTE *d = dst + y * stride + x;
-            if (*d != P_ASPHALT) continue;
             if (junction && x >= 4 && x <= 11 && y >= 4 && y <= 11) continue;
-            if (((arms & 1) && y <= 7) || ((arms & 4) && y >= 8)) {              /* vertical arms: 4 lanes at x 2-3, 5-6, 9-10, 12-13 */
-                if (x == 2 || x == 3) lane = 0; else if (x == 5 || x == 6) lane = 1; else if (x == 9 || x == 10) lane = 2; else if (x == 12 || x == 13) lane = 3;
+            if (((arms & 1) && y <= 7) || ((arms & 4) && y >= 8)) {              /* vertical arms: lanes at x 3-5 (down) and 10-12 (up) */
+                int lane = (x >= 3 && x <= 5) ? 0 : (x >= 10 && x <= 12) ? 1 : -1;
                 if (lane >= 0) {
-                    a = (lane < 2) ? py + off : py - off + 44;                          /* left carriageway down, right one up */
-                    a += lane * 19;
-                    pos = a % 44; c = a / 44;
-                    if (pos < 3 && ((c * 7 + lane * 5 + (px >> 5)) % 3) != 0) *d = col[(c + lane) & 1];
+                    a = lane == 0 ? py + off : py - off + 24 + 7;
+                    u = a % 24; c = a / 24; col = x - (lane == 0 ? 3 : 10);
+                    if (u < 5 && ((c * 7 + lane * 5) % 4) != 0) *d = V[u][col];
                 }
             }
-            if (lane < 0 && (((arms & 2) && x >= 8) || ((arms & 8) && x <= 7))) {    /* horizontal arms: lanes at y 2-3, 5-6, 9-10, 12-13 */
-                if (y == 2 || y == 3) lane = 0; else if (y == 5 || y == 6) lane = 1; else if (y == 9 || y == 10) lane = 2; else if (y == 12 || y == 13) lane = 3;
+            if (((arms & 2) && x >= 8) || ((arms & 8) && x <= 7)) {              /* horizontal arms: lanes at y 3-5 (west) and 10-12 (east) */
+                int lane = (y >= 3 && y <= 5) ? 0 : (y >= 10 && y <= 12) ? 1 : -1;
                 if (lane >= 0) {
-                    a = (lane < 2) ? px - off + 44 : px + off;                          /* upper carriageway west, lower one east */
-                    a += lane * 19;
-                    pos = a % 44; c = a / 44;
-                    if (pos < 3 && ((c * 7 + lane * 5 + (py >> 5)) % 3) != 0) *d = col[(c + lane) & 1];
+                    a = lane == 0 ? px - off + 24 : px + off + 11;
+                    u = a % 24; c = a / 24; row = y - (lane == 0 ? 3 : 10);
+                    if (u < 5 && ((c * 7 + lane * 5) % 4) != 0) *d = H[row][u];
                 }
             }
         }
