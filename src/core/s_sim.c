@@ -164,6 +164,7 @@ Simulate(int mod16)
 
       if (!(CityTime % TAXFREQ))  {
 	CollectTax();
+	HubYearRoll();
 	CityEvaluation();
       }
       break;

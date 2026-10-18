@@ -193,6 +193,8 @@ static int map_dirty = 1;
 static int sound_dirty = 1;
 static int budget_dirty = 1, notice_dirty = 1, eval_dirty = 1, graph_dirty = 1, query_dirty = 1;
 static int query_visible;
+static char query_k[3][24], query_v[3][24];   /* extra lines about traffic (traffic rules): key and value */
+static int query_n;
 static char query_f[6][24];                /* zone, density, value, crime, pollution, growth of the queried tile */   /* a panel must be redrawn */
 static int demand_r, demand_c, demand_i, demand_dirty = 1;   /* -15..15, from "UISetDemand" */
 static void clamp_view(void);
@@ -266,7 +268,25 @@ int ui_eval(const char *cmd)
             copy_braced(query_f[i], sizeof query_f[i], q);
             if (!(q = strchr(q, '}'))) break;
         }
+        query_n = 0;
         query_visible = 1; query_dirty = 1; dirty = 1;
+    }
+    else if (!strncmp(cmd, "UIShowTrafficStatus", 19)) {         /* {Key|value} up to three times, right after UIShowZoneStatus */
+        const char *q = cmd;
+        query_n = 0;
+        while (query_n < 3 && (q = strchr(q, '{'))) {
+            const char *e = strchr(q, '}'), *bar = e ? memchr(q, '|', (size_t)(e - q)) : NULL;
+            size_t kl, vl;
+            if (!e || !bar) break;
+            kl = (size_t)(bar - q - 1); vl = (size_t)(e - bar - 1);
+            if (kl > 23) kl = 23;
+            if (vl > 23) vl = 23;
+            memcpy(query_k[query_n], q + 1, kl); query_k[query_n][kl] = 0;
+            memcpy(query_v[query_n], bar + 1, vl); query_v[query_n][vl] = 0;
+            query_n++;
+            q = e + 1;
+        }
+        query_dirty = 1; dirty = 1;
     }
     else if (!strncmp(cmd, "UISetEvaluation ", 16))  { eval_set(cmd); eval_dirty = 1; dirty = 1; }
     else if (!strncmp(cmd, "UISetOptions ", 13) || !strncmp(cmd, "UISetGameLevel ", 15)) { menu_sync_pending = 1; dirty = 1; }   /* a loaded city brings its own options and level: show them in the menu */
@@ -623,7 +643,7 @@ enum { P_NOTICE, P_BUDGET, P_EVAL, P_GRAPH, P_QUERY, P_MAP, P_SOUND, NPANELS };
 #define QUERY_X 0
 #define QUERY_Y 0
 #define QUERY_W 236
-#define QUERY_H 112
+#define QUERY_H 164
 #define MAPWIN_W (MV_W + 2)
 #define MAPWIN_H (MV_H + 2)
 static int map_panel_dirty = 1, map_view_x = -1, map_view_y = -1;
@@ -642,6 +662,11 @@ static void draw_query(void)
     gfx_colors(PEN_TEXT, PEN_BAR);
     gfx_print(QUERY_X + 8, QUERY_Y + 18, T("Query zone status"));
     for (int i = 0; i < 6; i++) { gfx_print(QUERY_X + 8, QUERY_Y + 36 + i * 13, T(label[i])); gfx_print(QUERY_X + 8 + 88, QUERY_Y + 36 + i * 13, T(query_f[i])); }
+    for (int i = 0; i < query_n; i++) {                                                  /* traffic lines (traffic rules) */
+        int y = QUERY_Y + 36 + (6 + i) * 13 + 8;
+        gfx_colors(PEN_V_YELLOW, PEN_BAR);
+        gfx_print(QUERY_X + 8, y, T(query_k[i])); gfx_print(QUERY_X + 8 + 120, y, T(query_v[i]));
+    }
 }
 static void close_query(void) { query_visible = 0; }
 static void close_notice(void) { notice_close(); }

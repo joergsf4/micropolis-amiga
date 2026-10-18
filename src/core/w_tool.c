@@ -778,6 +778,8 @@ doZoneStatus(short mapH, short mapV)
 
   if (tileNum >= COALSMOKE1 && tileNum < FOOTBALLGAME1)
     tileNum = COALBASE;
+  if (IsHwy(tileNum))
+    tileNum = ROADBASE;			/* a highway is a road for the name */
 
   found = 1;
   for (x = 1; x < 29 && found; x++) {
@@ -802,6 +804,7 @@ doZoneStatus(short mapH, short mapV)
 
   DoShowZoneStatus(localStr, statusStr[0], statusStr[1],
 		   statusStr[2], statusStr[3], statusStr[4], mapH, mapV);
+  TrafficStatus(mapH, mapV);			/* traffic rules: the lines about traffic, rail and hubs */
 }
 
 

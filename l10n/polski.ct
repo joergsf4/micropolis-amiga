@@ -620,7 +620,7 @@ S_77E17C68
 Odpady radioaktywne
 ; Radioactive Waste
 S_4749A5E6
-Energia
+Prad
 ; Power
 S_3097F575
 Straz pozarna
@@ -1063,3 +1063,24 @@ lis
 S_275E7A73
 gru
 ; Dec
+S_11B5A8FF
+Dojazd koleja
+; Rail link
+S_1B96C33F
+Wplyw ruchu
+; Traffic effect
+S_32E2F1F4
+Polaczone porty
+; Linked hubs
+S_684ED03A
+Przejazdy w tym roku
+; Trips this year
+S_7BA04C1A
+Przejazdy w zeszlym roku
+; Trips last year
+S_13051395
+Dojazd droga
+; Road link
+S_4C200E59
+nieznane
+; Unknown

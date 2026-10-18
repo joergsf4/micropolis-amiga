@@ -84,6 +84,27 @@ short ZoneTested;		/* MakeTraf ran for this zone in this pass */
 short HubX[2][8], HubY[2][8], HubN[2];		/* ports (0) and airports (1) with power: zone centre tiles (of the last complete map scan) */
 short NextHubX[2][8], NextHubY[2][8], NextHubN[2];	/* the scan in progress */
 short HubRX[2][8], HubRY[2][8], NextHubRX[2][8], NextHubRY[2][8];	/* a road tile next to each hub: where a trip enters and leaves it */
+#define HUBSTATS 16
+static struct { short kind, x, y, now, last; } HubStat[HUBSTATS];
+
+static short HubStatFor(short kind, short x, short y)		/* the counter of the hub at x, y (made on first use) */
+{
+  short i, free = -1;
+  for (i = 0; i < HUBSTATS; i++) {
+    if (HubStat[i].x == x && HubStat[i].y == y && HubStat[i].kind == kind + 1) return (i);
+    if (free < 0 && !HubStat[i].kind) free = i;
+  }
+  if (free < 0) free = 0;
+  HubStat[free].kind = kind + 1; HubStat[free].x = x; HubStat[free].y = y; HubStat[free].now = HubStat[free].last = 0;
+  return (free);
+}
+
+void HubYearRoll(void)						/* once a year (at tax time) */
+{
+  short i;
+  for (i = 0; i < HUBSTATS; i++) { HubStat[i].last = HubStat[i].now; HubStat[i].now = 0; }
+}
+
 static short HubSea[8];				/* water body of each port (0 = none), filled by HubWater */
 static short HubSeaFor[8][2], HubSeaN;		/* the port list HubSea was computed for */
 static short Hopped;
@@ -562,9 +583,91 @@ HubHop(void)
   if (!nc) return;
   k = cand[Rand(nc - 1)];
   SMapX = HubRX[kind][k]; SMapY = HubRY[kind][k]; LDir = 5; PosStackN = 0; Hopped = 1; HopCount++;
+  HubStat[HubStatFor(kind, HubX[kind][here], HubY[kind][here])].now++;
+  HubStat[HubStatFor(kind, HubX[kind][k], HubY[kind][k])].now++;
   if (!(Rand16() & 3)) LaunchTransport(kind, here, k);	/* the plane / ship that carries it, now and then */
 }
 
+
+/* ---- what the query tool shows about traffic (UIShowTrafficStatus) ---- */
+static void ZoneAccess(short cx, short cy, short *rail, short *jam)	/* like FindPRoad: a rail tile first, else the road in front */
+{
+  static short PX[12] = {-1, 0, 1, 2, 2, 2, 1, 0,-1,-2,-2,-2};
+  static short PY[12] = {-2,-2,-2,-1, 0, 1, 2, 2, 2, 1, 0,-1};
+  short z, tx, ty, t;
+  *rail = 0; *jam = 0;
+  for (z = 0; z < 12; z++) {
+    tx = cx + PX[z]; ty = cy + PY[z];
+    if (!TestBounds(tx, ty)) continue;
+    t = Map[tx][ty] & LOMASK;
+    if (t >= RAILBASE && t <= LASTRAIL) { *rail = 1; return; }
+  }
+  for (z = 0; z < 12; z++) {
+    tx = cx + PX[z]; ty = cy + PY[z];
+    if (TestBounds(tx, ty) && RoadTest(Map[tx][ty]) && !IsHwy(Map[tx][ty])) { *jam = TrfDensity[tx >>1][ty >>1]; return; }
+  }
+}
+
+void TrafficStatus(short x, short y)				/* sent after UIShowZoneStatus for the tile that was queried */
+{
+  char buf[400], *p = buf;
+  short t, cx, cy, found = 0, k, kind = -1, n = 0, i, j;
+  if (!TestBounds(x, y)) return;
+  t = Map[x][y] & LOMASK;
+
+  p += sprintf(p, "UIShowTrafficStatus");
+  if (!TrafficRules || !TestBounds(x, y)) { Eval(buf); return; }
+  if (IsHwy(t)) {
+    p += sprintf(p, " {Traffic|Highway}");
+  } else if (t >= ROADBASE && t < POWERBASE) {
+    p += sprintf(p, " {Traffic|%d}", (int)TrfDensity[x >>1][y >>1]);
+  } else if (t >= RESBASE && t < COALBASE) {
+    short r = (t < PORTBASE) ? 1 : (t < AIRPORTBASE) ? 2 : 3, best = 99, ct;	/* how far the centre tile can be from any tile of the zone */
+    for (cy = y - r; cy <= y + r; cy++)
+      for (cx = x - r; cx <= x + r; cx++) {
+	if (!TestBounds(cx, cy) || !(Map[cx][cy] & ZONEBIT)) continue;
+	ct = Map[cx][cy] & LOMASK;
+	if (ct < RESBASE || ct >= COALBASE) continue;
+	if (abs(cx - x) + abs(cy - y) < best) { best = abs(cx - x) + abs(cy - y); k = cx; n = cy; found = 1; }
+      }
+    if (found) {
+      cx = k; cy = n; n = 0;
+      ct = Map[cx][cy] & LOMASK;
+      if (ct >= RESBASE && ct < PORTBASE) {					/* a zone: residential, commercial, industrial */
+	short rail, jam, eff;
+	ZoneAccess(cx, cy, &rail, &jam);
+	eff = (jam > 100 ? -(jam - 100) * 6 : 0) + (rail ? 150 : 0);
+	p += sprintf(p, " {Traffic|%d}", (int)jam);
+	p += sprintf(p, " {Rail link|%s}", rail ? "Yes" : "No");
+	p += sprintf(p, " {Traffic effect|%+d}", (int)eff);
+      } else {									/* a port or an airport */
+	kind = (ct < AIRPORTBASE) ? 0 : 1;
+	for (k = 0; k < HubN[kind]; k++)
+	  if (abs(HubX[kind][k] - cx) <= 1 && abs(HubY[kind][k] - cy) <= 1) break;
+	if (k < HubN[kind]) {							/* registered: powered and with a road */
+	  short s = HubStatFor(kind, HubX[kind][k], HubY[kind][k]);
+	  if (kind == 0) HubWater();
+	  for (j = 0; j < HubN[kind]; j++) if (j != k && (kind == 1 || (HubSea[j] && HubSea[j] == HubSea[k]))) n++;
+	  p += sprintf(p, " {Linked hubs|%d}", (int)n);
+	  p += sprintf(p, " {Trips this year|%d}", (int)HubStat[s].now);
+	  p += sprintf(p, " {Trips last year|%d}", (int)HubStat[s].last);
+	} else {
+	  short rr = (kind == 0) ? 4 : 5, road = 0;
+	  for (j = cy - rr; j <= cy + rr && !road; j++)			/* a road touching the hub (as RegisterHub looks for it) */
+	    for (i = cx - rr; i <= cx + rr; i++) {
+	      if (!TestBounds(i, j) || !RoadTest(Map[i][j]) || IsHwy(Map[i][j])) continue;
+	      if ((TestBounds(i, j - 1) && IsHubTile(kind, Map[i][j - 1])) || (TestBounds(i + 1, j) && IsHubTile(kind, Map[i + 1][j])) ||
+		  (TestBounds(i, j + 1) && IsHubTile(kind, Map[i][j + 1])) || (TestBounds(i - 1, j) && IsHubTile(kind, Map[i - 1][j]))) { road = 1; break; }
+	    }
+	  p += sprintf(p, " {Power|%s}", (Map[cx][cy] & PWRBIT) ? "Yes" : "No");
+	  p += sprintf(p, " {Road link|%s}", road ? "Yes" : "No");
+	  if ((Map[cx][cy] & PWRBIT) && road) p += sprintf(p, " {Linked hubs|-}");		/* the next map scan registers it */
+	}
+      }
+    }
+  }
+  Eval(buf);
+}
 
 /* comefrom: TryGo FindPRoad */
 RoadTest(int x)
