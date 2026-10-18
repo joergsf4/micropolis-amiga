@@ -1919,7 +1919,7 @@ static int real_main(int argc, char **argv)
         if (DoAnimation && coast_seen) {                           /* surf: next step every 145 ms (only while shore is on the screen) */
             struct timeval tn; int st;
             gettimeofday(&tn, NULL);
-            st = coast_freeze >= 0 ? coast_freeze : (int)((tn.tv_sec * 1000 + tn.tv_usec / 1000) / 145);
+            st = coast_freeze >= 0 ? coast_freeze : (int)((((unsigned long)tn.tv_sec & 0xFFFF) * 1000UL + (unsigned long)(tn.tv_usec / 1000)) / 145);   /* small enough for 32 bit longs and never negative */
             if (st != coast_tick) { coast_tick = st; dirty = 1; }
         }
         { static int amb_frame; if ((++amb_frame & 31) == 0 || amb_frame == 1) ambient_update(); ambient_tick(); }
