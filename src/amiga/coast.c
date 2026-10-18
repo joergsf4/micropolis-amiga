@@ -76,22 +76,22 @@ void coast_draw(UBYTE *dst, int stride, int tile, int wx, int wy, int tick)
             int i = y * 16 + x, dd = d[i], px = wx + x, py = wy + y, col = 0;
             if (!w[i] || dd > REACH) continue;
             if (t < 8) {                                    /* swell approaching: a crest that gets brighter and wider */
-                int len = 4 + t * 5 / 7;                    /* 4..8 (1/3 pixel) */
+                int len = 3 + t * 2 / 7;                    /* 3..4 (1/3 pixel): thin lines */
                 int off = dd - crest_pos[t];
                 if (off >= 0 && off < len) {
                     int a = ((px + 2 * py) + t * 3 + c * 17) & 63;      /* groups of waves that drift along the coast */
                     if (a < 44) col = t < 3 ? PEN_DARK : t < 6 ? PEN_LIGHT : ((px + py) & 1 ? PEN_FOAM : PEN_LIGHT);
                 }
             } else if (t < 10) {                            /* break: a band of foam along the land */
-                int wide = t == 8 ? 9 : 12;
+                int wide = t == 8 ? 6 : 8;
                 int a = ((px + 2 * py) + 24 + c * 17) & 63;
                 if (dd >= 3 && dd < wide && a < 44) col = ((px + py) & 1) ? PEN_FOAM : PEN_LIGHT;
-                else if (dd >= 3 && dd < 6) col = PEN_LIGHT;
+                else if (dd >= 3 && dd < 5) col = PEN_LIGHT;
             } else {                                        /* backwash: the foam runs back to sea in streaks (rip currents) */
                 int rip = (hash2((px >> 2) + c * 3, py >> 2) & 3) == 0 || (hash2(px >> 2, (py >> 2) + c * 5) & 3) == 0;
                 int out = 6 + (t - 9) * 6;                  /* how far out the streak has got */
-                if (rip && dd >= 6 && dd < out + 3 && dd >= out - 6) col = ((px + py) & 1) ? PEN_LIGHT : PEN_FOAM;
-                else if (t == 10 && dd >= 3 && dd < 6) col = PEN_LIGHT;
+                if (rip && dd >= 6 && dd < out + 2 && dd >= out - 3) col = ((px + py) & 1) ? PEN_LIGHT : PEN_FOAM;
+                else if (t == 10 && dd >= 3 && dd < 5) col = PEN_LIGHT;
             }
             if (col) dst[y * stride + x] = (UBYTE)col;
         }

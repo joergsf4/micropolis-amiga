@@ -375,7 +375,7 @@ static char last_line1[200], last_line2[200];
 
 static struct { long frames, tiles, bytes, render_us, sim_us, sim_steps; } stats;   /* no doubles: the ieee double library is unreliable */
 
-static int coast_tick, coast_seen;                /* animation step of the surf (110 ms each); shore tiles seen in the last picture */
+static int coast_tick, coast_seen;                /* animation step of the surf (145 ms each); shore tiles seen in the last picture */
 static int coast_freeze = -1;                     /* debug: show this step only */
 
 static void draw_tile(int col, int row, int tile)
@@ -1869,10 +1869,10 @@ static int real_main(int argc, char **argv)
             if (ox != view_x || oy != view_y) dirty = 1;
         }
         sound_poll();
-        if (DoAnimation && coast_seen) {                           /* surf: next step every 110 ms (only while shore is on the screen) */
+        if (DoAnimation && coast_seen) {                           /* surf: next step every 145 ms (only while shore is on the screen) */
             struct timeval tn; int st;
             gettimeofday(&tn, NULL);
-            st = coast_freeze >= 0 ? coast_freeze : (int)((tn.tv_sec * 1000 + tn.tv_usec / 1000) / 110);
+            st = coast_freeze >= 0 ? coast_freeze : (int)((tn.tv_sec * 1000 + tn.tv_usec / 1000) / 145);
             if (st != coast_tick) { coast_tick = st; dirty = 1; }
         }
         { static int amb_frame; if ((++amb_frame & 31) == 0 || amb_frame == 1) ambient_update(); ambient_tick(); }
