@@ -64,7 +64,8 @@ CONTROLS
 Query          the Query tool opens a zone status box at the top right (click it or Esc to close)
 Tools          click a button on the left (Query, Doze, Road, Rail, Wire, Park, zones,
                Fire, Police, Stadium, power plants, Sea port, Airport,
-               Chalk and Eraser for notes on the map; one click with the Eraser removes a whole line)
+               Chalk and Eraser for notes on the map; one click with the Eraser removes a whole line;
+               Highway, the last icon)
 Build          click or drag on the map; the white frame shows the area
 Scroll         W A S D, mouse wheel, mouse at the screen edge; in the overview map click or drag
 Menus          right mouse button
@@ -72,13 +73,18 @@ Speed          0 pause, 1 slow, 2 medium, 3 fast (or menu Speed)
 Budget         menu Windows/Budget (Continue or Cancel)
 Evaluation     menu Windows/Evaluation (opinion, problems, score)
 Graphs         menu Windows/Graphs (6 histories, 10 or 120 years)
-Overview map   menu Windows/Map opens the map window, Map/Next overlay cycles (14 overlays); click/drag in it to scroll
+Overview map   key M or menu Windows/Map opens the map window, Map/Next overlay cycles (14 overlays); click/drag in it to scroll
 Tool keys      b bulldozer, r road, p park, t wire, x rail, z query (as in the original); cheat words work too
 Start          at launch you choose: New city, Load city, Scenario or the default city (Options/Start menu at launch)
 Tool icons     uniform 32x32 set by default; Options/Classic tool icons switches to the original pictures
 Level          menu Level: Easy/Medium/Hard (start funds of a new city, saved in the preferences)
 Ambient sounds quiet sea / city / nature loops that follow the visible part of the map (Options > Sound options)
 Options        Auto Goto, Animation, Messages, Message windows can be switched off; sound switches, volume sliders and "Speak tool names" (off by default) are in Options > Sound options
+Animation      Options/Animation also switches the surf along the coasts and the gusts of wind over woods
+Traffic rules  Options/Traffic rules: jams slow zones, rail connections attract growth and keep trips off the roads, failed trips
+               cost growth; the Highway tool builds jam-free roads; sea ports and airports (with power and a road) link separated
+               areas, ships and planes sail and fly between them there and back; each carries 40 trips a year, the status line
+               says when one is full. The Query tool shows the traffic figures. Cities with highways do not load in the original game.
 Scenarios      menu Scenarios: 8 historic disasters/challenges with story and goal
 Help           Help key, or menu Project/Help (Micropolis.guide, AmigaGuide)
 Preferences    screen mode, options, speed, level and window positions are remembered (ENVARC:Micropolis.prefs)

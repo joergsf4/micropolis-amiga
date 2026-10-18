@@ -17,6 +17,8 @@
   @{" Klawiatura i mysz    " link KEYS}
   @{" Okna                 " link WINDOWS}
   @{" Menu                 " link MENUS}
+  @{" Zasady ruchu         " link TRAFFIC}
+  @{" Animacja             " link ANIMATION}
   @{" Paski R C I          " link DEMAND}
   @{" Scenariusze          " link SCENARIOS}
   @{" Tryb ekranu i ustawienia " link SETTINGS}
@@ -48,7 +50,7 @@
   Park 10     Strefy mieszkalne/handlowe/przemyslowe po 100 (3x3)
   Straz pozarna 500   Komisariat 500
   Stadion 5000   Elektrownia weglowa 3000   Elektrownia jadrowa 5000
-  Port morski 3000   Lotnisko 10000
+  Port morski 3000   Lotnisko 10000   Autostrada 40 (ostatnia ikona, zob. Zasady ruchu)
 
   Kreda       rysuje notatke na mapie (biala linia); notatki nie sa
               zapisywane z miastem
@@ -64,6 +66,7 @@
   Lewy przycisk myszy    uzyj narzedzia / kliknij przycisk
   Prawy przycisk myszy   menu
   W A S D, kolko myszy, mysz przy krawedzi ekranu   przewijanie
+  M                      otwiera lub zamyka mape przegladowa
   0 1 2 3                pauza, wolno, srednio, szybko
   b r p t x z            skroty narzedzi jak w oryginale (spychacz,
                          droga, park, linia, tory, zapytanie)
@@ -90,14 +93,52 @@
   Projekt      nowe miasto, wczytaj, zapisz, O programie, Pomoc, zakoncz
   Scenariusze  historyczne miasta z opowiescia i celem
   Tempo        pauza / wolno / srednio / szybko
-  Opcje        auto-burzenie, auto-budzet, katastrofy, dzwiek, auto-skok,
-               animacja, komunikaty, okna komunikatow, pytaj o tryb ekranu
+  Opcje        auto-burzenie, auto-budzet, katastrofy, auto-skok, animacja,
+               komunikaty, okna komunikatow, opcje dzwieku (okno z
+               przelacznikami i suwakami glosnosci), zasady ruchu,
+               pytaj o tryb ekranu
   Poziom       Latwy / Sredni / Trudny (srodki na start nowego miasta)
   Jezyk        Automatycznie (ustawienie systemu) / English / Deutsch / Polski
                (od nastepnego uruchomienia)
   Okna         budzet, ocena, wykresy
   Mapa         widoki: energia, ruch, zanieczyszczenie, przestepczosc ...
   Katastrofy   pozar, powodz, tornado, trzesienie ziemi, potwor, awaria reaktora
+@endnode
+
+@node TRAFFIC "Zasady ruchu"
+@toc MAIN
+
+  Menu Opcje/Zasady ruchu (w tej wersji domyslnie wlaczone) wlacza i
+  wylacza te zasady:
+
+  Korki       ruchliwa droga przed strefa hamuje jej wzrost.
+  Kolej       strefa z torem obok rosnie lepiej, a jej przejazdy nie
+              obciazaja drog.
+  Przejazdy   strefa, ktorej przejazdy nie dochodza do celu, rosnie slabiej.
+  Autostrada  narzedzie na koncu palety, 40 za pole, utrzymanie jak trzy
+              pola drogi. Szeroka droga bez korkow; laczy sie z drogami i
+              innymi autostradami, buduje sie tylko na wolnym terenie i nie
+              jest dojazdem dla stref.
+  Porty i     port morski lub lotnisko z pradem i droga obok laczy
+  lotniska    rozdzielone obszary: przejazd, ktory dojdzie do portu, jedzie
+              dalej od innego portu na tej samej wodzie, lotniska lacza
+              dowolne lotniska (takze nad ladem). Statki i samoloty plyna i
+              leca tam i z powrotem. Port lub lotnisko obsluzy 40 przejazdow
+              rocznie; gdy jest pelny, mowi o tym pasek stanu: zbuduj
+              nastepny.
+
+  Narzedzie Zapytanie pokazuje ruch na drogach, w strefach, portach i
+  lotniskach (ruch, dojazd koleja, wplyw na wzrost, polaczone porty,
+  uzycie w tym roku / w zeszlym roku).
+
+  Miast z autostradami nie da sie poprawnie wczytac w oryginalnym Micropolis.
+@endnode
+
+@node ANIMATION "Animacja"
+@toc MAIN
+
+  Opcje/Animacja wlacza tez przyboj wzdluz wybrzezy (fale, ktore nadchodza i
+  cofaja sie) oraz podmuchy wiatru nad lasami.
 @endnode
 
 @node DEMAND "Paski R C I"
@@ -142,4 +183,5 @@
   @{"Budzet" link MENUS}   @{"Cheaty" link CHEATS}   @{"Klawisze" link KEYS}
   @{"Scenariusze" link SCENARIOS}   @{"Tryb ekranu" link SETTINGS}
   @{"Narzedzia" link TOOLS}   @{"Okna" link WINDOWS}
+  @{"Ruch" link TRAFFIC}   @{"Animacja" link ANIMATION}
 @endnode

@@ -17,6 +17,8 @@
   @{" Keyboard and mouse  " link KEYS}
   @{" Windows             " link WINDOWS}
   @{" Menus               " link MENUS}
+  @{" Traffic rules       " link TRAFFIC}
+  @{" Animation           " link ANIMATION}
   @{" The R C I bars      " link DEMAND}
   @{" Scenarios           " link SCENARIOS}
   @{" Screen mode and settings " link SETTINGS}
@@ -46,6 +48,7 @@
   Fire    500 fire station   Polic 500 police station
   Stadm   5000 stadium       Coal  3000 coal power plant
   Nucl    5000 nuclear plant Sea   3000 sea port   Airp  10000 airport
+  Hwy     40 highway (last icon, see Traffic rules)
 
   Chalk   draw a note on the map (white line); notes are not saved with the city
   Eraser  removes the chalk lines you touch
@@ -60,6 +63,7 @@
   Left mouse button   use the tool / click buttons
   Right mouse button  menus
   W A S D, mouse wheel, mouse at the screen edge   scroll
+  M                   opens or closes the overview map
   0 1 2 3             pause, slow, medium, fast
   b r p t x z         tool shortcuts as in the original (bulldozer,
                       road, park, wire, rail, query)
@@ -85,14 +89,48 @@
 
   Project    new city, load, save, About, Help, quit
   Speed      pause / slow / medium / fast
-  Options    auto bulldoze, auto budget, disasters, sound, auto goto,
-             animation, messages, message windows, ask screen mode
+  Options    auto bulldoze, auto budget, disasters, auto goto, animation,
+             messages, message windows, sound options (window with the
+             switches and volume sliders), traffic rules, ask screen mode
   Level      Easy / Medium / Hard (start funds of a new city)
   Language   Automatic (system setting) / English / Deutsch / Polski (next start)
   Windows    budget, evaluation, graphs, map
   Map        overlays: power, traffic, pollution, crime, land value ...
   Disasters  fire, flood, tornado, earthquake, monster, meltdown
   Scenarios  historic cities with a story and a goal
+@endnode
+
+@node TRAFFIC "Traffic rules"
+@toc MAIN
+
+  Menu Options/Traffic rules (on by default in this version) switches these
+  rules on and off:
+
+  Jams        a busy road in front of a zone slows its growth.
+  Rail        a zone with a rail tile next to it grows better, and its trips
+              do not load the roads.
+  Trips       a zone whose trips reach no destination grows less.
+  Highway     tool at the bottom of the palette, 40 per tile, upkeep like three
+              road tiles. A wide road without jams; it joins roads and other
+              highways, goes on open land only and is no entrance for zones.
+  Ports and   a sea port or airport with power and a road next to it links
+  airports    separated areas: a trip that reaches a sea port goes on from
+              another sea port on the same water, an airport links any
+              airports (also over land). Ships and planes sail and fly there
+              and back. A port or airport carries 40 trips a year; when it is
+              full the status line says so: build another one.
+
+  The Query tool shows the traffic on roads, zones, ports and airports
+  (traffic, rail link, effect on growth, linked ports, use this year/last year).
+
+  Cities with highways cannot be loaded correctly by the original Micropolis.
+@endnode
+
+@node ANIMATION "Animation"
+@toc MAIN
+
+  Options/Animation also switches the surf along the coasts (waves that roll
+  in and run back) and the gusts of wind that pass over woods.
 @endnode
 
 @node DEMAND "The R C I bars"
@@ -137,4 +175,5 @@
   @{"Budget" link MENUS}   @{"Cheats" link CHEATS}   @{"Keys" link KEYS}
   @{"Scenarios" link SCENARIOS}   @{"Screen mode" link SETTINGS}
   @{"Tools" link TOOLS}   @{"Windows" link WINDOWS}
+  @{"Traffic" link TRAFFIC}   @{"Animation" link ANIMATION}
 @endnode

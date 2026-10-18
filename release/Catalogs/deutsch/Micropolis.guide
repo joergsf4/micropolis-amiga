@@ -18,6 +18,8 @@
   @{" Tastatur und Maus    " link KEYS}
   @{" Fenster              " link WINDOWS}
   @{" Menüs                " link MENUS}
+  @{" Verkehrsregeln       " link TRAFFIC}
+  @{" Animation            " link ANIMATION}
   @{" Die R-C-I-Balken     " link DEMAND}
   @{" Szenarien            " link SCENARIOS}
   @{" Bildschirmmodus und Einstellungen " link SETTINGS}
@@ -50,7 +52,7 @@
   Park 10        Wohnen/Gewerbe/Industrie je 100 (Zonen 3x3)
   Feuerwache 500   Polizeiwache 500
   Stadion 5000   Kohlekraftwerk 3000   Kernkraftwerk 5000
-  Seehafen 3000  Flughafen 10000
+  Seehafen 3000  Flughafen 10000   Autobahn 40 (letztes Symbol, siehe Verkehrsregeln)
 
   Kreide    zeichnet eine Notiz auf die Karte (weiße Linie); Notizen werden
             nicht mit der Stadt gespeichert
@@ -66,6 +68,7 @@
   Linke Maustaste    Werkzeug benutzen / Knöpfe anklicken
   Rechte Maustaste   Menüs
   W A S D, Mausrad, Maus am Bildschirmrand   scrollen
+  M                  öffnet oder schließt die Übersichtskarte
   0 1 2 3            Pause, langsam, mittel, schnell
   b r p t x z        Werkzeugkürzel wie im Original (Planierraupe,
                      Straße, Park, Leitung, Schiene, Abfrage)
@@ -94,14 +97,52 @@
   Projekt      neue Stadt, laden, speichern, Über, Hilfe, beenden
   Szenarien    historische Städte mit Geschichte und Ziel
   Tempo        Pause / langsam / mittel / schnell
-  Optionen     Auto-Abriss, Auto-Haushalt, Katastrophen, Ton, Auto-Sprung,
-               Animation, Meldungen, Meldungsfenster, Bildschirmmodus fragen
+  Optionen     Auto-Abriss, Auto-Haushalt, Katastrophen, Auto-Sprung,
+               Animation, Meldungen, Meldungsfenster, Tonoptionen (Fenster mit
+               Schaltern und Lautstärkereglern), Verkehrsregeln,
+               Bildschirmmodus fragen
   Stufe        Leicht / Mittel / Schwer (Startgeld einer neuen Stadt)
   Sprache      Automatisch (Systemeinstellung) / English / Deutsch / Polski
                (gilt ab dem nächsten Start)
   Fenster      Haushalt, Bewertung, Diagramme
   Karte        Ansichten: Strom, Verkehr, Verschmutzung, Kriminalität, Bodenwert ...
   Katastrophen Feuer, Überschwemmung, Tornado, Erdbeben, Monster, Kernschmelze
+@endnode
+
+@node TRAFFIC "Verkehrsregeln"
+@toc MAIN
+
+  Das Menü Optionen/Verkehrsregeln (in dieser Version standardmäßig an)
+  schaltet diese Regeln ein und aus:
+
+  Staus       eine stark befahrene Straße vor einer Zone bremst deren Wachstum.
+  Schiene     eine Zone mit einem Schienenfeld daneben wächst besser, und ihre
+              Fahrten belasten die Straßen nicht.
+  Fahrten     eine Zone, deren Fahrten kein Ziel erreichen, wächst weniger.
+  Autobahn    Werkzeug am Ende der Palette, 40 pro Feld, Unterhalt wie drei
+              Straßenfelder. Eine breite Straße ohne Staus; sie verbindet sich
+              mit Straßen und anderen Autobahnen, wird nur auf freiem Land
+              gebaut und ist keine Zufahrt für Zonen.
+  Häfen und    ein Seehafen oder Flughafen mit Strom und einer Straße daneben
+  Flughäfen    verbindet getrennte Gebiete: eine Fahrt, die einen Seehafen
+              erreicht, geht bei einem anderen Seehafen am selben Wasser
+              weiter, Flughäfen verbinden beliebige Flughäfen (auch über
+              Land). Schiffe und Flugzeuge fahren und fliegen hin und
+              zurück. Ein Hafen oder Flughafen schafft 40 Fahrten im Jahr;
+              ist er voll, sagt es die Statuszeile: noch einen bauen.
+
+  Das Abfrage-Werkzeug zeigt den Verkehr auf Straßen, Zonen, Häfen und
+  Flughäfen (Verkehr, Bahnanschluss, Wirkung auf das Wachstum, verbundene
+  Häfen, genutzt dieses/letztes Jahr).
+
+  Städte mit Autobahnen lassen sich im Original-Micropolis nicht richtig laden.
+@endnode
+
+@node ANIMATION "Animation"
+@toc MAIN
+
+  Optionen/Animation schaltet auch die Brandung an den Küsten (Wellen, die
+  anrollen und zurückfließen) und die Windböen über den Wäldern.
 @endnode
 
 @node DEMAND "Die R-C-I-Balken"
@@ -148,4 +189,5 @@
   @{"Haushalt" link MENUS}   @{"Cheats" link CHEATS}   @{"Tasten" link KEYS}
   @{"Szenarien" link SCENARIOS}   @{"Bildschirmmodus" link SETTINGS}
   @{"Werkzeuge" link TOOLS}   @{"Fenster" link WINDOWS}
+  @{"Verkehr" link TRAFFIC}   @{"Animation" link ANIMATION}
 @endnode
