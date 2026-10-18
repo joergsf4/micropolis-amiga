@@ -14,6 +14,7 @@
 #include "sound.h"
 #include "sound_ui.h"
 #include "coast.h"
+#include "wind.h"
 #include "l10n.h"
 #undef GetSprite
 #include <stdio.h>
@@ -334,6 +335,7 @@ static int load_assets(void)
     memcpy(palette, pal, 256 * 3);
     coast_init(tiles, pal);
     coast_palette(palette);
+    wind_init(tiles); wind_palette(palette);
     FreeVec(pal);
     if (toolicons2) for (int i = 0; i < toolicons2_n && 48 + i < 256; i++) memcpy(&palette[(48 + i) * 3], toolicons2 + 4 + i * 3, 3);
     palette[PEN_BAR * 3 + 0] = 0x20; palette[PEN_BAR * 3 + 1] = 0x28; palette[PEN_BAR * 3 + 2] = 0x50;
@@ -387,6 +389,8 @@ static void draw_tile(int col, int row, int tile)
         memcpy(dst, src, 16);
     if (DoAnimation && coast_has(tile))                          /* surf along the shore */
         coast_draw(fb + (BAR_H + row * 16) * SCR_W + TB_W + col * 16, SCR_W, tile, (view_x + col) << 4, (view_y + row) << 4, coast_tick);
+    if (DoAnimation && wind_has(tile))                           /* gusts over the woods */
+        wind_draw(fb + (BAR_H + row * 16) * SCR_W + TB_W + col * 16, SCR_W, tile, (view_x + col) << 4, (view_y + row) << 4, coast_tick);
 }
 
 /* picture of a sprite frame: size and pixels (0 = transparent), NULL if unknown */
@@ -869,6 +873,11 @@ static void render_frame(struct Window *win)
                 else tile &= LOMASK;
             }
             if (DoAnimation && coast_has(tile)) { coast_now++; if (coast_moved) redraw[row][col] = 1; }
+            else if (DoAnimation && wind_has(tile)) {                /* only trees a gust touches now or touched one step ago */
+                int wx = mx << 4, wy = my << 4;
+                coast_now++;
+                if (coast_moved && (wind_active(wx, wy, coast_tick) || wind_active(wx, wy, coast_drawn))) redraw[row][col] = 1;
+            }
             if (tile != shown[row][col]) { redraw[row][col] = 1; shown[row][col] = tile; }
         }
     }
