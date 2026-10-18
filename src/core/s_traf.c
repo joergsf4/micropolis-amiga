@@ -87,6 +87,7 @@ short HubRX[2][8], HubRY[2][8], NextHubRX[2][8], NextHubRY[2][8];	/* a road tile
 static short HubSea[8];				/* water body of each port (0 = none), filled by HubWater */
 static short HubSeaFor[8][2], HubSeaN;		/* the port list HubSea was computed for */
 static short Hopped;
+long TripShips, TripShipsDocked, TripPlanes, TripPlanesLanded;	/* statistics of the scheduled ships and planes */
 long HopCount;			/* trips that went on over a port or airport (statistics) */
 
 
@@ -387,12 +388,18 @@ RegisterHub(int kind)		/* called by the map scan for a powered port (0) or airpo
 static short Sea[WORLD_X][WORLD_Y];		/* water body label per tile (0 = not water / not labelled) */
 static short SeaStackX[WORLD_X * WORLD_Y], SeaStackY[WORLD_X * WORLD_Y];
 
+static short ShipTile(int t)		/* a tile a ship can sail on (the same set as the sprite code's BtClrTab, plus open and closed bridges) */
+{
+  t &= LOMASK;
+  return (t == RIVER || t == REDGE || t == CHANNEL || t == BRWH || t == BRWV || t == HBRIDGE || t == VBRIDGE ||
+	  t == POWERBASE || t == POWERBASE + 1 || t == RAILBASE || t == RAILBASE + 1 ||
+	  (t >= HBRDG0 && t <= HBRDG0 + 3) || (t >= VBRDG0 && t <= VBRDG0 + 3)) && 1;
+}
+
 static short IsWaterTile(short x, short y)
 {
-  short t;
   if (!TestBounds(x, y)) return 0;
-  t = Map[x][y] & LOMASK;
-  return (t >= RIVER && t <= LASTRIVEDGE) || t == BRWV || t == BRWH;
+  return ShipTile(Map[x][y]);
 }
 
 static void HubWater(void)		/* which body of water does each port touch? (recomputed when the ports change) */
@@ -428,6 +435,90 @@ static void HubWater(void)		/* which body of water does each port touch? (recomp
   HubSeaN = HubN[0];
 }
 
+/* ---- ships and planes that really go from hub to hub (the trip that hopped sends them off) ---- */
+#define MAXPATH 900
+short ShipPathX[MAXPATH], ShipPathY[MAXPATH], ShipPathN, ShipPathI;
+static short Par[WORLD_X * WORLD_Y], Que[WORLD_X * WORLD_Y];
+
+static short NearWater(short cx, short cy, short *wx, short *wy)	/* the sailable tile nearest to a hub centre */
+{
+  short r, x, y;
+  for (r = 1; r <= 7; r++)
+    for (y = cy - r; y <= cy + r; y++)
+      for (x = cx - r; x <= cx + r; x++) {
+	if (x != cx - r && x != cx + r && y != cy - r && y != cy + r) continue;	/* the ring only */
+	if (IsWaterTile(x, y)) { *wx = x; *wy = y; return (1); }
+      }
+  return (0);
+}
+
+static short BuildShipPath(short sx, short sy, short tx, short ty)	/* breadth first search over sailable tiles, 8 directions */
+{
+  static const short DX[8] = { 0, 1, 1, 1, 0, -1, -1, -1 }, DY[8] = { -1, -1, 0, 1, 1, 1, 0, -1 };
+  short head = 0, tail = 0, d, x, y, n, goal = ty * WORLD_X + tx, start = sy * WORLD_X + sx, cur;
+  long i;
+
+  for (i = 0; i < WORLD_X * WORLD_Y; i++) Par[i] = -1;
+  Par[start] = start; Que[tail++] = start;
+  while (head < tail && Par[goal] < 0) {
+    cur = Que[head++]; x = cur % WORLD_X; y = cur / WORLD_X;
+    for (d = 0; d < 8; d++) {
+      short nx = x + DX[d], ny = y + DY[d];
+      if (!IsWaterTile(nx, ny) || Par[ny * WORLD_X + nx] >= 0) continue;
+      if ((d & 1) && !(IsWaterTile(x + DX[d], y) && IsWaterTile(x, y + DY[d]))) continue;	/* no cutting corners across land */
+      Par[ny * WORLD_X + nx] = cur; Que[tail++] = ny * WORLD_X + nx;
+    }
+  }
+  if (Par[goal] < 0) return (0);
+  n = 0;
+  for (cur = goal; cur != start; cur = Par[cur]) {			/* from the goal back to the start */
+    if (n >= MAXPATH) return (0);
+    ShipPathX[n] = cur % WORLD_X; ShipPathY[n] = cur / WORLD_X; n++;
+  }
+  for (i = 0; i < n / 2; i++) {						/* reverse: start first */
+    short tx2 = ShipPathX[i], ty2 = ShipPathY[i];
+    ShipPathX[i] = ShipPathX[n - 1 - i]; ShipPathY[i] = ShipPathY[n - 1 - i];
+    ShipPathX[n - 1 - i] = tx2; ShipPathY[n - 1 - i] = ty2;
+  }
+  ShipPathN = n; ShipPathI = 0;
+  return (1);
+}
+
+static void LaunchTransport(short kind, short a, short b)
+{
+  SimSprite *sp;
+
+  if (kind == 1) {					/* a plane from airport a to airport b */
+    if (GetSprite(AIR) != NULL) return;
+    sp = MakeSprite(AIR, (HubX[1][a] << 4) + 48, (HubY[1][a] << 4) + 12);
+    sp->dest_x = (HubX[1][b] << 4) + 48; sp->dest_y = (HubY[1][b] << 4) + 12;
+    sp->flag = 1;					/* a scheduled flight: it lands at the other airport */
+    TripPlanes++;
+  } else {						/* a ship from port a to port b over the water */
+    short sx, sy, tx, ty;
+    if (GetSprite(SHI) != NULL) return;
+    if (!NearWater(HubX[0][a], HubY[0][a], &sx, &sy) || !NearWater(HubX[0][b], HubY[0][b], &tx, &ty)) return;
+    if (!BuildShipPath(sx, sy, tx, ty)) return;
+    sp = MakeSprite(SHI, (sx << 4) + 8 - 48, (sy << 4) + 8);
+    sp->flag = 1;					/* a scheduled trip: it follows ShipPath (see DoShipTrip) */
+    sp->frame = sp->new_dir = 3; sp->dir = 10; sp->count = 0;
+    TripShips++;
+  }
+}
+
+void PlaneTrip(SimSprite *sp, int x, int y)		/* a plane that starts at the airport at x, y flies to another airport */
+{
+  short k, here = -1, other;
+  if (!TrafficRules || HubN[1] < 2) return;
+  for (k = 0; k < HubN[1]; k++)
+    if (abs(HubX[1][k] - x) + abs(HubY[1][k] - y) <= 6) { here = k; break; }
+  if (here < 0) return;
+  other = Rand(HubN[1] - 2); if (other >= here) other++;
+  sp->dest_x = (HubX[1][other] << 4) + 48; sp->dest_y = (HubY[1][other] << 4) + 12;
+  sp->flag = 1;
+  TripPlanes++;
+}
+
 HubHop(void)
 {
   static short DX[4] = { 0, 1, 0, -1 }, DY[4] = { -1, 0, 1, 0 };
@@ -449,6 +540,7 @@ HubHop(void)
   if (!nc) return;
   k = cand[Rand(nc - 1)];
   SMapX = HubRX[kind][k]; SMapY = HubRY[kind][k]; LDir = 5; PosStackN = 0; Hopped = 1; HopCount++;
+  if (!(Rand16() & 3)) LaunchTransport(kind, here, k);	/* the plane / ship that carries it, now and then */
 }
 
 

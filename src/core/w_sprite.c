@@ -60,6 +60,7 @@
  * NOT APPLY TO YOU.
  */
 #include "sim.h"
+extern long TripShipsDocked, TripPlanesLanded;
 
 
 short CrashX, CrashY;
@@ -646,6 +647,10 @@ DoAirplaneSprite(SimSprite *sprite)
     }
   }	
 
+  if (absDist < 50 && sprite->flag == 1) {	/* a scheduled flight has arrived: it lands */
+    sprite->frame = 0; TripPlanesLanded++;
+    return;
+  }
   if (absDist < 50) { /* at destination  */
     sprite->dest_x = Rand((WORLD_X * 16) + 100) - 50;
     sprite->dest_y = Rand((WORLD_Y * 16) + 100) - 50;
@@ -676,6 +681,38 @@ DoAirplaneSprite(SimSprite *sprite)
 }
 
 
+extern short ShipPathX[], ShipPathY[], ShipPathN, ShipPathI;
+extern void PlaneTrip(SimSprite *sp, int x, int y);
+
+/* A ship on a scheduled trip (s_traf.c LaunchTransport) sails along ShipPath tile by tile and docks at the end. */
+DoShipTrip(SimSprite *sprite)
+{
+  static short BPx[9] = { 0,  0,  2,  2,  2,  0, -2, -2, -2 };
+  static short BPy[9] = { 0, -2, -2,  0,  2,  2,  2,  0, -2 };
+  int hx = sprite->x + sprite->x_hot, hy = sprite->y + sprite->y_hot, dx, dy, ax, ay, d;
+
+  if (sprite->count > 0) {
+    sprite->count--;
+    if (sprite->frame == sprite->new_dir) { sprite->x += BPx[sprite->frame]; sprite->y += BPy[sprite->frame]; }
+    return;
+  }
+  sprite->count = 7;
+  if (ShipPathI >= ShipPathN) { sprite->frame = 0; TripShipsDocked++; return; }		/* arrived: docked */
+  dx = (ShipPathX[ShipPathI] << 4) + 8 - hx;
+  dy = (ShipPathY[ShipPathI] << 4) + 8 - hy;
+  ax = dx < 0 ? -dx : dx; ay = dy < 0 ? -dy : dy;
+  if (ax < 9 && ay < 9) { ShipPathI++; sprite->count = 0; return; }		/* reached this waypoint: aim at the next one */
+  if (ay * 2 < ax)      d = dx > 0 ? 3 : 7;				/* E, W */
+  else if (ax * 2 < ay) d = dy > 0 ? 5 : 1;				/* S, N */
+  else if (dx > 0)      d = dy > 0 ? 4 : 2;				/* SE, NE */
+  else                  d = dy > 0 ? 6 : 8;				/* SW, NW */
+  sprite->new_dir = d;
+  if (sprite->frame != sprite->new_dir) sprite->frame = TurnTo(sprite->frame, sprite->new_dir);
+  else sprite->count = (ax > ay ? ax : ay) / 2 > 7 ? 7 : (ax > ay ? ax : ay) / 2;	/* do not sail past the waypoint */
+  if (SpriteNotInBounds(sprite)) sprite->frame = 0;
+}
+
+
 DoShipSprite(SimSprite *sprite)
 {
   static short BDx[9] = { 0,  0,  1,  1,  1,  0, -1, -1, -1 };
@@ -688,6 +725,11 @@ DoShipSprite(SimSprite *sprite)
   short tem, pem;
 
   if (sprite->sound_count > 0) sprite->sound_count--;
+  if (sprite->flag == 1) {			/* a scheduled trip between two ports */
+    if (!sprite->sound_count) { if ((Rand16() & 3) == 1) MakeSound("city", "HonkHonk-Low"); sprite->sound_count = 200; }
+    DoShipTrip(sprite);
+    return;
+  }
   if (!sprite->sound_count) {
     if ((Rand16() & 3) == 1) {
       if ((ScenarioID == 2) && /* San Francisco */
@@ -1425,9 +1467,12 @@ GenerateCopter(int x, int y)
 
 GeneratePlane(int x, int y)
 {
+  SimSprite *sp;
+
   if (GetSprite(AIR) != NULL) return;
 
-  MakeSprite(AIR, (x <<4) + 48, (y <<4) + 12);
+  sp = MakeSprite(AIR, (x <<4) + 48, (y <<4) + 12);
+  PlaneTrip(sp, x, y);				/* with the traffic rules it goes to another airport */
 }
 
 

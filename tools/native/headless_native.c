@@ -77,6 +77,6 @@ int main(int argc, char **argv)
                    (long)TotalFunds, (long)CityPop, (int)CityScore, (int)RValve, (int)CValve, (int)IValve), stats();
     }
     stats(); adjacency();
-    { extern long HopCount; printf("traffic: %ld trips over ports/airports\n", HopCount); }
+    { extern long HopCount, TripShips, TripShipsDocked, TripPlanes, TripPlanesLanded; printf("traffic: %ld trips over ports/airports; ships %ld sent, %ld docked; planes %ld sent, %ld landed\n", HopCount, TripShips, TripShipsDocked, TripPlanes, TripPlanesLanded); }
     return 0;
 }
