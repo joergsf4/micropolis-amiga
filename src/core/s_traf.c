@@ -85,7 +85,9 @@ short HubX[2][8], HubY[2][8], HubN[2];		/* ports (0) and airports (1) with power
 short NextHubX[2][8], NextHubY[2][8], NextHubN[2];	/* the scan in progress */
 short HubRX[2][8], HubRY[2][8], NextHubRX[2][8], NextHubRY[2][8];	/* a road tile next to each hub: where a trip enters and leaves it */
 #define HUBSTATS 16
-#define HUB_CAPACITY 40			/* trips per year one port or airport can carry: more are refused (the trip fails) */
+#ifndef HUB_CAPACITY
+#define HUB_CAPACITY 200		/* trips per year one port or airport can carry: more are refused (the trip fails); a busy hub uses about 100 */
+#endif
 static struct { short kind, x, y, now, last, warned; } HubStat[HUBSTATS];
 
 static short HubStatFor(short kind, short x, short y)		/* the counter of the hub at x, y (made on first use) */
@@ -114,6 +116,9 @@ long HopCount;			/* trips that went on over a port or airport (statistics) */
 
 
 /* comefrom: DoIndustrial DoCommercial DoResidential */
+#define HUB_LOAD 50		/* density a hub trip adds to the roads it uses per tile (like a normal trip) */
+static short HubTrip(short sx, short sy);
+static short IsolatedFor(int Zt, short sx, short sy);
 MakeTraf(int Zt)
 {
   short xtem, ytem;
@@ -140,12 +145,18 @@ MakeTraf(int Zt)
       if (t >= RAILBASE && t <= LASTRAIL) ZoneOnRail = 1;
       else ZoneJam = TrfDensity[SMapX >>1][SMapY >>1];
     }
+    short sx = SMapX, sy = SMapY;		/* the road the trip starts on */
     if (TryDrive()) {		/* attempt to drive somewhere */
       if (!(TrafficRules && ZoneOnRail))
 	SetTrafMem();		/* if sucessful, inc trafdensity (a trip on rails does not load the roads) */
       SMapX = xtem;
       SMapY = ytem;
       return (TRUE);		/* traffic passed */
+    }
+    if (TrafficRules && IsolatedFor(Zt, sx, sy) && HubTrip(sx, sy)) {	/* nothing found by wandering: the way to a port or airport, and on from there */
+      SMapX = xtem;
+      SMapY = ytem;
+      return (TRUE);
     }
     SMapX = xtem;
     SMapY = ytem;
@@ -191,6 +202,7 @@ SetTrafMem(void)
 /* comefrom: TryGo */
 PushPos(void)
 {
+  if (PosStackN >= MAXDIS) return;		/* highway steps are free, so a trip can be longer than the stack: the rest is not counted */
   PosStackN++;
   SMapXStack[PosStackN] = SMapX;
   SMapYStack[PosStackN] = SMapY;
@@ -598,7 +610,7 @@ HubHop(void)
     }
   if (!nc) return;
   k = cand[Rand(nc - 1)];
-  SMapX = HubRX[kind][k]; SMapY = HubRY[kind][k]; LDir = 5; PosStackN = 0; Hopped = 1; HopCount++;
+  SMapX = HubRX[kind][k]; SMapY = HubRY[kind][k]; LDir = 5; Hopped = 1; HopCount++;	/* the positions of the first leg stay on the stack: they get their traffic, too */
   HubStat[HubStatFor(kind, HubX[kind][here], HubY[kind][here])].now++;
   HubStat[HubStatFor(kind, HubX[kind][k], HubY[kind][k])].now++;
   if (!(Rand16() & 3)) LaunchTransport(kind, here, k);	/* the plane / ship that carries it, now and then */
@@ -684,6 +696,148 @@ void TrafficStatus(short x, short y)				/* sent after UIShowZoneStatus for the t
   }
   Eval(buf);
 }
+
+/* A trip that wandered 30 steps without finding its destination may still reach a port or airport: a distance field over the
+ * road net (multi-source breadth first search from the roads at the ports / airports that have a partner) tells every road tile
+ * the way to the nearest one. The trip walks down the field, loading the roads on the way, hops, and wanders on from there. */
+#define FIELD_AGE 4
+static unsigned char HubField[2][WORLD_X * WORLD_Y];
+static long HubFieldTime = -1000;
+
+static void BuildHubField(void)
+{
+  static const short DX[4] = { 0, 1, 0, -1 }, DY[4] = { -1, 0, 1, 0 };
+  short kind, k, head, tail, x, y, d, partner;
+  long i;
+
+  if (CityTime - HubFieldTime < FIELD_AGE && CityTime >= HubFieldTime) return;
+  HubFieldTime = CityTime;
+  for (kind = 0; kind < 2; kind++) {
+    for (i = 0; i < WORLD_X * WORLD_Y; i++) HubField[kind][i] = 255;
+    if (HubN[kind] < 2) continue;
+    if (kind == 0) HubWater();
+    head = tail = 0;
+    for (k = 0; k < HubN[kind]; k++) {
+      partner = (kind == 1);
+      if (!partner) for (d = 0; d < HubN[0]; d++) if (d != k && HubSea[d] && HubSea[d] == HubSea[k]) partner = 1;
+      if (!partner || HubFull(kind, k)) continue;
+      i = HubRX[kind][k] * WORLD_Y + HubRY[kind][k];
+      if (HubField[kind][i] == 0) continue;
+      HubField[kind][i] = 0; Que[tail++] = (short)i;
+    }
+    while (head < tail) {
+      short cur = Que[head++], cx = cur / WORLD_Y, cy = cur % WORLD_Y, v = HubField[kind][cur];
+      if (v >= 250) continue;
+      for (d = 0; d < 4; d++) {
+	x = cx + DX[d]; y = cy + DY[d];
+	if (!TestBounds(x, y) || !RoadTest(Map[x][y])) continue;
+	i = x * WORLD_Y + y;
+	if (HubField[kind][i] != 255) continue;
+	HubField[kind][i] = v + 1; Que[tail++] = (short)i;
+      }
+    }
+  }
+}
+
+/* Road areas: which kinds of zones does a connected piece of the road net serve? A trip only goes on over a hub when its own
+ * area has no destination for it at all (an island of industry without homes, ...): a trip that merely wandered off the wrong
+ * way in a big town just fails as in the original, it does not turn into a stream of trips to the port. */
+static short RoadComp[WORLD_X * WORLD_Y];
+static unsigned char CompHas[WORLD_X * WORLD_Y / 4 + 8];	/* per area: 1 res, 2 com, 4 ind, 8 a destination for homes, 16 homes */
+static long CompTime = -1000;
+
+static void BuildRoadAreas(void)
+{
+  static const short DX[4] = { 0, 1, 0, -1 }, DY[4] = { -1, 0, 1, 0 };
+  short x, y, d, head, tail, label = 0, cx, cy, r, t, xx, yy, found, lab;
+  long i;
+
+  if (CityTime - CompTime < FIELD_AGE && CityTime >= CompTime) return;
+  CompTime = CityTime;
+  for (i = 0; i < WORLD_X * WORLD_Y; i++) RoadComp[i] = 0;
+  for (x = 0; x < WORLD_X; x++)
+    for (y = 0; y < WORLD_Y; y++) {
+      i = x * WORLD_Y + y;
+      if (RoadComp[i] || !RoadTest(Map[x][y]) || label >= WORLD_X * WORLD_Y / 4) continue;
+      label++; CompHas[label] = 0; head = tail = 0;
+      RoadComp[i] = label; Que[tail++] = (short)i;
+      while (head < tail) {
+	short cur = Que[head++];
+	cx = cur / WORLD_Y; cy = cur % WORLD_Y;
+	for (d = 0; d < 4; d++) {
+	  xx = cx + DX[d]; yy = cy + DY[d];
+	  if (!TestBounds(xx, yy) || !RoadTest(Map[xx][yy]) || RoadComp[xx * WORLD_Y + yy]) continue;
+	  RoadComp[xx * WORLD_Y + yy] = label; Que[tail++] = (short)(xx * WORLD_Y + yy);
+	}
+      }
+    }
+  for (x = 0; x < WORLD_X; x++)
+    for (y = 0; y < WORLD_Y; y++) {
+      if (!(Map[x][y] & ZONEBIT)) continue;
+      t = Map[x][y] & LOMASK;
+      if (t < RESBASE || t > NUCLEAR) continue;
+      r = (t < PORTBASE) ? 2 : 4;					/* how far a road can be from the centre tile */
+      found = 0; lab = 0;
+      for (yy = y - r; yy <= y + r && !found; yy++)
+	for (xx = x - r; xx <= x + r; xx++)
+	  if (TestBounds(xx, yy) && RoadComp[xx * WORLD_Y + yy]) { lab = RoadComp[xx * WORLD_Y + yy]; found = 1; break; }
+      if (!found) continue;
+      if (t < COMBASE) CompHas[lab] |= 1 | 16;				/* homes */
+      else {
+	CompHas[lab] |= 8;						/* a destination for the people of the homes */
+	if (t < INDBASE) CompHas[lab] |= 2; else if (t < PORTBASE) CompHas[lab] |= 4;
+      }
+    }
+}
+
+static short IsolatedFor(int Zt, short sx, short sy)		/* the zone's area has no destination for its trips, so a hub is the only way */
+{
+  short lab;
+  if (Zt == 1) return (0);					/* commercial trips find a target next to themselves */
+  BuildRoadAreas();
+  lab = RoadComp[sx * WORLD_Y + sy];
+  if (!lab) return (0);
+  if (Zt == 0) return (!(CompHas[lab] & 8));			/* homes need commercial, industry or the like */
+  return (!(CompHas[lab] & 16));				/* industry needs homes */
+}
+
+static short HubTrip(short sx, short sy)
+{
+  static const short DX[4] = { 0, 1, 0, -1 }, DY[4] = { -1, 0, 1, 0 };
+  short kind, d, x = sx, y = sy, steps, best, bx, by, z;
+  long i = sx * WORLD_Y + sy;
+
+  if (HubN[0] < 2 && HubN[1] < 2) return (0);
+  BuildHubField();
+  kind = (HubField[0][i] <= HubField[1][i]) ? 0 : 1;
+  if (HubField[kind][i] >= 250) return (0);			/* no hub reachable from here */
+  for (steps = 0; steps < 120 && HubField[kind][x * WORLD_Y + y] > 0; steps++) {
+    best = HubField[kind][x * WORLD_Y + y]; bx = -1; by = -1;
+    for (d = 0; d < 4; d++) {
+      short nx = x + DX[d], ny = y + DY[d];
+      if (TestBounds(nx, ny) && RoadTest(Map[nx][ny]) && HubField[kind][nx * WORLD_Y + ny] < best) { best = HubField[kind][nx * WORLD_Y + ny]; bx = nx; by = ny; }
+    }
+    if (bx < 0) return (0);					/* the road has changed since the field was made */
+    x = bx; y = by;
+    z = Map[x][y] & LOMASK;
+    if (!ZoneOnRail && z >= ROADBASE && z < POWERBASE) {	/* load the road on the way, like SetTrafMem */
+      short dn = TrfDensity[x >>1][y >>1] + HUB_LOAD;
+      if (dn > 240) dn = 240;
+      TrfDensity[x >>1][y >>1] = dn;
+    }
+  }
+  if (HubField[kind][x * WORLD_Y + y] != 0) return (0);
+  SMapX = x; SMapY = y; Hopped = 0; PosStackN = 0;
+  HubHop();							/* jumps to a partner hub's road */
+  if (!Hopped) return (0);
+  LDir = 5;
+  if (TryDrive()) {						/* wander on from there */
+    if (!ZoneOnRail) SetTrafMem();
+    return (1);
+  }
+  return (0);
+}
+
 
 /* comefrom: TryGo FindPRoad */
 RoadTest(int x)
