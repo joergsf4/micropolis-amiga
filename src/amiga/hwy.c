@@ -47,10 +47,10 @@ void hwy_make_tiles(UBYTE *dst)
  * asphalt is painted over. (A "mouse cinema" like the traffic on the ordinary roads, not big blocks.) */
 void hwy_cars(UBYTE *dst, int stride, int tile, int wx, int wy, int tick)
 {
-    static const UBYTE col[4] = { 11, 12, 10, 17 };                 /* red, yellow, white, blue */
+    static const UBYTE col[2] = { 10, 14 };                         /* white and light grey: no colours, like the traffic on the roads */
     int mask = tile - 960, arms = mask ? mask : 5;
     int junction = ((arms & 5) && (arms & 10));
-    tick &= 0xFFFFF;
+    int off = (tick & 0xFFFFF) * 2 % 44;                              /* how far the cars have moved, never negative */
     for (int y = 0; y < 16; y++)
         for (int x = 0; x < 16; x++) {
             int px = wx + x, py = wy + y, pos, c, lane = -1, a;
@@ -60,19 +60,19 @@ void hwy_cars(UBYTE *dst, int stride, int tile, int wx, int wy, int tick)
             if (((arms & 1) && y <= 7) || ((arms & 4) && y >= 8)) {              /* vertical arms: 4 lanes at x 2-3, 5-6, 9-10, 12-13 */
                 if (x == 2 || x == 3) lane = 0; else if (x == 5 || x == 6) lane = 1; else if (x == 9 || x == 10) lane = 2; else if (x == 12 || x == 13) lane = 3;
                 if (lane >= 0) {
-                    a = (lane < 2) ? py + tick * 2 : py - tick * 2 + 44 * 100;           /* left carriageway down, right one up */
+                    a = (lane < 2) ? py + off : py - off + 44;                          /* left carriageway down, right one up */
                     a += lane * 19;
                     pos = a % 44; c = a / 44;
-                    if (pos < 3 && ((c * 7 + lane * 5 + (px >> 5)) % 3) != 0) *d = col[(c + lane) & 3];
+                    if (pos < 3 && ((c * 7 + lane * 5 + (px >> 5)) % 3) != 0) *d = col[(c + lane) & 1];
                 }
             }
             if (lane < 0 && (((arms & 2) && x >= 8) || ((arms & 8) && x <= 7))) {    /* horizontal arms: lanes at y 2-3, 5-6, 9-10, 12-13 */
                 if (y == 2 || y == 3) lane = 0; else if (y == 5 || y == 6) lane = 1; else if (y == 9 || y == 10) lane = 2; else if (y == 12 || y == 13) lane = 3;
                 if (lane >= 0) {
-                    a = (lane < 2) ? px - tick * 2 + 44 * 100 : px + tick * 2;           /* upper carriageway west, lower one east */
+                    a = (lane < 2) ? px - off + 44 : px + off;                          /* upper carriageway west, lower one east */
                     a += lane * 19;
                     pos = a % 44; c = a / 44;
-                    if (pos < 3 && ((c * 7 + lane * 5 + (py >> 5)) % 3) != 0) *d = col[(c + lane) & 3];
+                    if (pos < 3 && ((c * 7 + lane * 5 + (py >> 5)) % 3) != 0) *d = col[(c + lane) & 1];
                 }
             }
         }
