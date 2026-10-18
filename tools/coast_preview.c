@@ -14,6 +14,7 @@ int main(int argc, char **argv)
     unsigned char *img = calloc(W * H, 3), *tile = malloc(pw * ph);
     const unsigned char *map = cty + n - 24000;
     coast_init(tiles, pal);
+    coast_palette(pal);
     for (int f = 0; f < frames; f++) {
         for (int ty = 0; ty < h; ty++) for (int tx = 0; tx < w; tx++) {
             int mx = x0 + tx, my = y0 + ty, v = (map[(mx * 100 + my) * 2] << 8 | map[(mx * 100 + my) * 2 + 1]) & 0x3ff;

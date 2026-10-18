@@ -333,6 +333,7 @@ static int load_assets(void)
     notice_load();
     memcpy(palette, pal, 256 * 3);
     coast_init(tiles, pal);
+    coast_palette(palette);
     FreeVec(pal);
     if (toolicons2) for (int i = 0; i < toolicons2_n && 48 + i < 256; i++) memcpy(&palette[(48 + i) * 3], toolicons2 + 4 + i * 3, 3);
     palette[PEN_BAR * 3 + 0] = 0x20; palette[PEN_BAR * 3 + 1] = 0x28; palette[PEN_BAR * 3 + 2] = 0x50;
