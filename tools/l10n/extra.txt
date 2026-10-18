@@ -41,3 +41,5 @@ A seaport is at capacity: build another one
 An airport is at capacity: build another one
 Used this year
 Used last year
+A seaport is nearly at capacity
+An airport is nearly at capacity

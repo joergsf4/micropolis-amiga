@@ -86,7 +86,7 @@ short NextHubX[2][8], NextHubY[2][8], NextHubN[2];	/* the scan in progress */
 short HubRX[2][8], HubRY[2][8], NextHubRX[2][8], NextHubRY[2][8];	/* a road tile next to each hub: where a trip enters and leaves it */
 #define HUBSTATS 16
 #ifndef HUB_CAPACITY
-#define HUB_CAPACITY 200		/* trips per year one port or airport can carry: more are refused (the trip fails); a busy hub uses about 100 */
+#define HUB_CAPACITY 1000		/* trips per year one port or airport can carry: more are refused (the trip fails); an island of ten populated factories needs about 400 */
 #endif
 static struct { short kind, x, y, now, last, warned; } HubStat[HUBSTATS];
 
@@ -578,9 +578,13 @@ void PlaneTrip(SimSprite *sp, int x, int y)		/* a plane that starts at the airpo
 static short HubFull(short kind, short k)			/* the hub has used up its capacity this year (warns once a year) */
 {
   short s = HubStatFor(kind, HubX[kind][k], HubY[kind][k]);
-  if (HubStat[s].now < HUB_CAPACITY) return (0);
-  if (!HubStat[s].warned) {
+  if (HubStat[s].now >= HUB_CAPACITY * 8 / 10 && HubStat[s].warned < 1 && HubStat[s].now < HUB_CAPACITY) {	/* 80 %: a warning in time */
     HubStat[s].warned = 1;
+    Eval(kind == 0 ? "UISetMessage {A seaport is nearly at capacity}" : "UISetMessage {An airport is nearly at capacity}");
+  }
+  if (HubStat[s].now < HUB_CAPACITY) return (0);
+  if (HubStat[s].warned < 2) {
+    HubStat[s].warned = 2;
     Eval(kind == 0 ? "UISetMessage {A seaport is at capacity: build another one}" : "UISetMessage {An airport is at capacity: build another one}");
   }
   return (1);
@@ -739,11 +743,12 @@ static void BuildHubField(void)
   }
 }
 
-/* Road areas: which kinds of zones does a connected piece of the road net serve? A trip only goes on over a hub when its own
- * area has no destination for it at all (an island of industry without homes, ...): a trip that merely wandered off the wrong
- * way in a big town just fails as in the original, it does not turn into a stream of trips to the port. */
+/* Road areas: how many homes, shops and factories does a connected piece of the road net serve? A trip only goes on over a hub
+ * when its own area is short of destinations for it (an island of industry with few or no homes, homes without work, ...): a
+ * trip that merely wandered off the wrong way in a balanced town just fails as in the original, it does not turn into a stream
+ * of trips to the port. */
 static short RoadComp[WORLD_X * WORLD_Y];
-static unsigned char CompHas[WORLD_X * WORLD_Y / 4 + 8];	/* per area: 1 res, 2 com, 4 ind, 8 a destination for homes, 16 homes */
+static unsigned char CompRes[WORLD_X * WORLD_Y / 4 + 8], CompCom[WORLD_X * WORLD_Y / 4 + 8], CompInd[WORLD_X * WORLD_Y / 4 + 8];	/* zones per area (saturating) */
 static long CompTime = -1000;
 
 static void BuildRoadAreas(void)
@@ -759,7 +764,7 @@ static void BuildRoadAreas(void)
     for (y = 0; y < WORLD_Y; y++) {
       i = x * WORLD_Y + y;
       if (RoadComp[i] || !RoadTest(Map[x][y]) || label >= WORLD_X * WORLD_Y / 4) continue;
-      label++; CompHas[label] = 0; head = tail = 0;
+      label++; CompRes[label] = CompCom[label] = CompInd[label] = 0; head = tail = 0;
       RoadComp[i] = label; Que[tail++] = (short)i;
       while (head < tail) {
 	short cur = Que[head++];
@@ -782,11 +787,9 @@ static void BuildRoadAreas(void)
 	for (xx = x - r; xx <= x + r; xx++)
 	  if (TestBounds(xx, yy) && RoadComp[xx * WORLD_Y + yy]) { lab = RoadComp[xx * WORLD_Y + yy]; found = 1; break; }
       if (!found) continue;
-      if (t < COMBASE) CompHas[lab] |= 1 | 16;				/* homes */
-      else {
-	CompHas[lab] |= 8;						/* a destination for the people of the homes */
-	if (t < INDBASE) CompHas[lab] |= 2; else if (t < PORTBASE) CompHas[lab] |= 4;
-      }
+      if (t < COMBASE) { if (CompRes[lab] < 255) CompRes[lab]++; }				/* homes */
+      else if (t < INDBASE) { if (CompCom[lab] < 255) CompCom[lab]++; }
+      else if (t < PORTBASE) { if (CompInd[lab] < 255) CompInd[lab]++; }
     }
 }
 
@@ -797,8 +800,8 @@ static short IsolatedFor(int Zt, short sx, short sy)		/* the zone's area has no 
   BuildRoadAreas();
   lab = RoadComp[sx * WORLD_Y + sy];
   if (!lab) return (0);
-  if (Zt == 0) return (!(CompHas[lab] & 8));			/* homes need commercial, industry or the like */
-  return (!(CompHas[lab] & 16));				/* industry needs homes */
+  if (Zt == 0) return (3 * (CompCom[lab] + CompInd[lab]) < CompRes[lab]);	/* homes without enough shops and factories to work in */
+  return (2 * CompRes[lab] < CompInd[lab]);			/* factories without enough homes (less than one home zone for two factories) */
 }
 
 static short HubTrip(short sx, short sy)

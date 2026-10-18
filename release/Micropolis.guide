@@ -117,7 +117,7 @@
   airports    separated areas: a trip that reaches a sea port goes on from
               another sea port on the same water, an airport links any
               airports (also over land). Ships and planes sail and fly there
-              and back. A port or airport carries 200 trips a year; when it is
+              and back. A port or airport carries 1000 trips a year; when it is
               full the status line says so: build another one.
 
   The Query tool shows the traffic on roads, zones, ports and airports

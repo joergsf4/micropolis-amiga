@@ -83,7 +83,7 @@ Options        Auto Goto, Animation, Messages, Message windows can be switched o
 Animation      Options/Animation also switches the surf along the coasts, the gusts of wind over woods and the cars on highways
 Traffic rules  Options/Traffic rules: jams slow zones, rail connections attract growth and keep trips off the roads, failed trips
                cost growth; the Highway tool builds jam-free roads; sea ports and airports (with power and a road) link separated
-               areas, ships and planes sail and fly between them there and back; each carries 200 trips a year, the status line
+               areas, ships and planes sail and fly between them there and back; each carries 1000 trips a year, the status line
                says when one is full. The Query tool shows the traffic figures. Cities with highways do not load in the original game.
 Scenarios      menu Scenarios: 8 historic disasters/challenges with story and goal
 Help           Help key, or menu Project/Help (Micropolis.guide, AmigaGuide)
