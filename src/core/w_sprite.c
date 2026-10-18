@@ -1386,6 +1386,9 @@ GenerateBus(int x, int y)
 GenerateShip(void)
 {
   register short x, y;
+  extern short LaunchRandomTrip(short kind);
+
+  if (LaunchRandomTrip(0)) return;		/* traffic rules: sail between two ports of the same water */
 
   if (!(Rand16() & 3))
     for (x = 4; x < WORLD_X - 2; x++)

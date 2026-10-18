@@ -506,6 +506,25 @@ static void LaunchTransport(short kind, short a, short b)
   }
 }
 
+/* The map scan asks for a ship (port) or a plane: with the traffic rules and at least two hubs they sail / fly between hubs
+ * instead of wandering. Returns 1 when a scheduled trip was started. */
+short LaunchRandomTrip(short kind)
+{
+  short a, b, tries;
+
+  if (!TrafficRules || HubN[kind] < 2) return (0);
+  if (kind == 0) HubWater();
+  for (tries = 0; tries < 6; tries++) {
+    a = Rand(HubN[kind] - 1);
+    b = Rand(HubN[kind] - 2); if (b >= a) b++;
+    if (kind == 1 || (HubSea[a] && HubSea[a] == HubSea[b])) {
+      LaunchTransport(kind, a, b);
+      return (1);
+    }
+  }
+  return (0);
+}
+
 void PlaneTrip(SimSprite *sp, int x, int y)		/* a plane that starts at the airport at x, y flies to another airport */
 {
   short k, here = -1, other;
