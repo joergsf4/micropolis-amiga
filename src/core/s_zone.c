@@ -158,6 +158,20 @@ SetSmoke(int ZonePower)
 }
 
 
+/* Traffic rules (see s_traf.c): what the last trip of this zone adds to or takes from its growth score */
+short
+TrafficScore(int TrfGood)
+{
+  short z = 0;
+
+  if (!TrafficRules || !ZoneTested) return (0);
+  if (ZoneJam > 100)  z -= (ZoneJam - 100) * 6;		/* a jammed road in front of the zone: up to -840 */
+  if (ZoneOnRail)     z += 150;				/* a rail connection attracts */
+  if (TrfGood == 0)   z -= 250;				/* no destination reached */
+  return (z);
+}
+
+
 DoIndustrial(int ZonePwrFlg)
 {
   short tpop, zscore, TrfGood;
@@ -166,6 +180,7 @@ DoIndustrial(int ZonePwrFlg)
   SetSmoke(ZonePwrFlg);
   tpop = IZPop(CChr9);
   IndPop += tpop;
+  ZoneTested = 0;
   if (tpop > Rand(5)) TrfGood = MakeTraf(2);
   else TrfGood = TRUE;
 
@@ -175,7 +190,7 @@ DoIndustrial(int ZonePwrFlg)
   }
 
   if (!(Rand16() & 7)) {
-    zscore = IValve + EvalInd(TrfGood);
+    zscore = IValve + EvalInd(TrfGood) + TrafficScore(TrfGood);
     if (!ZonePwrFlg) zscore = -500;
     if ((zscore > -350) &&
 	(((short)(zscore - 26380)) > ((short)Rand16Signed()))) {
@@ -197,6 +212,7 @@ DoCommercial(int ZonePwrFlg)
   ComZPop++;
   tpop = CZPop(CChr9);
   ComPop += tpop;
+  ZoneTested = 0;
   if (tpop > Rand(5)) TrfGood = MakeTraf(1);
   else TrfGood = TRUE;
 
@@ -208,7 +224,7 @@ DoCommercial(int ZonePwrFlg)
 
   if (!(Rand16() & 7)) {
     locvalve = EvalCom(TrfGood);
-    zscore = CValve + locvalve;
+    zscore = CValve + locvalve + TrafficScore(TrfGood);
     if (!ZonePwrFlg) zscore = -500;
 
     if (TrfGood &&
@@ -236,6 +252,7 @@ DoResidential(int ZonePwrFlg)
   else tpop = RZPop(CChr9);
 
   ResPop += tpop;
+  ZoneTested = 0;
   if (tpop > Rand(35)) TrfGood = MakeTraf(0);
   else TrfGood = TRUE;
 
@@ -247,7 +264,7 @@ DoResidential(int ZonePwrFlg)
 
   if ((CChr9 == FREEZ) || (!(Rand16() & 7))) {
     locvalve = EvalRes(TrfGood);
-    zscore = RValve + locvalve;
+    zscore = RValve + locvalve + TrafficScore(TrfGood);
     if (!ZonePwrFlg) zscore = -500;
 
     if ((zscore > -350) &&

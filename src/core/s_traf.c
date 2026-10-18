@@ -72,6 +72,20 @@ short LDir;
 short Zsource;
 short TrafMaxX, TrafMaxY;
 
+/* Traffic rules (experiment, see issue #37): jams slow the zones next to a busy road, a rail connection keeps trips off
+ * the roads and attracts growth, a failed trip costs growth, and ports / airports link separated areas. */
+#ifndef TRAFFIC_RULES_DEFAULT
+#define TRAFFIC_RULES_DEFAULT 1
+#endif
+short TrafficRules = TRAFFIC_RULES_DEFAULT;
+short ZoneJam;			/* traffic density at the road a zone starts from (0..240); set by MakeTraf */
+short ZoneOnRail;		/* the zone has a rail tile next to it */
+short ZoneTested;		/* MakeTraf ran for this zone in this pass */
+short HubX[2][8], HubY[2][8], HubN[2];		/* ports (0) and airports (1) with power: zone centre tiles (of the last complete map scan) */
+short NextHubX[2][8], NextHubY[2][8], NextHubN[2];	/* the scan in progress */
+static short Hopped;
+long HopCount;			/* trips that went on over a port or airport (statistics) */
+
 
 /* comefrom: DoIndustrial DoCommercial DoResidential */
 MakeTraf(int Zt)
@@ -82,6 +96,10 @@ MakeTraf(int Zt)
   ytem = SMapY;
   Zsource = Zt;
   PosStackN = 0;
+  Hopped = 0;
+  ZoneJam = 0;
+  ZoneOnRail = 0;
+  ZoneTested = 1;
 
 #if 0
   if ((!Rand(2)) && FindPTele()) {
@@ -91,8 +109,14 @@ MakeTraf(int Zt)
 #endif
 
   if (FindPRoad()) {		/* look for road on zone perimeter */
+    if (TrafficRules) {
+      short t = Map[SMapX][SMapY] & LOMASK;
+      if (t >= RAILBASE && t <= LASTRAIL) ZoneOnRail = 1;
+      else ZoneJam = TrfDensity[SMapX >>1][SMapY >>1];
+    }
     if (TryDrive()) {		/* attempt to drive somewhere */
-      SetTrafMem();		/* if sucessful, inc trafdensity */
+      if (!(TrafficRules && ZoneOnRail))
+	SetTrafMem();		/* if sucessful, inc trafdensity (a trip on rails does not load the roads) */
       SMapX = xtem;
       SMapY = ytem;
       return (TRUE);		/* traffic passed */
@@ -163,6 +187,17 @@ FindPRoad(void)		/* look for road on edges of zone   */
   static short PerimY[12] = {-2,-2,-2,-1, 0, 1, 2, 2, 2, 1, 0,-1};
   register short tx, ty, z;
 
+  if (TrafficRules && ZoneTested) {		/* a rail connection comes first (only for the zones' trips) */
+    for (z = 0; z < 12; z++) {
+      tx = SMapX + PerimX[z];
+      ty = SMapY + PerimY[z];
+      if (TestBounds(tx, ty)) {
+	short t = Map[tx][ty] & LOMASK;
+	if (t >= RAILBASE && t <= LASTRAIL) { SMapX = tx; SMapY = ty; return (TRUE); }
+      }
+    }
+  }
+
   for (z = 0; z < 12; z++) {
 	  tx = SMapX + PerimX[z];
 	  ty = SMapY + PerimY[z];
@@ -208,6 +243,7 @@ TryDrive(void)
     if (TryGo(z)) {			/* if it got a road */
       if (DriveDone())			/* if destination is reached */
 	return (TRUE);			/* pass */
+      if (TrafficRules && !Hopped) HubHop();	/* next to a port or airport: continue from another one */
     } else {
       if (PosStackN) {			/* deadend , backup */
 	PosStackN--;
@@ -312,6 +348,41 @@ DriveDone(void)
 #endif
 
   return (FALSE);
+}
+
+
+/* Ports and airports link separated areas: a trip that reaches a port (airport) goes on from the road next to another
+ * powered port (airport), as ships (planes) would carry it. Once per trip. */
+HubHop(void)
+{
+  static short DX[4] = { 0, 1, 0, -1 }, DY[4] = { -1, 0, 1, 0 };
+  short d, k, kind, n, here = -1, to, cx, cy, x, y, found = 0;
+
+  for (d = 0; d < 4 && !found; d++) {
+    short tx = SMapX + DX[d], ty = SMapY + DY[d], t;
+    if (!TestBounds(tx, ty)) continue;
+    t = Map[tx][ty] & LOMASK;
+    if (t >= PORTBASE && t <= LASTPORT) { kind = 0; found = 1; }
+    else if (t >= AIRPORTBASE && t < COALBASE) { kind = 1; found = 1; }
+  }
+  if (!found || HubN[kind] < 2) return;
+  for (k = 0; k < HubN[kind]; k++) {		/* which hub are we at? the nearest centre */
+    short ax = HubX[kind][k] - SMapX, ay = HubY[kind][k] - SMapY;
+    if (ax < 0) ax = -ax;
+    if (ay < 0) ay = -ay;
+    if (ax + ay <= 6) { here = k; break; }
+  }
+  if (here < 0) return;
+  n = HubN[kind] - 1;
+  to = Rand(n);
+  if (to >= here) to++;
+  cx = HubX[kind][to]; cy = HubY[kind][to];
+  for (y = cy - 4; y <= cy + 4 && !Hopped; y++)
+    for (x = cx - 4; x <= cx + 4; x++)
+      if (TestBounds(x, y) && RoadTest(Map[x][y])) {
+	SMapX = x; SMapY = y; LDir = 5; PosStackN = 0; Hopped = 1; HopCount++;
+	break;
+      }
 }
 
 

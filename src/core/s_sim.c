@@ -547,6 +547,11 @@ ClearCensus(void)
   PortPop = z;
   APortPop = z;
   PowerStackNum = z;		/* Reset before Mapscan */
+  for (x = 0; x < 2; x++) {		/* the ports and airports of the last complete map scan become the active ones */
+    HubN[x] = NextHubN[x];
+    for (y = 0; y < NextHubN[x]; y++) { HubX[x][y] = NextHubX[x][y]; HubY[x][y] = NextHubY[x][y]; }
+    NextHubN[x] = 0;
+  }
   for (x = 0; x < SmX; x++)
     for (y = 0; y < SmY; y++) {
       FireStMap[x][y] = z;
@@ -1089,6 +1094,7 @@ DoSPZone(short PwrOn)
 
  case AIRPORT:
     APortPop++;
+    if (PwrOn && NextHubN[1] < 8) { NextHubX[1][NextHubN[1]] = SMapX; NextHubY[1][NextHubN[1]] = SMapY; NextHubN[1]++; }
     if (!(CityTime & 7))
       RepairZone(AIRPORT, 6);
 
