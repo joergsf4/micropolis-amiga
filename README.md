@@ -64,7 +64,7 @@ question on again. `SIZE=` (ToolType or argument) skips the question and uses th
 | Budget | Windows > Budget (taxes, road/fire/police funding; Continue / Cancel) |
 | Evaluation | Windows > Evaluation (public opinion, worst problems, score) |
 | Graphs | Windows > Graphs (residential, commercial, industrial, money, crime, pollution; 10 or 120 years) |
-| Overview map | Windows > Map opens the overview map, Map > Next overlay cycles power, traffic, pollution, crime, land value, ...; click or drag in it to scroll |
+| Overview map | M or Windows > Map opens/closes the overview map, Map > Next overlay cycles power, traffic, pollution, crime, land value, ...; click or drag in it to scroll |
 | Scenarios | menu Scenarios: Dullsville 1900, San Francisco 1906, Hamburg 1944, Bern 1965, Tokyo 1957, Detroit 1972, Boston 2010, Rio de Janeiro 2047 (each with its story and goal) |
 | Tool keys | as in the original: `b` bulldozer, `r` road, `p` park, `t` wire, `x` rail, `z` zone query; typed cheat words (e.g. `fund`) work too |
 | Start | at launch a requester asks: New city, Load city, Scenario or the current (default) city; Options > Start menu at launch turns it off |

@@ -338,6 +338,12 @@ static int load_assets(void)
     }
     palette[PEN_BTN * 3 + 0] = 0x40; palette[PEN_BTN * 3 + 1] = 0x48; palette[PEN_BTN * 3 + 2] = 0x70;
     palette[PEN_GREY * 3 + 0] = 0xaa; palette[PEN_GREY * 3 + 1] = 0xaa; palette[PEN_GREY * 3 + 2] = 0xaa;
+    /* Menus highlight by complementing the pixels: pen p becomes 255-p. Menu text (pen 0) turns into pen 255 and the grey
+       menu background into pen 255-PEN_GREY, so those two must be readable colours (they were black: unreadable). */
+    if (!toolicons2 || 48 + toolicons2_n <= 255 - PEN_GREY) {
+        palette[(255 - PEN_GREY) * 3 + 0] = 0xff; palette[(255 - PEN_GREY) * 3 + 1] = 0xff; palette[(255 - PEN_GREY) * 3 + 2] = 0xff;
+        palette[255 * 3 + 0] = 0x00; palette[255 * 3 + 1] = 0x00; palette[255 * 3 + 2] = 0x88;
+    }
     return 1;
 }
 
@@ -959,7 +965,7 @@ static struct Menu *make_menus(struct Screen *scr, APTR *vi_out)
     mi(NM_ITEM, T("Help..."), NULL, 0, CMD_HELP);
     mi(NM_ITEM, T("About Micropolis..."), NULL, 0, CMD_ABOUT);
     mi(NM_ITEM, (const char *)NM_BARLABEL, NULL, 0, 0);
-    mi(NM_ITEM, T("New City"), "N", 0, CMD_NEW);
+    mi(NM_ITEM, T("New City"), NULL, 0, CMD_NEW);
     mi(NM_ITEM, T("Load City..."), "L", 0, CMD_LOAD);
     mi(NM_ITEM, T("Save City"), "S", 0, CMD_SAVE);
     mi(NM_ITEM, T("Save City As..."), NULL, 0, CMD_SAVEAS);
@@ -1005,7 +1011,7 @@ static struct Menu *make_menus(struct Screen *scr, APTR *vi_out)
     mi(NM_ITEM, T("Evaluation..."), "E", 0, CMD_EVAL);
     mi(NM_ITEM, T("Graphs..."), "G", 0, CMD_GRAPHS);
     mi(NM_TITLE, T("Map"), NULL, 0, 0);
-    mi(NM_ITEM, T("Map window on/off"), "M", 0, CMD_MAP);
+    mi(NM_ITEM, T("Map window on/off"), NULL, 0, CMD_MAP);   /* Amiga+M belongs to the system: plain M instead */
     mi(NM_ITEM, T("Next overlay"), "C", 0, CMD_OVERLAY);
     mi(NM_ITEM, (const char *)NM_BARLABEL, NULL, 0, 0);
     for (int i = 0; i < MAP_MODES; i++) mi(NM_ITEM, T(map_names[i]), NULL, 0, CMD_MAPMODE + i);
@@ -1761,6 +1767,7 @@ static int real_main(int argc, char **argv)
                 case 0x21: view_y++; break;
                 case 0x22: view_x++; break;
                 case 0x20: view_x--; break;
+                case 0x37: if (!(qual & (IEQUALIFIER_LCOMMAND | IEQUALIFIER_RCOMMAND))) { map_visible = !map_visible; map_dirty = 1; } break;   /* M */
                 case 0x5f: show_help(); break;                                       /* Help key */
                 case 0x45: if (pi >= 0) panels[pi].close(); else if (ask_quit(win)) running = 0; break;   /* Esc: closes the active panel window, else quits */
                 case 0x44: case 0x40: if (pi >= 0) panels[pi].close(); break;          /* Return, Space */
@@ -1826,10 +1833,10 @@ static int real_main(int argc, char **argv)
         }
         if (mouse_x >= 0 && !panning && (++frame & 3) == 0) {   /* edge scrolling */
             int ox = view_x, oy = view_y;
-            if (mouse_x >= TB_W && mouse_x < TB_W + 6) view_x--;
-            if (mouse_x >= SCR_W - 6) view_x++;
-            if (mouse_y >= BAR_H && mouse_y < BAR_H + 4) view_y--;
-            if (mouse_y >= SCR_H - 4) view_y++;
+            if (mouse_x >= TB_W && mouse_x < TB_W + 8) view_x--;        /* left: the strip next to the palette */
+            if (mouse_x >= SCR_W - 8) view_x++;
+            if (mouse_y < BAR_H + 8 && mouse_x >= TB_W) view_y--;       /* top: the status bar counts, too */
+            if (mouse_y >= SCR_H - 8) view_y++;
             clamp_view();
             if (ox != view_x || oy != view_y) dirty = 1;
         }
