@@ -6,7 +6,7 @@
 #define SPACING 640               /* distance between two gusts (world pixels) */
 #define BAND 224                  /* width of a gust */
 #define SPEED 8                   /* world pixels per step */
-#define PEAK 7                    /* strongest dithering: 7 of 16 bright pixels */
+#define PEAK 9                    /* strongest dithering: 9 of 16 bright pixels */
 
 static UBYTE tree[LAST_TILE + 1];
 static const UBYTE bayer[16] = { 0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5 };
@@ -22,7 +22,7 @@ void wind_init(const UBYTE *tiles)
 
 void wind_palette(UBYTE *palette)
 {
-    static const UBYTE rgb[3] = { 0x88, 0xf8, 0x70 };       /* the bright green is 00 e6 00 */
+    static const UBYTE rgb[3] = { 0xa0, 0xff, 0x88 };       /* the bright green is 00 e6 00 */
     memcpy(palette + WIND_PEN * 3, rgb, 3);
 }
 
