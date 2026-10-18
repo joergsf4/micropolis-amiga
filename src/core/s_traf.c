@@ -83,6 +83,9 @@ short ZoneOnRail;		/* the zone has a rail tile next to it */
 short ZoneTested;		/* MakeTraf ran for this zone in this pass */
 short HubX[2][8], HubY[2][8], HubN[2];		/* ports (0) and airports (1) with power: zone centre tiles (of the last complete map scan) */
 short NextHubX[2][8], NextHubY[2][8], NextHubN[2];	/* the scan in progress */
+short HubRX[2][8], HubRY[2][8], NextHubRX[2][8], NextHubRY[2][8];	/* a road tile next to each hub: where a trip enters and leaves it */
+static short HubSea[8];				/* water body of each port (0 = none), filled by HubWater */
+static short HubSeaFor[8][2], HubSeaN;		/* the port list HubSea was computed for */
 static short Hopped;
 long HopCount;			/* trips that went on over a port or airport (statistics) */
 
@@ -354,38 +357,98 @@ DriveDone(void)
 }
 
 
-/* Ports and airports link separated areas: a trip that reaches a port (airport) goes on from the road next to another
- * powered port (airport), as ships (planes) would carry it. Once per trip. */
+/* Ports and airports link separated areas. A hub only counts when a road touches it (the trips come in and leave over
+ * that road). A trip that reaches a port (airport) goes on from the road of another one: ports only to ports on the same
+ * body of water (ships need water), airports to any airport (planes fly over land, too). Once per trip. */
+static short IsHubTile(int kind, int t)
+{
+  t &= LOMASK;
+  return (kind == 0) ? (t >= PORTBASE && t <= LASTPORT) : (t >= AIRPORTBASE && t < COALBASE);
+}
+
+RegisterHub(int kind)		/* called by the map scan for a powered port (0) or airport (1) at SMapX, SMapY */
+{
+  short r = (kind == 0) ? 4 : 5, x, y, n = NextHubN[kind];
+
+  if (!TrafficRules || n >= 8) return;
+  for (y = SMapY - r; y <= SMapY + r; y++)
+    for (x = SMapX - r; x <= SMapX + r; x++) {
+      if (!TestBounds(x, y) || !RoadTest(Map[x][y]) || IsHwy(Map[x][y])) continue;
+      if ((TestBounds(x, y - 1) && IsHubTile(kind, Map[x][y - 1])) || (TestBounds(x + 1, y) && IsHubTile(kind, Map[x + 1][y])) ||
+	  (TestBounds(x, y + 1) && IsHubTile(kind, Map[x][y + 1])) || (TestBounds(x - 1, y) && IsHubTile(kind, Map[x - 1][y]))) {
+	NextHubX[kind][n] = SMapX; NextHubY[kind][n] = SMapY;
+	NextHubRX[kind][n] = x; NextHubRY[kind][n] = y;
+	NextHubN[kind] = n + 1;
+	return;
+      }
+    }
+}
+
+static short Sea[WORLD_X][WORLD_Y];		/* water body label per tile (0 = not water / not labelled) */
+static short SeaStackX[WORLD_X * WORLD_Y], SeaStackY[WORLD_X * WORLD_Y];
+
+static short IsWaterTile(short x, short y)
+{
+  short t;
+  if (!TestBounds(x, y)) return 0;
+  t = Map[x][y] & LOMASK;
+  return (t >= RIVER && t <= LASTRIVEDGE) || t == BRWV || t == BRWH;
+}
+
+static void HubWater(void)		/* which body of water does each port touch? (recomputed when the ports change) */
+{
+  short k, x, y, same = (HubSeaN == HubN[0]), label = 0, sp;
+  static const short DX[4] = { 0, 1, 0, -1 }, DY[4] = { -1, 0, 1, 0 };
+
+  for (k = 0; k < HubN[0] && same; k++) if (HubSeaFor[k][0] != HubX[0][k] || HubSeaFor[k][1] != HubY[0][k]) same = 0;
+  if (same) return;
+  for (x = 0; x < WORLD_X; x++) for (y = 0; y < WORLD_Y; y++) Sea[x][y] = 0;
+  for (k = 0; k < HubN[0]; k++) {
+    HubSea[k] = 0;
+    HubSeaFor[k][0] = HubX[0][k]; HubSeaFor[k][1] = HubY[0][k];
+    for (y = HubY[0][k] - 5; y <= HubY[0][k] + 5 && !HubSea[k]; y++)		/* the nearest water tile of the port */
+      for (x = HubX[0][k] - 5; x <= HubX[0][k] + 5; x++)
+	if (IsWaterTile(x, y)) {
+	  if (!Sea[x][y]) {							/* label this whole body of water */
+	    label++; sp = 0;
+	    SeaStackX[sp] = x; SeaStackY[sp] = y; sp++; Sea[x][y] = label;
+	    while (sp > 0) {
+	      short cx, cy, d;
+	      sp--; cx = SeaStackX[sp]; cy = SeaStackY[sp];
+	      for (d = 0; d < 4; d++) {
+		short nx = cx + DX[d], ny = cy + DY[d];
+		if (IsWaterTile(nx, ny) && !Sea[nx][ny]) { Sea[nx][ny] = label; SeaStackX[sp] = nx; SeaStackY[sp] = ny; sp++; }
+	      }
+	    }
+	  }
+	  HubSea[k] = Sea[x][y];
+	  break;
+	}
+  }
+  HubSeaN = HubN[0];
+}
+
 HubHop(void)
 {
   static short DX[4] = { 0, 1, 0, -1 }, DY[4] = { -1, 0, 1, 0 };
-  short d, k, kind, n, here = -1, to, cx, cy, x, y, found = 0;
+  short d, k, kind, here = -1, found = 0, cand[8], nc = 0;
 
   for (d = 0; d < 4 && !found; d++) {
-    short tx = SMapX + DX[d], ty = SMapY + DY[d], t;
+    short tx = SMapX + DX[d], ty = SMapY + DY[d];
     if (!TestBounds(tx, ty)) continue;
-    t = Map[tx][ty] & LOMASK;
-    if (t >= PORTBASE && t <= LASTPORT) { kind = 0; found = 1; }
-    else if (t >= AIRPORTBASE && t < COALBASE) { kind = 1; found = 1; }
+    if (IsHubTile(0, Map[tx][ty])) { kind = 0; found = 1; }
+    else if (IsHubTile(1, Map[tx][ty])) { kind = 1; found = 1; }
   }
   if (!found || HubN[kind] < 2) return;
-  for (k = 0; k < HubN[kind]; k++) {		/* which hub are we at? the nearest centre */
-    short ax = HubX[kind][k] - SMapX, ay = HubY[kind][k] - SMapY;
-    if (ax < 0) ax = -ax;
-    if (ay < 0) ay = -ay;
-    if (ax + ay <= 6) { here = k; break; }
-  }
+  for (k = 0; k < HubN[kind]; k++)		/* which hub are we at? the one whose road we are on or next to */
+    if (abs(HubRX[kind][k] - SMapX) + abs(HubRY[kind][k] - SMapY) <= 8) { here = k; break; }
   if (here < 0) return;
-  n = HubN[kind] - 1;
-  to = Rand(n);
-  if (to >= here) to++;
-  cx = HubX[kind][to]; cy = HubY[kind][to];
-  for (y = cy - 4; y <= cy + 4 && !Hopped; y++)
-    for (x = cx - 4; x <= cx + 4; x++)
-      if (TestBounds(x, y) && RoadTest(Map[x][y])) {
-	SMapX = x; SMapY = y; LDir = 5; PosStackN = 0; Hopped = 1; HopCount++;
-	break;
-      }
+  if (kind == 0) HubWater();
+  for (k = 0; k < HubN[kind]; k++)
+    if (k != here && (kind == 1 || (HubSea[k] && HubSea[k] == HubSea[here]))) cand[nc++] = k;
+  if (!nc) return;
+  k = cand[Rand(nc - 1)];
+  SMapX = HubRX[kind][k]; SMapY = HubRY[kind][k]; LDir = 5; PosStackN = 0; Hopped = 1; HopCount++;
 }
 
 

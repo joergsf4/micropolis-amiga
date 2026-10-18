@@ -426,7 +426,7 @@ extern short HospPop, ChurchPop, StadiumPop;
 extern short PolicePop, FireStPop;
 extern short CoalPop, NuclearPop, PortPop, APortPop;
 extern short TrafficRules, ZoneJam, ZoneOnRail, ZoneTested;
-extern short HubX[2][8], HubY[2][8], HubN[2], NextHubX[2][8], NextHubY[2][8], NextHubN[2];
+extern short HubX[2][8], HubY[2][8], HubRX[2][8], HubRY[2][8], HubN[2], NextHubX[2][8], NextHubY[2][8], NextHubRX[2][8], NextHubRY[2][8], NextHubN[2];
 extern short NeedHosp, NeedChurch;
 extern short CrimeAverage, PolluteAverage, LVAverage;
 extern char *MicropolisVersion;
