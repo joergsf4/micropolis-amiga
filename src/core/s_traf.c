@@ -492,7 +492,8 @@ static void LaunchTransport(short kind, short a, short b)
     if (GetSprite(AIR) != NULL) return;
     sp = MakeSprite(AIR, (HubX[1][a] << 4) + 48, (HubY[1][a] << 4) + 12);
     sp->dest_x = (HubX[1][b] << 4) + 48; sp->dest_y = (HubY[1][b] << 4) + 12;
-    sp->flag = 1;					/* a scheduled flight: it lands at the other airport */
+    sp->flag = 1;					/* a scheduled flight: to the other airport and back, then it lands */
+    sp->orig_x = sp->x; sp->orig_y = sp->y; sp->step = 0;
     TripPlanes++;
   } else {						/* a ship from port a to port b over the water */
     short sx, sy, tx, ty;
@@ -500,7 +501,8 @@ static void LaunchTransport(short kind, short a, short b)
     if (!NearWater(HubX[0][a], HubY[0][a], &sx, &sy) || !NearWater(HubX[0][b], HubY[0][b], &tx, &ty)) return;
     if (!BuildShipPath(sx, sy, tx, ty)) return;
     sp = MakeSprite(SHI, (sx << 4) + 8 - 48, (sy << 4) + 8);
-    sp->flag = 1;					/* a scheduled trip: it follows ShipPath (see DoShipTrip) */
+    sp->flag = 1;					/* a scheduled trip: it follows ShipPath there and back (see DoShipTrip) */
+    sp->step = 0;
     sp->frame = sp->new_dir = 3; sp->dir = 10; sp->count = 0;
     TripShips++;
   }
@@ -534,6 +536,7 @@ void PlaneTrip(SimSprite *sp, int x, int y)		/* a plane that starts at the airpo
   if (here < 0) return;
   other = Rand(HubN[1] - 2); if (other >= here) other++;
   sp->dest_x = (HubX[1][other] << 4) + 48; sp->dest_y = (HubY[1][other] << 4) + 12;
+  sp->orig_x = sp->x; sp->orig_y = sp->y; sp->step = 0;
   sp->flag = 1;
   TripPlanes++;
 }

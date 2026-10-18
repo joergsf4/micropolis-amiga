@@ -647,11 +647,15 @@ DoAirplaneSprite(SimSprite *sprite)
     }
   }	
 
-  if (absDist < 50 && sprite->flag == 1) {	/* a scheduled flight has arrived: it lands */
-    sprite->frame = 0; TripPlanesLanded++;
-    return;
-  }
-  if (absDist < 50) { /* at destination  */
+  if (absDist < 50 && sprite->flag == 1) {				/* a scheduled flight has arrived */
+    if (sprite->step == 0) {						/* it flies back ... */
+      sprite->step = 1;
+      sprite->dest_x = sprite->orig_x; sprite->dest_y = sprite->orig_y;
+    } else {								/* ... and lands where it started */
+      sprite->frame = 0; TripPlanesLanded++;
+      return;
+    }
+  } else if (absDist < 50) { /* at destination  */
     sprite->dest_x = Rand((WORLD_X * 16) + 100) - 50;
     sprite->dest_y = Rand((WORLD_Y * 16) + 100) - 50;
   }
@@ -697,7 +701,20 @@ DoShipTrip(SimSprite *sprite)
     return;
   }
   sprite->count = 7;
-  if (ShipPathI >= ShipPathN) { sprite->frame = 0; TripShipsDocked++; return; }		/* arrived: docked */
+  if (ShipPathI >= ShipPathN) {						/* arrived */
+    if (sprite->step == 0) {						/* turn round and sail the same way back */
+      short i, tx, ty;
+      for (i = 0; i < ShipPathN / 2; i++) {
+	tx = ShipPathX[i]; ty = ShipPathY[i];
+	ShipPathX[i] = ShipPathX[ShipPathN - 1 - i]; ShipPathY[i] = ShipPathY[ShipPathN - 1 - i];
+	ShipPathX[ShipPathN - 1 - i] = tx; ShipPathY[ShipPathN - 1 - i] = ty;
+      }
+      ShipPathI = 0; sprite->step = 1; sprite->count = 0;
+      return;
+    }
+    sprite->frame = 0; TripShipsDocked++;				/* back at the start: docked */
+    return;
+  }
   dx = (ShipPathX[ShipPathI] << 4) + 8 - hx;
   dy = (ShipPathY[ShipPathI] << 4) + 8 - hy;
   ax = dx < 0 ? -dx : dx; ay = dy < 0 ? -dy : dy;
