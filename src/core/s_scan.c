@@ -269,6 +269,7 @@ GetPValue(int loc)
   if (loc <= LASTIND) return (0);
   if (loc < PORTBASE) return (50);	/* Ind  */
   if (loc <= LASTPOWERPLANT) return (/* 60 */ 100);	/* prt, aprt, cpp */
+  if (loc >= HWYBASE && loc <= HWYLAST) return (40);	/* highway: noise and exhaust */
   return (0);
 }
 

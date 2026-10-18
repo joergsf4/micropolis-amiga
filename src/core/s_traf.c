@@ -202,7 +202,7 @@ FindPRoad(void)		/* look for road on edges of zone   */
 	  tx = SMapX + PerimX[z];
 	  ty = SMapY + PerimY[z];
 	  if (TestBounds(tx, ty)) {
-		  if (RoadTest(Map[tx][ty])) {
+		  if (RoadTest(Map[tx][ty]) && !IsHwy(Map[tx][ty])) {		/* zones do not open onto a highway */
 			  SMapX = tx;
 			  SMapY = ty;
 			  return (TRUE);
@@ -236,11 +236,14 @@ FindPTele(void)		/* look for telecommunication on edges of zone */
 /* comefrom: MakeTraf */
 TryDrive(void)
 {
-  short z;
+  short z, free = 0;
 
   LDir = 5;
   for (z = 0; z < MAXDIS; z++) {	/* Maximum distance to try */
     if (TryGo(z)) {			/* if it got a road */
+      if (TrafficRules && IsHwy(Map[SMapX][SMapY]) && free < 200) {	/* a highway is fast: its tiles do not use up the distance */
+	z--; free++;
+      }
       if (DriveDone())			/* if destination is reached */
 	return (TRUE);			/* pass */
       if (TrafficRules && !Hopped) HubHop();	/* next to a port or airport: continue from another one */
@@ -390,6 +393,8 @@ HubHop(void)
 RoadTest(int x)
 {
   x = x & LOMASK;
+  if (x >= HWYBASE && x <= HWYLAST)
+    return (TrafficRules);			/* highways are part of the road net when the traffic rules are on */
   if (x < ROADBASE)
     return (FALSE);
   if (x > LASTRAIL)

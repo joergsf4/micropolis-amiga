@@ -345,6 +345,10 @@
 #define VBRDG3		951
 
 #define TILE_COUNT	960
+/* Highways (experiment, #37): 16 tiles after the original ones, one per combination of connected sides (N 1, E 2, S 4, W 8) */
+#define HWYBASE		960
+#define HWYLAST		975
+#define IsHwy(t)	(((t) & LOMASK) >= HWYBASE && ((t) & LOMASK) <= HWYLAST)
 
 /* 
  * These describe the wand values, the object dragged around on the screen.

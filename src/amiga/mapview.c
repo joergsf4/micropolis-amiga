@@ -71,7 +71,8 @@ static void draw_tiles(int mode)
     for (int col = 0; col < WORLD_X; col++) {
         for (int row = 0; row < WORLD_Y; row++) {
             unsigned tile = (unsigned short)Map[col][row] & LOMASK;
-            if (tile >= TILE_COUNT) tile -= TILE_COUNT;
+            if (tile >= HWYBASE && tile <= HWYLAST) tile = 66;           /* highway: shown as a road */
+            else if (tile >= TILE_COUNT) tile -= TILE_COUNT;
             switch (mode) {
             case 1: if (tile > 422) tile = 0;
                 break;                                                                    /* residential */
@@ -95,7 +96,8 @@ static void draw_power(void)
     for (int col = 0; col < WORLD_X; col++) {
         for (int row = 0; row < WORLD_Y; row++) {
             unsigned short tile = (unsigned short)Map[col][row];
-            if ((tile & LOMASK) >= TILE_COUNT) tile -= TILE_COUNT;
+            if (IsHwy(tile)) tile = (tile & ~LOMASK) | 66;               /* highway: shown as a road */
+            else if ((tile & LOMASK) >= TILE_COUNT) tile -= TILE_COUNT;
             if ((tile & LOMASK) <= 63) put_tile(col, row, tile & LOMASK);
             else if (tile & ZONEBIT) fill3(col, row, (tile & PWRBIT) ? PEN_V_RED : PEN_V_LBLUE);
             else if (tile & CONDBIT) fill3(col, row, PEN_V_LGRAY);

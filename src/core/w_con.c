@@ -104,7 +104,7 @@ ConnecTile(short x, short y, short *TileAdrPtr, short Command)
   }
 
   /* AutoDoze */
-  if ((Command >= 2) && (Command <= 4)) {
+  if ((Command >= 2) && (Command <= 5)) {
 
     if ((autoBulldoze != 0) &&
 	(TotalFunds > 0) &&
@@ -142,6 +142,11 @@ ConnecTile(short x, short y, short *TileAdrPtr, short Command)
     
   case 4:	/* Lay Wire */
     result = _LayWire(x, y, TileAdrPtr);
+    _FixZone(x, y, TileAdrPtr);
+    break;
+
+  case 5:	/* Lay Highway */
+    result = _LayHwy(x, y, TileAdrPtr);
     _FixZone(x, y, TileAdrPtr);
     break;
 
@@ -300,6 +305,22 @@ _LayRoad(int x, int y, short *TileAdrPtr)
 
   Spend(cost);
 
+  return 1;
+}
+
+
+/* comefrom: ConnecTile: a highway goes on bare land only (no bridges, no crossings); _FixSingle picks the picture */
+int
+_LayHwy(int x, int y, short *TileAdrPtr)
+{
+  if (TotalFunds < 40) {
+    return -2;
+  }
+  if (((*TileAdrPtr) & LOMASK) != DIRT) {
+    return 0;
+  }
+  (*TileAdrPtr) = HWYBASE | BULLBIT | BURNBIT;
+  Spend(40);
   return 1;
 }
 
@@ -524,6 +545,15 @@ _FixSingle(int x, int y, short *TileAdrPtr)
   short adjTile = 0;
 
   Tile = (*TileAdrPtr) & LOMASK;
+  if (IsHwy(Tile)) {				/* Cleanup Highway: joins other highways and the roads next to it */
+#define HWYJOIN(t) (IsHwy(t) || (((t) & LOMASK) >= 66 && ((t) & LOMASK) <= 76))
+    if (y > 0 && HWYJOIN(TileAdrPtr[-1])) adjTile |= 0x0001;
+    if (x < (WORLD_X - 1) && HWYJOIN(TileAdrPtr[WORLD_Y])) adjTile |= 0x0002;
+    if (y < (WORLD_Y - 1) && HWYJOIN(TileAdrPtr[1])) adjTile |= 0x0004;
+    if (x > 0 && HWYJOIN(TileAdrPtr[-WORLD_Y])) adjTile |= 0x0008;
+    (*TileAdrPtr) = (HWYBASE + adjTile) | BULLBIT | BURNBIT;
+    return;
+  }
   NeutralizeRoad(Tile);
   if ((Tile >= 66) && (Tile <= 76)) {		/* Cleanup Road */
 

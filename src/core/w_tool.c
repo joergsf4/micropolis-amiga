@@ -77,7 +77,7 @@ QUAD CostOf[] = {
       0,    500,      5,      1,
      20,     10,      0,      0,
    5000,     10,   3000,   3000,
-   5000,  10000,    100,      0,
+   5000,  10000,     40,      0,
 };
 
 
@@ -1022,6 +1022,25 @@ road_tool(SimView *view, short x, short y)
 
 
 int
+hwy_tool(SimView *view, short x, short y)
+{
+  int result;
+
+  if ((x < 0) || (x > (WORLD_X - 1)) ||
+      (y < 0) || (y > (WORLD_Y - 1))) {
+    return -1;
+  }
+
+  result = ConnecTile(x, y, &Map[x][y], 5);
+  UpdateFunds();
+  if (result == 1) {
+    DidTool(view, "Road", x, y);
+  }
+  return result;
+}
+
+
+int
 rail_tool(SimView *view, short x, short y)
 {
   int result;
@@ -1521,7 +1540,7 @@ do_tool(SimView *view, short state, short x, short y, short first)
     result = airport_tool(view, x >>4, y >>4);
     break;
   case networkState:
-    result = network_tool(view, x >>4, y >>4);
+    result = hwy_tool(view, x >>4, y >>4);
     break;
 
   default:

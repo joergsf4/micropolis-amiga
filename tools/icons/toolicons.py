@@ -257,6 +257,27 @@ GLYPH['road'] = [                         # road
     "kkkkkkkkkkkkkkkkkk",
 ]
 
+GLYPH['hwy'] = [                          # highway: wide carriageway with a median and an exit ramp
+    "kkkkkkkkkkkkkkkkkkkk",
+    "kyEEEEEEEEwwEEEEEEyk",
+    "kyEEEEEEEEwwEEEEEEyk",
+    "kywEEEEEEEEEEEEEEwyk",
+    "kyEEEEEEEEwwEEEEEEyk",
+    "kyEEEEEEEEwwEEEEEEyk",
+    "kyEEEEwEEEEEEEEwEEyk",
+    "kyEEEEwEEEeeEEEwEEyk",
+    "kyEEEEEEEEeeEEEEEEyk",
+    "kyEEEEEEEEeeEEEEEEyk",
+    "kywEEEEEEEEEEEEEEwyk",
+    "kyEEEEwEEEeeEEEwEEyk",
+    "kyEEEEwEEEEEEEEwEEyk",
+    "kyEEEEEEEEeeEEEEEEyk",
+    "kyEEEEEEEEeeEEEEEEyk",
+    "kywEEEEEEEEEEEEEEwyk",
+    "kyEEEEEEEEwwEEEEEEyk",
+    "kkkkkkkkkkkkkkkkkkkk",
+]
+
 GLYPH['chlk'] = [                         # chalk
     "..............kkk.",
     ".............kwwwk",
@@ -423,14 +444,14 @@ GLYPH['airp'] = sym([                     # plane from above
 ])
 
 ORDER = ['res', 'com', 'ind', 'fire', 'qry', 'pol', 'wire', 'dozr', 'rail', 'road', 'chlk', 'ersr',
-         'stad', 'park', 'seap', 'coal', 'nuc', 'airp']
+         'stad', 'park', 'seap', 'coal', 'nuc', 'airp', 'hwy']
 GROUP_OF = {'res': 'zone_r', 'com': 'zone_c', 'ind': 'zone_i', 'fire': 'service', 'pol': 'service', 'stad': 'service', 'park': 'service',
             'qry': 'tool', 'dozr': 'tool', 'chlk': 'tool', 'ersr': 'tool',
             'wire': 'power', 'coal': 'power', 'nuc': 'power',
-            'rail': 'transport', 'road': 'transport', 'seap': 'building', 'airp': 'building'}
+            'rail': 'transport', 'road': 'transport', 'hwy': 'transport', 'seap': 'building', 'airp': 'building'}
 NAME = {'res': 'Residential', 'com': 'Commercial', 'ind': 'Industrial', 'fire': 'Fire Station', 'qry': 'Query', 'pol': 'Police Station',
         'wire': 'Wire', 'dozr': 'Bulldozer', 'rail': 'Rail', 'road': 'Road', 'chlk': 'Chalk', 'ersr': 'Eraser',
-        'stad': 'Stadium', 'park': 'Park', 'seap': 'Seaport', 'coal': 'Coal Power', 'nuc': 'Nuclear Power', 'airp': 'Airport'}
+        'stad': 'Stadium', 'park': 'Park', 'seap': 'Seaport', 'coal': 'Coal Power', 'nuc': 'Nuclear Power', 'airp': 'Airport', 'hwy': 'Highway'}
 
 
 def glyph_image(name):

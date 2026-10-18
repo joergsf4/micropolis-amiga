@@ -728,6 +728,11 @@ MapScan(int x1, int x2)
 	    continue;
 	  }
 
+	  if (IsHwy(CChr9)) {		/* highway: costs more to keep up than a road, never jams */
+	    RoadTotal += 3;
+	    continue;
+	  }
+
 	  if (CChr & ZONEBIT) {	/* process Zones */
 	    DoZone();
 	    continue;

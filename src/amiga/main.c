@@ -15,6 +15,7 @@
 #include "sound_ui.h"
 #include "coast.h"
 #include "wind.h"
+#include "hwy.h"
 #include "l10n.h"
 #undef GetSprite
 #include <stdio.h>
@@ -215,7 +216,7 @@ static int debug_show;                  /* test option show=eval|graph: keep mes
 static const int panning = 0;            /* (right button is the menu button now) */
 static int mouse_x = -1, mouse_y = -1;   /* last window position, for edge scrolling */
 
-#define NTOOLS 18
+#define NTOOLS 19
 static UBYTE *toolicons2;              /* toolicons2.bin: uniform 32x32 set (colours from pen 48 up) */
 static int toolicons2_n, toolicons2_t;
 static UBYTE *toolicons;               /* toolicons.bin: the original's tool palette pictures (normal and highlighted) */
@@ -227,6 +228,7 @@ static const struct { const char *name; int cost; short x, y; } tooldef[NTOOLS] 
     { N_("Chalk"), 0, 32, 216 },         { N_("Eraser"), 0, 70, 216 },
     { N_("Stadium"), 5000, 5, 254 },     { N_("Park"), 10, 51, 254 },         { N_("Seaport"), 3000, 89, 254 },
     { N_("Coal Power"), 3000, 5, 300 },  { N_("Nuclear Power"), 5000, 89, 300 }, { N_("Airport"), 10000, 39, 346 },
+    { N_("Highway"), 40, 5, 392 },                       /* no picture in the classic set: it shows the uniform icon */
 };
 
 /* ---------- notifications from the simulation core (see ui_core.c) ---------- */
@@ -320,6 +322,10 @@ static int load_assets(void)
     UBYTE *pal = load_file("PROGDIR:res/palette.bin", NULL);
     tiles = load_file("PROGDIR:res/tiles.bin", NULL);
     objects = load_file("PROGDIR:res/objects.bin", NULL);
+    if (tiles) {                                          /* the original tiles plus the highway pictures (drawn in code) */
+        UBYTE *nt = AllocVec((TILE_COUNT + HWY_TILES) * 256, MEMF_ANY | MEMF_CLEAR);
+        if (nt) { memcpy(nt, tiles, TILE_COUNT * 256); hwy_make_tiles(nt + TILE_COUNT * 256); FreeVec(tiles); tiles = nt; }
+    }
     toolicons = load_file("PROGDIR:res/toolicons.bin", NULL);
     toolicons2 = load_file("PROGDIR:res/toolicons2.bin", NULL);
     if (toolicons2) { toolicons2_n = *(UWORD *)toolicons2; toolicons2_t = *(UWORD *)(toolicons2 + 2); }
@@ -495,7 +501,7 @@ static void draw_toolbar(void)
         }
     } else if (toolicons) {
         const UBYTE *tab = toolicons + 2;
-        for (int i = 0; i < NTOOLS; i++) {
+        for (int i = 0; i < 18; i++) {                      /* the classic set has no highway picture */
             int w = tab[i * 10], h = tab[i * 10 + 1];
             const UBYTE *px = toolicons + *(const ULONG *)(tab + i * 10 + (i == editor.tool_state ? 6 : 2));
             for (int y = 0; y < h; y++) {
@@ -868,7 +874,7 @@ static void render_frame(struct Window *win)
             int mx = view_x + col, my = view_y + row, tile = 0;
             if (mx < WORLD_X && my < WORLD_Y) {
                 tile = (unsigned short)Map[mx][my];
-                if ((tile & LOMASK) >= TILE_COUNT) tile -= TILE_COUNT;
+                if ((tile & LOMASK) >= TILE_COUNT + HWY_TILES) tile -= TILE_COUNT;
                 if (blink && (tile & ZONEBIT) && !(tile & PWRBIT)) tile = LIGHTNINGBOLT;
                 else tile &= LOMASK;
             }
@@ -1852,10 +1858,10 @@ static int real_main(int argc, char **argv)
                     if (mx < TB_W && my >= BAR_H) {
                         int i = tool_at(mx, my);
                         if (i >= 0) {
-                            static const char *const tool_sound[18] = { "res", "com", "ind", "fire", "query", "police", "wire", "bulldozer", "rail",
-                                                                         "road", "chalk", "eraser", "stadium", "park", "seaport", "coal", "nuclear", "airport" };
+                            static const char *const tool_sound[19] = { "res", "com", "ind", "fire", "query", "police", "wire", "bulldozer", "rail",
+                                                                         "road", "chalk", "eraser", "stadium", "park", "seaport", "coal", "nuclear", "airport", "road" };
                             editor.tool_state = i; toolbar_dirty = 1; tb_label_only = 0;
-                            if (UserSoundOn && speak_tools && editor.tool_state >= 0 && editor.tool_state < 18) sound_play(tool_sound[editor.tool_state]);   /* like the original palette */
+                            if (UserSoundOn && speak_tools && editor.tool_state >= 0 && editor.tool_state < 19) sound_play(tool_sound[editor.tool_state]);   /* like the original palette */
                         }
                     } else if (inview) {
                         ToolDown(&editor, wx, wy);
