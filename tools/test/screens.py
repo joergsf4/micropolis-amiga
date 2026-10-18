@@ -82,6 +82,8 @@ def run_case(args, timeout=60):
 CASES = [
     ('start-en', 'show=none', [('fb', 'Speed 2', True), ('fb', '(Pause)', False), ('fb', 'Funds:', True), ('fb', 'Query', True)]),
     ('pause', 'show=none speed=0', [('fb', 'Speed 0', True), ('fb', '(Pause)', True)]),
+    ('hwy-de', 'show=none lang=deutsch hover=18', [('fb', 'Autobahn', True), ('fb', 'Kosten: $40', True)]),
+    ('query-de', 'show=none lang=deutsch query=108,10', [('scr', 'Zonenabfrage', True), ('scr', 'Strom', True), ('scr', 'Stra\xdfenanschluss', True)]),
     ('hover', 'show=none hover=7', [('fb', 'Bulldozer', True), ('fb', 'Cost: $1', True)]),
     ('budget-en', 'show=budget', [('scr', 'Taxes collected', True), ('scr', '$1,000,000', True), ('scr', 'Continue', True)]),
     ('budget-de', 'show=budget lang=deutsch', [('scr', 'Steuereinnahmen', True), ('scr', '$1,000,000', True), ('scr', 'Weiter', True)]),

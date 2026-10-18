@@ -142,7 +142,8 @@
 @toc MAIN
 
   Optionen/Animation schaltet auch die Brandung an den Küsten (Wellen, die
-  anrollen und zurückfließen) und die Windböen über den Wäldern.
+  anrollen und zurückfließen), die Windböen über den Wäldern und die
+  Autos auf den Autobahnen.
 @endnode
 
 @node DEMAND "Die R-C-I-Balken"

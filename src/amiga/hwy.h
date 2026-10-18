@@ -5,5 +5,6 @@
 #include <exec/types.h>
 #define HWY_TILES 16
 void hwy_make_tiles(UBYTE *dst);     /* 16 tiles of 16x16 palette indices */
+void hwy_cars(UBYTE *dst, int stride, int tile, int wx, int wy, int tick);   /* little cars on a highway tile already copied into dst; (wx, wy) = world pixel of its corner */
 void hwy_small_tiles(UBYTE *dst);    /* 16 minimap tiles of 12 bytes (2x? colours like the game's tilessm.bin: same pen for all) */
 #endif

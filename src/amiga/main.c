@@ -415,6 +415,8 @@ static void draw_tile(int col, int row, int tile)
         memcpy(dst, src, 16);
     if (DoAnimation && coast_has(tile))                          /* surf along the shore */
         coast_draw(fb + (BAR_H + row * 16) * SCR_W + TB_W + col * 16, SCR_W, tile, (view_x + col) << 4, (view_y + row) << 4, coast_tick);
+    if (DoAnimation && IsHwy(tile))                              /* cars on the highways */
+        hwy_cars(fb + (BAR_H + row * 16) * SCR_W + TB_W + col * 16, SCR_W, tile, (view_x + col) << 4, (view_y + row) << 4, coast_tick);
     if (DoAnimation && wind_has(tile))                           /* gusts over the woods */
         wind_draw(fb + (BAR_H + row * 16) * SCR_W + TB_W + col * 16, SCR_W, tile, (view_x + col) << 4, (view_y + row) << 4, coast_tick);
 }
@@ -904,6 +906,7 @@ static void render_frame(struct Window *win)
                 else tile &= LOMASK;
             }
             if (DoAnimation && coast_has(tile)) { coast_now++; if (coast_moved) redraw[row][col] = 1; }
+            else if (DoAnimation && IsHwy(tile)) { coast_now++; if (coast_moved) redraw[row][col] = 1; }   /* the cars move */
             else if (DoAnimation && wind_has(tile)) {                /* only trees a gust touches now or touched one step ago */
                 int wx = mx << 4, wy = my << 4;
                 coast_now++;
