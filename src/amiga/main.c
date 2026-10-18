@@ -661,11 +661,11 @@ static void draw_query(void)
     gfx_target(scratch, SCRATCH_STRIDE);
     gfx_colors(PEN_TEXT, PEN_BAR);
     gfx_print(QUERY_X + 8, QUERY_Y + 18, T("Query zone status"));
-    for (int i = 0; i < 6; i++) { gfx_print(QUERY_X + 8, QUERY_Y + 36 + i * 13, T(label[i])); gfx_print(QUERY_X + 8 + 88, QUERY_Y + 36 + i * 13, T(query_f[i])); }
+    for (int i = 0; i < 6; i++) { gfx_print(QUERY_X + 8, QUERY_Y + 36 + i * 13, T(label[i])); gfx_print(QUERY_X + 8 + 104, QUERY_Y + 36 + i * 13, T(query_f[i])); }
     for (int i = 0; i < query_n; i++) {                                                  /* traffic lines (traffic rules) */
         int y = QUERY_Y + 36 + (6 + i) * 13 + 8;
         gfx_colors(PEN_V_YELLOW, PEN_BAR);
-        gfx_print(QUERY_X + 8, y, T(query_k[i])); gfx_print(QUERY_X + 8 + 120, y, T(query_v[i]));
+        gfx_print(QUERY_X + 8, y, T(query_k[i])); gfx_print_r(QUERY_X + QUERY_W - 8, y, T(query_v[i]));
     }
 }
 static void close_query(void) { query_visible = 0; }

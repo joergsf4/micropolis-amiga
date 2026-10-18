@@ -32,10 +32,12 @@ Highway
 Rail link
 Traffic effect
 Linked hubs
-Trips this year
-Trips last year
 Power
 Road link
 Unknown
 Yes
 No
+A seaport is at capacity: build another one
+An airport is at capacity: build another one
+Used this year
+Used last year

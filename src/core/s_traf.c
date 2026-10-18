@@ -85,7 +85,8 @@ short HubX[2][8], HubY[2][8], HubN[2];		/* ports (0) and airports (1) with power
 short NextHubX[2][8], NextHubY[2][8], NextHubN[2];	/* the scan in progress */
 short HubRX[2][8], HubRY[2][8], NextHubRX[2][8], NextHubRY[2][8];	/* a road tile next to each hub: where a trip enters and leaves it */
 #define HUBSTATS 16
-static struct { short kind, x, y, now, last; } HubStat[HUBSTATS];
+#define HUB_CAPACITY 40			/* trips per year one port or airport can carry: more are refused (the trip fails) */
+static struct { short kind, x, y, now, last, warned; } HubStat[HUBSTATS];
 
 static short HubStatFor(short kind, short x, short y)		/* the counter of the hub at x, y (made on first use) */
 {
@@ -95,14 +96,14 @@ static short HubStatFor(short kind, short x, short y)		/* the counter of the hub
     if (free < 0 && !HubStat[i].kind) free = i;
   }
   if (free < 0) free = 0;
-  HubStat[free].kind = kind + 1; HubStat[free].x = x; HubStat[free].y = y; HubStat[free].now = HubStat[free].last = 0;
+  HubStat[free].kind = kind + 1; HubStat[free].x = x; HubStat[free].y = y; HubStat[free].now = HubStat[free].last = 0; HubStat[free].warned = 0;
   return (free);
 }
 
 void HubYearRoll(void)						/* once a year (at tax time) */
 {
   short i;
-  for (i = 0; i < HUBSTATS; i++) { HubStat[i].last = HubStat[i].now; HubStat[i].now = 0; }
+  for (i = 0; i < HUBSTATS; i++) { HubStat[i].last = HubStat[i].now; HubStat[i].now = 0; HubStat[i].warned = 0; }
 }
 
 static short HubSea[8];				/* water body of each port (0 = none), filled by HubWater */
@@ -562,6 +563,17 @@ void PlaneTrip(SimSprite *sp, int x, int y)		/* a plane that starts at the airpo
   TripPlanes++;
 }
 
+static short HubFull(short kind, short k)			/* the hub has used up its capacity this year (warns once a year) */
+{
+  short s = HubStatFor(kind, HubX[kind][k], HubY[kind][k]);
+  if (HubStat[s].now < HUB_CAPACITY) return (0);
+  if (!HubStat[s].warned) {
+    HubStat[s].warned = 1;
+    Eval(kind == 0 ? "UISetMessage {A seaport is at capacity: build another one}" : "UISetMessage {An airport is at capacity: build another one}");
+  }
+  return (1);
+}
+
 HubHop(void)
 {
   static short DX[4] = { 0, 1, 0, -1 }, DY[4] = { -1, 0, 1, 0 };
@@ -578,8 +590,12 @@ HubHop(void)
     if (abs(HubRX[kind][k] - SMapX) + abs(HubRY[kind][k] - SMapY) <= 8) { here = k; break; }
   if (here < 0) return;
   if (kind == 0) HubWater();
+  if (HubFull(kind, here)) return;				/* this hub has carried all it can this year */
   for (k = 0; k < HubN[kind]; k++)
-    if (k != here && (kind == 1 || (HubSea[k] && HubSea[k] == HubSea[here]))) cand[nc++] = k;
+    if (k != here && (kind == 1 || (HubSea[k] && HubSea[k] == HubSea[here]))) {
+      if (HubFull(kind, k)) continue;				/* a full partner is no way on */
+      cand[nc++] = k;
+    }
   if (!nc) return;
   k = cand[Rand(nc - 1)];
   SMapX = HubRX[kind][k]; SMapY = HubRY[kind][k]; LDir = 5; PosStackN = 0; Hopped = 1; HopCount++;
@@ -649,8 +665,8 @@ void TrafficStatus(short x, short y)				/* sent after UIShowZoneStatus for the t
 	  if (kind == 0) HubWater();
 	  for (j = 0; j < HubN[kind]; j++) if (j != k && (kind == 1 || (HubSea[j] && HubSea[j] == HubSea[k]))) n++;
 	  p += sprintf(p, " {Linked hubs|%d}", (int)n);
-	  p += sprintf(p, " {Trips this year|%d}", (int)HubStat[s].now);
-	  p += sprintf(p, " {Trips last year|%d}", (int)HubStat[s].last);
+	  p += sprintf(p, " {Used this year|%d of %d}", (int)HubStat[s].now, HUB_CAPACITY);
+	  p += sprintf(p, " {Used last year|%d of %d}", (int)HubStat[s].last, HUB_CAPACITY);
 	} else {
 	  short rr = (kind == 0) ? 4 : 5, road = 0;
 	  for (j = cy - rr; j <= cy + rr && !road; j++)			/* a road touching the hub (as RegisterHub looks for it) */

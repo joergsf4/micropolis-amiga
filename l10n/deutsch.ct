@@ -1072,15 +1072,21 @@ Verkehrswirkung
 S_32E2F1F4
 Verbundene Häfen
 ; Linked hubs
-S_684ED03A
-Fahrten dieses Jahr
-; Trips this year
-S_7BA04C1A
-Fahrten letztes Jahr
-; Trips last year
 S_13051395
 Straßenanschluss
 ; Road link
 S_4C200E59
 unbekannt
 ; Unknown
+S_1A5F74B4
+Seehafen ausgelastet: noch einen bauen
+; A seaport is at capacity: build another one
+S_6B0908D5
+Flughafen ausgelastet: noch einen bauen
+; An airport is at capacity: build another one
+S_00BCD0AD
+Genutzt dieses Jahr
+; Used this year
+S_0FA3B769
+Genutzt letztes Jahr
+; Used last year

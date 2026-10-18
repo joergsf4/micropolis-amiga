@@ -1072,15 +1072,21 @@ Wplyw ruchu
 S_32E2F1F4
 Polaczone porty
 ; Linked hubs
-S_684ED03A
-Przejazdy w tym roku
-; Trips this year
-S_7BA04C1A
-Przejazdy w zeszlym roku
-; Trips last year
 S_13051395
 Dojazd droga
 ; Road link
 S_4C200E59
 nieznane
 ; Unknown
+S_1A5F74B4
+Port przeciazony: zbuduj kolejny
+; A seaport is at capacity: build another one
+S_6B0908D5
+Lotnisko przeciazone: zbuduj kolejne
+; An airport is at capacity: build another one
+S_00BCD0AD
+Uzycie w tym roku
+; Used this year
+S_0FA3B769
+Uzycie w zeszlym roku
+; Used last year
