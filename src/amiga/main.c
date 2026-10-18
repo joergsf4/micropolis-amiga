@@ -13,6 +13,7 @@
 #include "gfx.h"
 #include "sound.h"
 #include "sound_ui.h"
+#include "coast.h"
 #include "l10n.h"
 #undef GetSprite
 #include <stdio.h>
@@ -331,6 +332,7 @@ static int load_assets(void)
     map_load();
     notice_load();
     memcpy(palette, pal, 256 * 3);
+    coast_init(tiles, pal);
     FreeVec(pal);
     if (toolicons2) for (int i = 0; i < toolicons2_n && 48 + i < 256; i++) memcpy(&palette[(48 + i) * 3], toolicons2 + 4 + i * 3, 3);
     palette[PEN_BAR * 3 + 0] = 0x20; palette[PEN_BAR * 3 + 1] = 0x28; palette[PEN_BAR * 3 + 2] = 0x50;
@@ -373,12 +375,17 @@ static char last_line1[200], last_line2[200];
 
 static struct { long frames, tiles, bytes, render_us, sim_us, sim_steps; } stats;   /* no doubles: the ieee double library is unreliable */
 
+static int coast_tick, coast_seen;                /* animation step of the surf (110 ms each); shore tiles seen in the last picture */
+static int coast_freeze = -1;                     /* debug: show this step only */
+
 static void draw_tile(int col, int row, int tile)
 {
     const UBYTE *src = tiles + tile * 256;
     UBYTE *dst = fb + (BAR_H + row * 16) * SCR_W + TB_W + col * 16;
     for (int y = 0; y < 16; y++, src += 16, dst += SCR_W)
         memcpy(dst, src, 16);
+    if (DoAnimation && coast_has(tile))                          /* surf along the shore */
+        coast_draw(fb + (BAR_H + row * 16) * SCR_W + TB_W + col * 16, SCR_W, tile, (view_x + col) << 4, (view_y + row) << 4, coast_tick);
 }
 
 /* picture of a sprite frame: size and pixels (0 = transparent), NULL if unknown */
@@ -848,6 +855,9 @@ static void render_frame(struct Window *win)
     }
 
     /* which cells changed? */
+    static int coast_drawn = -1;
+    int coast_now = 0, coast_moved = coast_drawn != coast_tick;
+
     for (int row = 0; row < VIEW_ROWS; row++) {
         for (int col = 0; col < VIEW_COLS; col++) {
             int mx = view_x + col, my = view_y + row, tile = 0;
@@ -857,9 +867,12 @@ static void render_frame(struct Window *win)
                 if (blink && (tile & ZONEBIT) && !(tile & PWRBIT)) tile = LIGHTNINGBOLT;
                 else tile &= LOMASK;
             }
+            if (DoAnimation && coast_has(tile)) { coast_now++; if (coast_moved) redraw[row][col] = 1; }
             if (tile != shown[row][col]) { redraw[row][col] = 1; shown[row][col] = tile; }
         }
     }
+
+    coast_drawn = coast_tick; coast_seen = coast_now;
 
     /* moving things: redraw the cells under their old and new positions */
     for (SimSprite *sp = sim->sprite; sp && n_spr < MAX_SPR; sp = sp->next) {
@@ -1704,7 +1717,8 @@ static int real_main(int argc, char **argv)
         if (!strncmp(a, "show=", 5)) debug_show = 1;
         if (!strcmp(a, "show=about")) { show_about(); dbg_about = 1; }
         if (!strcmp(a, "newcity")) do_command(CMD_NEW, win, NULL);
-        if (!strcmp(a, "det")) { dbg_det = 1; DoAnimation = 0; ambient_on = 0; }
+        if (!strncmp(a, "coast=", 6)) { coast_freeze = atoi(a + 6); DoAnimation = 1; }   /* debug: show one surf step (with det) */
+        if (!strcmp(a, "det")) { dbg_det = 1; DoAnimation = coast_freeze >= 0; ambient_on = 0; }
         if (!strncmp(a, "dump=", 5)) strncpy(dbg_dump, a + 5, sizeof dbg_dump - 1);
         if (!strcmp(a, "show=eval")) open_info_panel(P_EVAL);              /* debug: open a panel at start */
         if (!strcmp(a, "show=graph")) open_info_panel(P_GRAPH);
@@ -1855,6 +1869,12 @@ static int real_main(int argc, char **argv)
             if (ox != view_x || oy != view_y) dirty = 1;
         }
         sound_poll();
+        if (DoAnimation && coast_seen) {                           /* surf: next step every 110 ms (only while shore is on the screen) */
+            struct timeval tn; int st;
+            gettimeofday(&tn, NULL);
+            st = coast_freeze >= 0 ? coast_freeze : (int)((tn.tv_sec * 1000 + tn.tv_usec / 1000) / 110);
+            if (st != coast_tick) { coast_tick = st; dirty = 1; }
+        }
         { static int amb_frame; if ((++amb_frame & 31) == 0 || amb_frame == 1) ambient_update(); ambient_tick(); }
         guide_poll();
         if (ShakeNow > 0 && shake_frames == 0) { shake_frames = 50; shake_bx = view_x; shake_by = view_y; }
