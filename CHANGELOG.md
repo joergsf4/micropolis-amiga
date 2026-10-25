@@ -2,6 +2,23 @@
 
 Older versions: see the release notes on GitHub (v0.1 to v0.8.1).
 
+## 0.8.4 (25 October 2026)
+
+### Fixed
+- **Scrolling is no longer slowed down by the animation** (#39): the surf and the wind stand still while the view scrolls and go on
+  a moment after it stopped; a slow machine (a step that takes long to draw) gets half the animation speed; the surf is drawn
+  from a list of the pixels it can touch instead of all 256.
+- **The surf could be drawn wrongly:** the animation clock overflowed the 32 bit numbers of the Amiga, its steps became negative
+  and the wave pattern read from outside its table (restless, wrong shapes). The clock is now always positive.
+- **Gusts of wind are calmer** (#39): fewer lighter pixels, a wider and slower band, a colour closer to the green.
+- **Menus use the "new look"** (#33): they follow the screen's pens like the Workbench (grey, 3D) instead of the 1.3 style with the
+  game's colour 1 as background, which turned the highlighted entry black with unreadable text on 256 colour screens.
+- **Autoscrolling at the left edge** (#34): the very left pixel columns of the screen scroll as well, not only the strip next to
+  the tool palette.
+
+### Other
+- The log (option `debug`) lists the pens of the screen (`pens:`) and times the `scroll=N` test.
+
 ## 0.8.3 (25 October 2026)
 
 ### New

@@ -3,10 +3,10 @@
 
 #define LAST_TILE 63
 #define PEN_BRIGHT 8              /* the tile palette's bright green: the only colour that changes */
-#define SPACING 640               /* distance between two gusts (world pixels) */
-#define BAND 224                  /* width of a gust */
-#define SPEED 8                   /* world pixels per step */
-#define PEAK 14                   /* strongest dithering: 14 of 16 bright pixels */
+#define SPACING 960               /* distance between two gusts (world pixels) */
+#define BAND 320                  /* width of a gust */
+#define SPEED 4                   /* world pixels per step */
+#define PEAK 5                    /* strongest dithering: 5 of 16 bright pixels (calm: more was too restless) */
 
 static UBYTE tree[LAST_TILE + 1];
 static const UBYTE bayer[16] = { 0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5 };
@@ -22,7 +22,7 @@ void wind_init(const UBYTE *tiles)
 
 void wind_palette(UBYTE *palette)
 {
-    static const UBYTE rgb[3] = { 0xb8, 0xff, 0x98 };       /* the bright green is 00 e6 00 */
+    static const UBYTE rgb[3] = { 0x78, 0xf4, 0x60 };       /* the bright green is 00 e6 00 */
     memcpy(palette + WIND_PEN * 3, rgb, 3);
 }
 

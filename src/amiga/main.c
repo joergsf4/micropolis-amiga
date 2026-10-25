@@ -378,6 +378,7 @@ static char last_line1[200], last_line2[200];
 
 static struct { long frames, tiles, bytes, render_us, sim_us, sim_steps; } stats;   /* no doubles: the ieee double library is unreliable */
 
+static int anim_hold, anim_slow;                  /* the animation stands still while the view scrolls (anim_hold frames); anim_slow: a slow machine, half the speed */
 static int coast_tick, coast_seen;                /* animation step of the surf (145 ms each); shore tiles seen in the last picture */
 static int coast_freeze = -1;                     /* debug: show this step only */
 
@@ -739,7 +740,7 @@ static void panel_open(int i)
     if (y < bar) y = bar;
     p->win = OpenWindowTags(NULL, WA_CustomScreen, (ULONG)g_scr, WA_Left, x, WA_Top, y,
                             WA_InnerWidth, p->w, WA_InnerHeight, p->h, WA_Title, (ULONG)T(p->title),
-                            WA_DragBar, TRUE, WA_DepthGadget, TRUE, WA_CloseGadget, TRUE, WA_Activate, TRUE,
+                            WA_DragBar, TRUE, WA_DepthGadget, TRUE, WA_CloseGadget, TRUE, WA_Activate, TRUE, WA_NewLookMenus, TRUE,
                             WA_SimpleRefresh, TRUE, WA_ReportMouse, p->wants_move ? TRUE : FALSE,
                             WA_IDCMP, 0, TAG_DONE);
     if (!p->win) { *p->visible = 0; return; }
@@ -843,6 +844,7 @@ static void render_frame(struct Window *win)
     gettimeofday(&t_a, NULL);
     if (view_x != last_view_x || view_y != last_view_y) {
         int ddx = view_x - last_view_x, ddy = view_y - last_view_y;
+        anim_hold = 12;                                          /* scrolling: no animation steps until it has been still for a moment */
         if (!full_redraw && !first_present && last_view_x >= 0 && panels_open() == 0 &&
             ddx >= -6 && ddx <= 6 && ddy >= -6 && ddy <= 6)
             scroll_by(rp, ddx, ddy);
@@ -933,7 +935,10 @@ static void render_frame(struct Window *win)
         gfx_colors(PEN_TEXT, PEN_BAR);
         gfx_print(DEM_X + 10, DEM_Y + 30, "R"); gfx_print(DEM_X + 46, DEM_Y + 30, "C"); gfx_print(DEM_X + 82, DEM_Y + 30, "I");
     }
-    stats.render_us += elapsed_us();
+    { long el = elapsed_us();
+      stats.render_us += el;
+      if (coast_moved) anim_slow = el > 60000 ? 1 : el < 30000 ? 0 : anim_slow;      /* an animation step that takes long: slow it down (with some hysteresis) */
+    }
 
     /* send the changes to the screen */
     if (first_present) {
@@ -1053,7 +1058,7 @@ static struct Menu *make_menus(struct Screen *scr, APTR *vi_out)
     *vi_out = vi;
     if (!vi) return NULL;
     menu = CreateMenusA(newmenu, NULL);
-    if (menu && !LayoutMenusA(menu, vi, NULL)) { FreeMenus(menu); menu = NULL; }
+    if (menu && !LayoutMenus(menu, vi, GTMN_NewLookMenus, TRUE, TAG_DONE)) { FreeMenus(menu); menu = NULL; }   /* new look: the menus use the screen's pens (grey, 3D), not the 1.3 black-and-colour 1 look */
     if (menu) {                                               /* every title must be reachable: the last one has to end inside the screen */
         int right = 0; char lb[80];
         for (struct Menu *m = menu; m; m = m->NextMenu) if (m->LeftEdge + m->Width > right) right = m->LeftEdge + m->Width;
@@ -1655,6 +1660,15 @@ static int real_main(int argc, char **argv)
     if (!scr) { fail(T("Cannot open the RTG screen (mode 0x%08lx, %d bit)."), (unsigned long)id, depth); goto out; }
     g_scr = scr;
     logmsg("screen open");
+    {   struct DrawInfo *dri = GetScreenDrawInfo(scr);                 /* which pens will the menus use? (they are inverted when highlighted) */
+        if (dri) {
+            char b[160]; int n = dri->dri_NumPens < 12 ? dri->dri_NumPens : 12;
+            strcpy(b, "pens:");
+            for (int i = 0; i < n; i++) sprintf(b + strlen(b), " %d", (int)dri->dri_Pens[i]);
+            logmsg(b);
+            FreeScreenDrawInfo(scr, dri);
+        }
+    }
     {   /* the game picture fills the screen below the title bar */
         int top = scr->BarHeight + 1;
         scr_w = scr->Width > MAX_W ? MAX_W : scr->Width;
@@ -1677,7 +1691,7 @@ static int real_main(int argc, char **argv)
         idcmp_port = CreateMsgPort();
         if (!idcmp_port) { fail(T("Cannot create a message port.")); goto out; }
         win = OpenWindowTags(NULL, WA_CustomScreen, (ULONG)scr, WA_Left, 0, WA_Top, top, WA_Width, scr_w,
-                             WA_Height, scr_h, WA_Borderless, TRUE, WA_Backdrop, TRUE, WA_Activate, TRUE,
+                             WA_Height, scr_h, WA_Borderless, TRUE, WA_Backdrop, TRUE, WA_Activate, TRUE, WA_NewLookMenus, TRUE,
                              WA_ReportMouse, TRUE, WA_SimpleRefresh, TRUE, WA_IDCMP, 0, TAG_DONE);
         if (!win) { fail(T("Cannot open the game window.")); goto out; }
         win->UserPort = idcmp_port;
@@ -1871,7 +1885,7 @@ static int real_main(int argc, char **argv)
         }
         if (mouse_x >= 0 && !panning && (++frame & 3) == 0) {   /* edge scrolling */
             int ox = view_x, oy = view_y;
-            if (mouse_x >= TB_W && mouse_x < TB_W + 8) view_x--;        /* left: the strip next to the palette */
+            if ((mouse_x >= TB_W && mouse_x < TB_W + 8) || mouse_x < 3) view_x--;   /* left: the strip next to the palette or the very edge of the screen */
             if (mouse_x >= SCR_W - 8) view_x++;
             if (mouse_y < BAR_H + 8 && mouse_x >= TB_W) view_y--;       /* top: the status bar counts, too */
             if (mouse_y >= SCR_H - 8) view_y++;
@@ -1879,10 +1893,11 @@ static int real_main(int argc, char **argv)
             if (ox != view_x || oy != view_y) dirty = 1;
         }
         sound_poll();
-        if (DoAnimation && coast_seen) {                           /* surf: next step every 145 ms (only while shore is on the screen) */
+        if (anim_hold > 0) anim_hold--;
+        else if (DoAnimation && coast_seen) {                           /* surf: next step every 145 ms (only while shore is on the screen) */
             struct timeval tn; int st;
             gettimeofday(&tn, NULL);
-            st = coast_freeze >= 0 ? coast_freeze : (int)((tn.tv_sec * 1000 + tn.tv_usec / 1000) / 145);
+            st = coast_freeze >= 0 ? coast_freeze : (int)((((unsigned long)tn.tv_sec & 0xFFFF) * 1000UL + (unsigned long)(tn.tv_usec / 1000)) / (anim_slow ? 290 : 145));   /* small enough for 32 bit longs and never negative (the old product overflowed on the Amiga) */
             if (st != coast_tick) { coast_tick = st; dirty = 1; }
         }
         { static int amb_frame; if ((++amb_frame & 31) == 0 || amb_frame == 1) ambient_update(); ambient_tick(); }
@@ -1895,7 +1910,16 @@ static int real_main(int argc, char **argv)
             clamp_view(); dirty = 1;
         }
         if (debug_show && notice_visible && !dbg_about) notice_close();
-        if (dbg_scroll > 0 && (frame & 3) == 0) { view_x++; if (dbg_scroll & 1) view_y++; dbg_scroll--; clamp_view(); dirty = 1; }
+        if (dbg_scroll > 0 && (frame & 3) == 0) {
+            static struct timeval ts; static int steps;
+            if (!steps) gettimeofday(&ts, NULL);
+            steps++; view_x++; if (dbg_scroll & 1) view_y++; dbg_scroll--; clamp_view(); dirty = 1;
+            if (!dbg_scroll) {                                  /* debug: how long did the scroll test take? */
+                struct timeval te; char b[80]; gettimeofday(&te, NULL);
+                sprintf(b, "scroll test: %d steps in %ld ms (%d loops)", steps, (long)((te.tv_sec - ts.tv_sec) * 1000 + (te.tv_usec - ts.tv_usec) / 1000), frame);
+                logmsg(b);
+            }
+        }
         if (SimSpeed && ++tick >= delay[SimSpeed]) {
             struct timeval t0, t1;
             tick = 0;
