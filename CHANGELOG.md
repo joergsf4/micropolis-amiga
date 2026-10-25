@@ -2,6 +2,22 @@
 
 Older versions: see the release notes on GitHub (v0.1 to v0.8.1).
 
+## 0.8.3-traffic (25 October 2026, experiment)
+
+Everything of 0.8.3 plus fundamental changes of the game rules (branch `traffic-experiments`, issue #37). Options > Traffic rules
+switches the rules on and off. Cities with highways do not load correctly in the original Micropolis.
+
+- **Jams:** a busy road in front of a zone slows its growth (up to -840). The query tool shows traffic, rail link and effect.
+- **Rail:** trips that go by rail attract growth (up to +150, by the share of the way on rails); rail steps do not load roads.
+- **Failed trips** (no destination reached) cost growth (-150).
+- **Highway** tool (last palette icon): 40 per tile, upkeep like five road tiles, no jams, joins roads and highways, little cars,
+  three of four tiles do not use up the trip distance; zones do not open onto a highway.
+- **Ports and airports link separated areas** (with power and a road next to them): trips that find no destination in their area
+  (industry without homes, ...) go on over the nearest port or airport and load the roads on the way. Ports reach ports on the
+  same water, airports any airport. Ships and planes sail and fly between them there and back. 1000 trips a year per hub, a
+  warning at 80 % and 100 % in the status line, use shown in the query tool.
+- German and Polish texts and guides for all of it.
+
 ## 0.8.3 (25 October 2026)
 
 ### New

@@ -6,9 +6,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 VER="${1:-$(sed -n 's/#define VERSION  "\(.*\)"/\1/p' src/amiga/version.h)}"
-SHARE="$HOME/dev/AmigaProjekt/workbench/share/Micropolis"
+SHARE="${SHARE:-$HOME/dev/AmigaProjekt/workbench/share/Micropolis}"   # res/ and Catalogs/ come from here (SHARE=.../Micropolis-Traffic for the experiment)
 OUT=out/release; D=$OUT/stage
-./build.sh >/dev/null                              # fresh build + data
+./build.sh DEST=/share/$(basename "$SHARE") >/dev/null                              # fresh build + data
 rm -rf "$OUT/stage" "$OUT/icons" "$OUT/verify"; mkdir -p "$D/Micropolis/Tools" "$D/Micropolis/res" "$D/Micropolis/cities"
 python3 tools/make_icons.py "$OUT/icons" >/dev/null
 cp "$OUT/icons/Micropolis-drawer.info" "$D/Micropolis.info"
