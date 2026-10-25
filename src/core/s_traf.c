@@ -112,6 +112,7 @@ static short HubSea[8];				/* water body of each port (0 = none), filled by HubW
 static short HubSeaFor[8][2], HubSeaN;		/* the port list HubSea was computed for */
 static short Hopped;
 long TripShips, TripShipsDocked, TripPlanes, TripPlanesLanded;	/* statistics of the scheduled ships and planes */
+long TripAll, TripOk, TripFail, TripNoRoad;		/* statistics of MakeTraf */
 long HopCount;			/* trips that went on over a port or airport (statistics) */
 
 
@@ -146,7 +147,9 @@ MakeTraf(int Zt)
       else ZoneJam = TrfDensity[SMapX >>1][SMapY >>1];
     }
     short sx = SMapX, sy = SMapY;		/* the road the trip starts on */
-    if (TryDrive()) {		/* attempt to drive somewhere */
+    TripAll++;
+    if (TryDrive()) {
+      TripOk++;		/* attempt to drive somewhere */
       if (!(TrafficRules && ZoneOnRail))
 	SetTrafMem();		/* if sucessful, inc trafdensity (a trip on rails does not load the roads) */
       SMapX = xtem;
@@ -160,9 +163,10 @@ MakeTraf(int Zt)
     }
     SMapX = xtem;
     SMapY = ytem;
+    TripFail++;
     return (FALSE);		/* traffic failed */
   }
-  else return (-1);		/* no road found */
+  else { TripNoRoad++; return (-1); }		/* no road found */
 }
 
 
