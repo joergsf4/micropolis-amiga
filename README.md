@@ -110,7 +110,8 @@ tools/release.sh             # -> out/release/Micropolis-<version>.lha
 ```
 
 `src/core` is the original simulation (copied from upstream `src/sim`, Tcl/Tk/X11 removed, changes marked
-`AMIGA`), `src/amiga` is the new front end. `tools/emusys.sh` boots an installed Workbench disk image
+`AMIGA`), `src/amiga` is the new front end. What is from upstream, what was replaced and what is left out on purpose is
+listed in [PORTING.md](PORTING.md). `tools/emusys.sh` boots an installed Workbench disk image
 headless in FS-UAE to test the program with RTG.
 
 ## License
