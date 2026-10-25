@@ -72,6 +72,7 @@ question on again. `SIZE=` (ToolType or argument) skips the question and uses th
 | Level | menu Level: Easy / Medium / Hard (start funds of a new city; saved in the preferences) |
 | Ambient sounds | quiet loops that follow the visible part of the map: sea where it shows mostly water, traffic hum over a city, birds and wind over open land (Options > Sound options; CC0 recordings, see `tools/ambient/SOURCES.md`) |
 | Options | Auto Goto, Animation, Messages, Message windows can be switched off in the Options menu; Options > Sound options: sound on/off, ambient sounds, "Speak tool names" (off by default), and volume sliders for effects and ambient sounds |
+| Animation | Options > Animation also switches the surf along the coasts (waves that roll in, break and run back) and gusts of wind that pass over woods |
 | Help | `Help` key or Project > Help (AmigaGuide document `Micropolis.guide`) |
 | Preferences | screen mode, options, speed, level and window positions are remembered (ENVARC:Micropolis.prefs) |
 | Language | Options > ... Language: automatic (the system's locale), English, Deutsch or Polski (used from the next start; `lang=deutsch` on the command line, ToolType `LANGUAGE=`). Translations live in `l10n/*.ct` (FlexCat format, see `tools/l10n/l10n.py`); Polish is written without diacritics (the Amiga system fonts have no Latin-2 letters). **The German and Polish texts are machine translations and need review by native speakers.** |
@@ -108,7 +109,8 @@ tools/release.sh             # -> out/release/Micropolis-<version>.lha
 ```
 
 `src/core` is the original simulation (copied from upstream `src/sim`, Tcl/Tk/X11 removed, changes marked
-`AMIGA`), `src/amiga` is the new front end. `tools/emusys.sh` boots an installed Workbench disk image
+`AMIGA`), `src/amiga` is the new front end. What is from upstream, what was replaced and what is left out on purpose is
+listed in [PORTING.md](PORTING.md). `tools/emusys.sh` boots an installed Workbench disk image
 headless in FS-UAE to test the program with RTG.
 
 ## License

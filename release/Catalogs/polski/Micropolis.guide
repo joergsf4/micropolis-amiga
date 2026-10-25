@@ -17,6 +17,7 @@
   @{" Klawiatura i mysz    " link KEYS}
   @{" Okna                 " link WINDOWS}
   @{" Menu                 " link MENUS}
+  @{" Animacja             " link ANIMATION}
   @{" Paski R C I          " link DEMAND}
   @{" Scenariusze          " link SCENARIOS}
   @{" Tryb ekranu i ustawienia " link SETTINGS}
@@ -64,6 +65,7 @@
   Lewy przycisk myszy    uzyj narzedzia / kliknij przycisk
   Prawy przycisk myszy   menu
   W A S D, kolko myszy, mysz przy krawedzi ekranu   przewijanie
+  M                      otwiera lub zamyka mape przegladowa
   0 1 2 3                pauza, wolno, srednio, szybko
   b r p t x z            skroty narzedzi jak w oryginale (spychacz,
                          droga, park, linia, tory, zapytanie)
@@ -90,14 +92,22 @@
   Projekt      nowe miasto, wczytaj, zapisz, O programie, Pomoc, zakoncz
   Scenariusze  historyczne miasta z opowiescia i celem
   Tempo        pauza / wolno / srednio / szybko
-  Opcje        auto-burzenie, auto-budzet, katastrofy, dzwiek, auto-skok,
-               animacja, komunikaty, okna komunikatow, pytaj o tryb ekranu
+  Opcje        auto-burzenie, auto-budzet, katastrofy, auto-skok, animacja,
+               komunikaty, okna komunikatow, opcje dzwieku (okno z
+               przelacznikami i suwakami glosnosci), pytaj o tryb ekranu
   Poziom       Latwy / Sredni / Trudny (srodki na start nowego miasta)
   Jezyk        Automatycznie (ustawienie systemu) / English / Deutsch / Polski
                (od nastepnego uruchomienia)
   Okna         budzet, ocena, wykresy
   Mapa         widoki: energia, ruch, zanieczyszczenie, przestepczosc ...
   Katastrofy   pozar, powodz, tornado, trzesienie ziemi, potwor, awaria reaktora
+@endnode
+
+@node ANIMATION "Animacja"
+@toc MAIN
+
+  Opcje/Animacja wlacza tez przyboj wzdluz wybrzezy (fale, ktore nadchodza i
+  cofaja sie) oraz podmuchy wiatru nad lasami.
 @endnode
 
 @node DEMAND "Paski R C I"
@@ -141,5 +151,5 @@
 
   @{"Budzet" link MENUS}   @{"Cheaty" link CHEATS}   @{"Klawisze" link KEYS}
   @{"Scenariusze" link SCENARIOS}   @{"Tryb ekranu" link SETTINGS}
-  @{"Narzedzia" link TOOLS}   @{"Okna" link WINDOWS}
+  @{"Narzedzia" link TOOLS}   @{"Okna" link WINDOWS}   @{"Animacja" link ANIMATION}
 @endnode

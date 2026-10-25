@@ -17,6 +17,7 @@
   @{" Keyboard and mouse  " link KEYS}
   @{" Windows             " link WINDOWS}
   @{" Menus               " link MENUS}
+  @{" Animation           " link ANIMATION}
   @{" The R C I bars      " link DEMAND}
   @{" Scenarios           " link SCENARIOS}
   @{" Screen mode and settings " link SETTINGS}
@@ -60,6 +61,7 @@
   Left mouse button   use the tool / click buttons
   Right mouse button  menus
   W A S D, mouse wheel, mouse at the screen edge   scroll
+  M                   opens or closes the overview map
   0 1 2 3             pause, slow, medium, fast
   b r p t x z         tool shortcuts as in the original (bulldozer,
                       road, park, wire, rail, query)
@@ -85,14 +87,22 @@
 
   Project    new city, load, save, About, Help, quit
   Speed      pause / slow / medium / fast
-  Options    auto bulldoze, auto budget, disasters, sound, auto goto,
-             animation, messages, message windows, ask screen mode
+  Options    auto bulldoze, auto budget, disasters, auto goto, animation,
+             messages, message windows, sound options (window with the
+             switches and volume sliders), ask screen mode
   Level      Easy / Medium / Hard (start funds of a new city)
   Language   Automatic (system setting) / English / Deutsch / Polski (next start)
   Windows    budget, evaluation, graphs, map
   Map        overlays: power, traffic, pollution, crime, land value ...
   Disasters  fire, flood, tornado, earthquake, monster, meltdown
   Scenarios  historic cities with a story and a goal
+@endnode
+
+@node ANIMATION "Animation"
+@toc MAIN
+
+  Options/Animation also switches the surf along the coasts (waves that roll
+  in and run back) and the gusts of wind that pass over woods.
 @endnode
 
 @node DEMAND "The R C I bars"
@@ -136,5 +146,5 @@
 
   @{"Budget" link MENUS}   @{"Cheats" link CHEATS}   @{"Keys" link KEYS}
   @{"Scenarios" link SCENARIOS}   @{"Screen mode" link SETTINGS}
-  @{"Tools" link TOOLS}   @{"Windows" link WINDOWS}
+  @{"Tools" link TOOLS}   @{"Windows" link WINDOWS}   @{"Animation" link ANIMATION}
 @endnode

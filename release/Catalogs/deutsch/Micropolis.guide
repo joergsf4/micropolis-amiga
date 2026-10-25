@@ -18,6 +18,7 @@
   @{" Tastatur und Maus    " link KEYS}
   @{" Fenster              " link WINDOWS}
   @{" Menüs                " link MENUS}
+  @{" Animation            " link ANIMATION}
   @{" Die R-C-I-Balken     " link DEMAND}
   @{" Szenarien            " link SCENARIOS}
   @{" Bildschirmmodus und Einstellungen " link SETTINGS}
@@ -66,6 +67,7 @@
   Linke Maustaste    Werkzeug benutzen / Knöpfe anklicken
   Rechte Maustaste   Menüs
   W A S D, Mausrad, Maus am Bildschirmrand   scrollen
+  M                  öffnet oder schließt die Übersichtskarte
   0 1 2 3            Pause, langsam, mittel, schnell
   b r p t x z        Werkzeugkürzel wie im Original (Planierraupe,
                      Straße, Park, Leitung, Schiene, Abfrage)
@@ -94,14 +96,22 @@
   Projekt      neue Stadt, laden, speichern, Über, Hilfe, beenden
   Szenarien    historische Städte mit Geschichte und Ziel
   Tempo        Pause / langsam / mittel / schnell
-  Optionen     Auto-Abriss, Auto-Haushalt, Katastrophen, Ton, Auto-Sprung,
-               Animation, Meldungen, Meldungsfenster, Bildschirmmodus fragen
+  Optionen     Auto-Abriss, Auto-Haushalt, Katastrophen, Auto-Sprung,
+               Animation, Meldungen, Meldungsfenster, Tonoptionen (Fenster mit
+               Schaltern und Lautstärkereglern), Bildschirmmodus fragen
   Stufe        Leicht / Mittel / Schwer (Startgeld einer neuen Stadt)
   Sprache      Automatisch (Systemeinstellung) / English / Deutsch / Polski
                (gilt ab dem nächsten Start)
   Fenster      Haushalt, Bewertung, Diagramme
   Karte        Ansichten: Strom, Verkehr, Verschmutzung, Kriminalität, Bodenwert ...
   Katastrophen Feuer, Überschwemmung, Tornado, Erdbeben, Monster, Kernschmelze
+@endnode
+
+@node ANIMATION "Animation"
+@toc MAIN
+
+  Optionen/Animation schaltet auch die Brandung an den Küsten (Wellen, die
+  anrollen und zurückfließen) und die Windböen über den Wäldern.
 @endnode
 
 @node DEMAND "Die R-C-I-Balken"
@@ -147,5 +157,5 @@
 
   @{"Haushalt" link MENUS}   @{"Cheats" link CHEATS}   @{"Tasten" link KEYS}
   @{"Szenarien" link SCENARIOS}   @{"Bildschirmmodus" link SETTINGS}
-  @{"Werkzeuge" link TOOLS}   @{"Fenster" link WINDOWS}
+  @{"Werkzeuge" link TOOLS}   @{"Fenster" link WINDOWS}   @{"Animation" link ANIMATION}
 @endnode
