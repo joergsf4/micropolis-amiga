@@ -107,10 +107,10 @@
   rules on and off:
 
   Jams        a busy road in front of a zone slows its growth.
-  Rail        a zone with a rail tile next to it grows better, and its trips
-              do not load the roads.
+  Rail        a zone whose trips go by rail grows better (up to +150, by the
+              share of the way on rails); rail steps do not load the roads.
   Trips       a zone whose trips reach no destination grows less.
-  Highway     tool at the bottom of the palette, 40 per tile, upkeep like three
+  Highway     tool at the bottom of the palette, 40 per tile, upkeep like five
               road tiles. A wide road without jams; it joins roads and other
               highways, goes on open land only and is no entrance for zones.
   Ports and   a sea port or airport with power and a road next to it links

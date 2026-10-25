@@ -733,7 +733,7 @@ MapScan(int x1, int x2)
 	  }
 
 	  if (IsHwy(CChr9)) {		/* highway: costs more to keep up than a road, never jams */
-	    RoadTotal += 3;
+	    RoadTotal += 5;
 	    continue;
 	  }
 

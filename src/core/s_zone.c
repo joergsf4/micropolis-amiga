@@ -166,8 +166,8 @@ TrafficScore(int TrfGood)
 
   if (!TrafficRules || !ZoneTested) return (0);
   if (ZoneJam > 100)  z -= (ZoneJam - 100) * 6;		/* a jammed road in front of the zone: up to -840 */
-  if (ZoneOnRail)     z += 150;				/* a rail connection attracts */
-  if (TrfGood == 0)   z -= 250;				/* no destination reached */
+  z += ZoneRailBonus;					/* trips that go by rail attract: up to +150 */
+  if (TrfGood == 0)   z -= 150;				/* no destination reached */
   return (z);
 }
 

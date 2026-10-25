@@ -112,11 +112,11 @@
   wylacza te zasady:
 
   Korki       ruchliwa droga przed strefa hamuje jej wzrost.
-  Kolej       strefa z torem obok rosnie lepiej, a jej przejazdy nie
-              obciazaja drog.
+  Kolej       strefa, ktorej przejazdy ida koleja, rosnie lepiej (do +150,
+              wedlug udzialu drogi po torach); pola torow nie obciazaja drog.
   Przejazdy   strefa, ktorej przejazdy nie dochodza do celu, rosnie slabiej.
-  Autostrada  narzedzie na koncu palety, 40 za pole, utrzymanie jak trzy
-              pola drogi. Szeroka droga bez korkow; laczy sie z drogami i
+  Autostrada  narzedzie na koncu palety, 40 za pole, utrzymanie jak piec
+              pol drogi. Szeroka droga bez korkow; laczy sie z drogami i
               innymi autostradami, buduje sie tylko na wolnym terenie i nie
               jest dojazdem dla stref.
   Porty i     port morski lub lotnisko z pradem i droga obok laczy

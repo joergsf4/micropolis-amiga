@@ -116,10 +116,11 @@
   schaltet diese Regeln ein und aus:
 
   Staus       eine stark befahrene Straße vor einer Zone bremst deren Wachstum.
-  Schiene     eine Zone mit einem Schienenfeld daneben wächst besser, und ihre
-              Fahrten belasten die Straßen nicht.
+  Schiene     eine Zone, deren Fahrten mit der Bahn laufen, wächst besser (bis
+              +150, nach dem Anteil des Wegs auf Schienen); Schienenfelder
+              belasten die Straßen nicht.
   Fahrten     eine Zone, deren Fahrten kein Ziel erreichen, wächst weniger.
-  Autobahn    Werkzeug am Ende der Palette, 40 pro Feld, Unterhalt wie drei
+  Autobahn    Werkzeug am Ende der Palette, 40 pro Feld, Unterhalt wie fünf
               Straßenfelder. Eine breite Straße ohne Staus; sie verbindet sich
               mit Straßen und anderen Autobahnen, wird nur auf freiem Land
               gebaut und ist keine Zufahrt für Zonen.

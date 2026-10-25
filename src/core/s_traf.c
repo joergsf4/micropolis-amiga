@@ -80,6 +80,8 @@ short TrafMaxX, TrafMaxY;
 short TrafficRules = TRAFFIC_RULES_DEFAULT;
 short ZoneJam;			/* traffic density at the road a zone starts from (0..240); set by MakeTraf */
 short ZoneOnRail;		/* the zone has a rail tile next to it */
+short ZoneRailBonus;		/* growth bonus of the last trip: up to 150, by the share of its steps that went on rails */
+static short RailSteps, RoadSteps;	/* steps of the trip on rails / on roads and highways */
 short ZoneTested;		/* MakeTraf ran for this zone in this pass */
 short HubX[2][8], HubY[2][8], HubN[2];		/* ports (0) and airports (1) with power: zone centre tiles (of the last complete map scan) */
 short NextHubX[2][8], NextHubY[2][8], NextHubN[2];	/* the scan in progress */
@@ -119,6 +121,10 @@ long HopCount;			/* trips that went on over a port or airport (statistics) */
 /* comefrom: DoIndustrial DoCommercial DoResidential */
 #define HUB_LOAD 50		/* density a hub trip adds to the roads it uses per tile (like a normal trip) */
 static short HubTrip(short sx, short sy);
+static void RailBonus(void)			/* a successful trip earns the rail bonus by the share of rail steps it took */
+{
+  if (RailSteps + RoadSteps > 0) ZoneRailBonus = RailSteps * 150 / (RailSteps + RoadSteps);
+}
 static short IsolatedFor(int Zt, short sx, short sy);
 MakeTraf(int Zt)
 {
@@ -131,6 +137,8 @@ MakeTraf(int Zt)
   Hopped = 0;
   ZoneJam = 0;
   ZoneOnRail = 0;
+  ZoneRailBonus = 0;
+  RailSteps = RoadSteps = 0;
   ZoneTested = 1;
 
 #if 0
@@ -150,13 +158,14 @@ MakeTraf(int Zt)
     TripAll++;
     if (TryDrive()) {
       TripOk++;		/* attempt to drive somewhere */
-      if (!(TrafficRules && ZoneOnRail))
-	SetTrafMem();		/* if sucessful, inc trafdensity (a trip on rails does not load the roads) */
+      SetTrafMem();		/* if sucessful, inc trafdensity (rail tiles are not counted: only the road steps load the roads) */
+      if (TrafficRules) RailBonus();
       SMapX = xtem;
       SMapY = ytem;
       return (TRUE);		/* traffic passed */
     }
     if (TrafficRules && IsolatedFor(Zt, sx, sy) && HubTrip(sx, sy)) {	/* nothing found by wandering: the way to a port or airport, and on from there */
+      RailBonus();
       SMapX = xtem;
       SMapY = ytem;
       return (TRUE);
@@ -283,8 +292,9 @@ TryDrive(void)
   LDir = 5;
   for (z = 0; z < MAXDIS; z++) {	/* Maximum distance to try */
     if (TryGo(z)) {			/* if it got a road */
-      if (TrafficRules && IsHwy(Map[SMapX][SMapY]) && free < 200) {	/* a highway is fast: its tiles do not use up the distance */
-	z--; free++;
+      if (TrafficRules && IsHwy(Map[SMapX][SMapY]) && free < 200) {	/* a highway is fast: three of four of its tiles do not use up the distance */
+	free++;
+	if (free & 3) z--;
       }
       if (DriveDone())			/* if destination is reached */
 	return (TRUE);			/* pass */
@@ -316,6 +326,7 @@ TryGo(int z)
     if (realdir == LDir) continue;	/* skip last direction */
     if (RoadTest(GetFromMap(realdir))) {
       MoveMapSim(realdir);
+      { short st = Map[SMapX][SMapY] & LOMASK; if (st >= RAILBASE && st <= LASTRAIL) RailSteps++; else RoadSteps++; }
       LDir = (realdir + 2) & 3;
       if (z & 1)			/* save pos every other move */
 	PushPos();
@@ -672,7 +683,7 @@ void TrafficStatus(short x, short y)				/* sent after UIShowZoneStatus for the t
       if (ct >= RESBASE && ct < PORTBASE) {					/* a zone: residential, commercial, industrial */
 	short rail, jam, eff;
 	ZoneAccess(cx, cy, &rail, &jam);
-	eff = (jam > 100 ? -(jam - 100) * 6 : 0) + (rail ? 150 : 0);
+	eff = (jam > 100 ? -(jam - 100) * 6 : 0);			/* the rail bonus (up to 150) depends on how much of the trips goes by rail */
 	p += sprintf(p, " {Traffic|%d}", (int)jam);
 	p += sprintf(p, " {Rail link|%s}", rail ? "Yes" : "No");
 	p += sprintf(p, " {Traffic effect|%+d}", (int)eff);
@@ -827,7 +838,8 @@ static short HubTrip(short sx, short sy)
     if (bx < 0) return (0);					/* the road has changed since the field was made */
     x = bx; y = by;
     z = Map[x][y] & LOMASK;
-    if (!ZoneOnRail && z >= ROADBASE && z < POWERBASE) {	/* load the road on the way, like SetTrafMem */
+    if (z >= RAILBASE && z <= LASTRAIL) RailSteps++; else RoadSteps++;
+    if (z >= ROADBASE && z < POWERBASE) {			/* load the road on the way, like SetTrafMem */
       short dn = TrfDensity[x >>1][y >>1] + HUB_LOAD;
       if (dn > 240) dn = 240;
       TrfDensity[x >>1][y >>1] = dn;
@@ -839,7 +851,7 @@ static short HubTrip(short sx, short sy)
   if (!Hopped) return (0);
   LDir = 5;
   if (TryDrive()) {						/* wander on from there */
-    if (!ZoneOnRail) SetTrafMem();
+    SetTrafMem();
     return (1);
   }
   return (0);
