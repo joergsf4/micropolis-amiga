@@ -2,7 +2,7 @@
 
 Older versions: see the release notes on GitHub (v0.1 to v0.8.1).
 
-## Next version (AHI, in the sources)
+## 0.8.6 (26 October 2026)
 
 ### New
 - **Sound through AHI** (#40): the sound window has a button *Output* that chooses the system sound (sound.datatype, Paula) or an
