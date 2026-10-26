@@ -129,9 +129,11 @@
 @node ANIMATION "Animation"
 @toc MAIN
 
-  Options/Animation also switches the surf along the coasts (waves that roll
-  in and run back), the gusts of wind that pass over woods and the cars
-  on highways.
+  Options/City animation switches the movement in the city itself (cars on
+  the roads and highways, smoke, ...). Options/World animation switches the
+  surf along the coasts (waves that roll in and run back) and the gusts of wind
+  that pass over woods. Both are separate so that a slow machine can do without
+  the second.
 @endnode
 
 @node DEMAND "The R C I bars"
