@@ -6,7 +6,7 @@
 #define SPACING 960               /* distance between two gusts (world pixels) */
 #define BAND 320                  /* width of a gust */
 #define SPEED 4                   /* world pixels per step */
-#define PEAK 5                    /* strongest dithering: 5 of 16 bright pixels (calm: more was too restless) */
+#define PEAK 7                    /* strongest dithering: 7 of 16 bright pixels (14 was far too restless, 5 was not seen) */
 
 static UBYTE tree[LAST_TILE + 1];
 static const UBYTE bayer[16] = { 0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5 };
@@ -22,7 +22,7 @@ void wind_init(const UBYTE *tiles)
 
 void wind_palette(UBYTE *palette)
 {
-    static const UBYTE rgb[3] = { 0x78, 0xf4, 0x60 };       /* the bright green is 00 e6 00 */
+    static const UBYTE rgb[3] = { 0x90, 0xf8, 0x78 };       /* the bright green is 00 e6 00 */
     memcpy(palette + WIND_PEN * 3, rgb, 3);
 }
 
@@ -44,15 +44,16 @@ int wind_active(int wx, int wy, int tick)
 
 void wind_draw(UBYTE *dst, int stride, int tile, int wx, int wy, int tick)
 {
-    for (int y = 0; y < 16; y++)
-        for (int x = 0; x < 16; x++) {
-            int u, d, k;
-            if (dst[y * stride + x] != PEN_BRIGHT) continue;
-            u = wave(wx + x, wy + y, tick);
+    for (int by = 0; by < 4; by++)                          /* the strength is worked out once for each block of 4x4 pixels */
+        for (int bx = 0; bx < 4; bx++) {
+            int u = wave(wx + bx * 4 + 2, wy + by * 4 + 2, tick), d, k;
             if (u >= BAND) continue;
             d = u < BAND / 2 ? u : BAND - u;                 /* 0 at the edges, BAND/2 in the middle */
             k = d * PEAK * 2 / BAND;                         /* 0..PEAK, soft edges */
-            if (bayer[((wy + y) & 3) * 4 + ((wx + x) & 3)] < k) dst[y * stride + x] = WIND_PEN;
+            if (k <= 0) continue;
+            for (int y = by * 4; y < by * 4 + 4; y++)
+                for (int x = bx * 4; x < bx * 4 + 4; x++)
+                    if (dst[y * stride + x] == PEN_BRIGHT && bayer[((wy + y) & 3) * 4 + ((wx + x) & 3)] < k) dst[y * stride + x] = WIND_PEN;
         }
     (void)tile;
 }

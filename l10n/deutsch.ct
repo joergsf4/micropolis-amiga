@@ -274,9 +274,12 @@ Toneinstellungen...
 S_12929962
 Auto-Sprung (zu Ereignissen)
 ; Auto Goto (jump to events)
-S_41E389FD
-Animation
-; Animation
+S_23466D04
+Animation Stadt
+; City animation
+S_04251D81
+Animation Welt
+; World animation
 S_78611FD5
 Meldungen
 ; Messages

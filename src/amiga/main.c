@@ -94,13 +94,14 @@ static int pref_ask = 1;
 static ULONG pref_mode = 0xffffffffUL;          /* remembered RTG mode id, picture size and depth */
 static int pref_w, pref_h, pref_depth;
 static int pref_level;                          /* difficulty 0 easy, 1 medium, 2 hard */
-enum { O_BULLDOZE, O_BUDGET, O_DISASTERS, O_SOUND, O_AUTOGO, O_ANIM, O_MSGS, O_NOTICES, O_SPEAK, O_STARTMENU, O_CLASSIC, O_AMBIENT, N_OPT };
+enum { O_BULLDOZE, O_BUDGET, O_DISASTERS, O_SOUND, O_AUTOGO, O_ANIM, O_MSGS, O_NOTICES, O_SPEAK, O_STARTMENU, O_CLASSIC, O_AMBIENT, O_WORLD, N_OPT };
 static int classic_icons;                        /* 1 = the original tool palette pictures, 0 = the uniform 32x32 set */
 static int start_pending;
 static int refresh_full;                   /* the next window refresh must be followed by a complete redraw (the picture changed while a requester covered it) */
 static int start_menu = 1;                       /* ask what to start with: new city, load, scenario */
-static const char *const opt_key[N_OPT] = { "AUTOBULLDOZE", "AUTOBUDGET", "DISASTERS", "SOUND", "AUTOGOTO", "ANIMATION", "MESSAGES", "MESSAGEWINDOWS", "SPEAKTOOLS", "STARTMENU", "CLASSICICONS", "AMBIENT" };
-static int pref_opt[N_OPT] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };     /* -1 = not saved yet: keep the default */
+static const char *const opt_key[N_OPT] = { "AUTOBULLDOZE", "AUTOBUDGET", "DISASTERS", "SOUND", "AUTOGOTO", "ANIMATION", "MESSAGES", "MESSAGEWINDOWS", "SPEAKTOOLS", "STARTMENU", "CLASSICICONS", "AMBIENT", "WORLDANIM" };
+static int world_anim = 1;                       /* surf along the coasts and gusts of wind over woods (the 'city' animation of cars and smoke is the core's DoAnimation) */
+static int pref_opt[N_OPT] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };     /* -1 = not saved yet: keep the default */
 static int pref_speed = -1;
 static int pref_fxvol = -1, pref_ambvol = -1;      /* volume sliders of the sound window (-1 = default) */
 static char pref_lang[24];                       /* "" = the system's preferred language, else "english" "deutsch" "polski" */
@@ -112,7 +113,7 @@ static int opt_get(int o)
     switch (o) {
     case O_BULLDOZE: return autoBulldoze;  case O_BUDGET: return autoBudget;  case O_DISASTERS: return !NoDisasters;
     case O_SOUND: return UserSoundOn;      case O_AUTOGO: return autoGo;      case O_ANIM: return DoAnimation;
-    case O_MSGS: return DoMessages;        case O_SPEAK: return speak_tools;   case O_STARTMENU: return start_menu;   case O_CLASSIC: return classic_icons;   case O_AMBIENT: return ambient_on;   default: return DoNotices;
+    case O_MSGS: return DoMessages;        case O_SPEAK: return speak_tools;   case O_STARTMENU: return start_menu;   case O_CLASSIC: return classic_icons;   case O_AMBIENT: return ambient_on;   case O_WORLD: return world_anim;   default: return DoNotices;
     }
 }
 static void opt_set(int o, int v)
@@ -120,7 +121,7 @@ static void opt_set(int o, int v)
     switch (o) {
     case O_BULLDOZE: autoBulldoze = v; break;  case O_BUDGET: autoBudget = v; break;  case O_DISASTERS: NoDisasters = !v; break;
     case O_SOUND: UserSoundOn = v; break;      case O_AUTOGO: autoGo = v; break;      case O_ANIM: DoAnimation = v; break;
-    case O_MSGS: DoMessages = v; break;        case O_SPEAK: speak_tools = v; break;   case O_STARTMENU: start_menu = v; break;   case O_CLASSIC: classic_icons = v; break;   case O_AMBIENT: ambient_on = v; break;   default: DoNotices = v; break;
+    case O_MSGS: DoMessages = v; break;        case O_SPEAK: speak_tools = v; break;   case O_STARTMENU: start_menu = v; break;   case O_CLASSIC: classic_icons = v; break;   case O_AMBIENT: ambient_on = v; break;   case O_WORLD: world_anim = v; break;   default: DoNotices = v; break;
     }
 }
 
@@ -388,9 +389,9 @@ static void draw_tile(int col, int row, int tile)
     UBYTE *dst = fb + (BAR_H + row * 16) * SCR_W + TB_W + col * 16;
     for (int y = 0; y < 16; y++, src += 16, dst += SCR_W)
         memcpy(dst, src, 16);
-    if (DoAnimation && coast_has(tile))                          /* surf along the shore */
+    if (world_anim && coast_has(tile))                           /* surf along the shore */
         coast_draw(fb + (BAR_H + row * 16) * SCR_W + TB_W + col * 16, SCR_W, tile, (view_x + col) << 4, (view_y + row) << 4, coast_tick);
-    if (DoAnimation && wind_has(tile))                           /* gusts over the woods */
+    if (world_anim && wind_has(tile))                            /* gusts over the woods */
         wind_draw(fb + (BAR_H + row * 16) * SCR_W + TB_W + col * 16, SCR_W, tile, (view_x + col) << 4, (view_y + row) << 4, coast_tick);
 }
 
@@ -874,8 +875,8 @@ static void render_frame(struct Window *win)
                 if (blink && (tile & ZONEBIT) && !(tile & PWRBIT)) tile = LIGHTNINGBOLT;
                 else tile &= LOMASK;
             }
-            if (DoAnimation && coast_has(tile)) { coast_now++; if (coast_moved) redraw[row][col] = 1; }
-            else if (DoAnimation && wind_has(tile)) {                /* only trees a gust touches now or touched one step ago */
+            if (world_anim && coast_has(tile)) { coast_now++; if (coast_moved) redraw[row][col] = 1; }
+            else if (world_anim && wind_has(tile)) {                /* only trees a gust touches now or touched one step ago */
                 int wx = mx << 4, wy = my << 4;
                 coast_now++;
                 if (coast_moved && (wind_active(wx, wy, coast_tick) || wind_active(wx, wy, coast_drawn))) redraw[row][col] = 1;
@@ -975,7 +976,7 @@ static void render_frame(struct Window *win)
 /* ---------- menus and commands ---------- */
 enum { CMD_NEW = 1, CMD_LOAD, CMD_SAVE, CMD_SAVEAS, CMD_QUIT,
        CMD_PAUSE = 10, CMD_SLOW, CMD_MEDIUM, CMD_FAST,
-       CMD_AUTOBULLDOZE = 20, CMD_AUTOBUDGET, CMD_DISASTERS, CMD_SOUND, CMD_ASKMODE, CMD_AUTOGO, CMD_ANIM, CMD_MSGS, CMD_NOTICES, CMD_OVERLAY, CMD_LEVEL = 60, CMD_SPEAK = 65, CMD_STARTMENU = 66, CMD_CLASSIC = 67, CMD_LANG = 70, CMD_AMBIENT = 75, CMD_SOUNDWIN = 76,
+       CMD_AUTOBULLDOZE = 20, CMD_AUTOBUDGET, CMD_DISASTERS, CMD_SOUND, CMD_ASKMODE, CMD_AUTOGO, CMD_ANIM, CMD_MSGS, CMD_NOTICES, CMD_OVERLAY, CMD_LEVEL = 60, CMD_SPEAK = 65, CMD_STARTMENU = 66, CMD_CLASSIC = 67, CMD_LANG = 70, CMD_AMBIENT = 75, CMD_SOUNDWIN = 76, CMD_WORLDANIM = 77,
        CMD_ABOUT = 44, CMD_HELP = 45, CMD_SCEN = 200, CMD_BUDGET = 40, CMD_MAP = 41, CMD_EVAL = 42, CMD_GRAPHS = 43, CMD_MAPMODE = 100,
        CMD_FIRE = 30, CMD_FLOOD, CMD_TORNADO, CMD_QUAKE, CMD_MONSTER, CMD_MELTDOWN };
 
@@ -1021,7 +1022,8 @@ static struct Menu *make_menus(struct Screen *scr, APTR *vi_out)
     mi(NM_ITEM, T("Disasters"), NULL, CHECKIT | MENUTOGGLE | (NoDisasters ? 0 : CHECKED), CMD_DISASTERS);
     mi(NM_ITEM, T("Sound options..."), NULL, 0, CMD_SOUNDWIN);
     mi(NM_ITEM, T("Auto Goto (jump to events)"), NULL, CHECKIT | MENUTOGGLE | (autoGo ? CHECKED : 0), CMD_AUTOGO);
-    mi(NM_ITEM, T("Animation"), NULL, CHECKIT | MENUTOGGLE | (DoAnimation ? CHECKED : 0), CMD_ANIM);
+    mi(NM_ITEM, T("City animation"), NULL, CHECKIT | MENUTOGGLE | (DoAnimation ? CHECKED : 0), CMD_ANIM);
+    mi(NM_ITEM, T("World animation"), NULL, CHECKIT | MENUTOGGLE | (world_anim ? CHECKED : 0), CMD_WORLDANIM);
     mi(NM_ITEM, T("Messages"), NULL, CHECKIT | MENUTOGGLE | (DoMessages ? CHECKED : 0), CMD_MSGS);
     mi(NM_ITEM, T("Start menu at launch"), NULL, CHECKIT | MENUTOGGLE | (start_menu ? CHECKED : 0), CMD_STARTMENU);
     mi(NM_ITEM, T("Classic tool icons"), NULL, CHECKIT | MENUTOGGLE | (classic_icons ? CHECKED : 0), CMD_CLASSIC);
@@ -1241,6 +1243,7 @@ static void menu_sync(void)                                  /* make the check m
             case CMD_SOUND: want = UserSoundOn; break;
             case CMD_AUTOGO: want = autoGo; break;
             case CMD_ANIM: want = DoAnimation; break;
+            case CMD_WORLDANIM: want = world_anim; break;
             case CMD_MSGS: want = DoMessages; break;
             case CMD_NOTICES: want = DoNotices; break;
             default:
@@ -1315,6 +1318,7 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
     case CMD_SOUND: UserSoundOn = checked; break;
     case CMD_AUTOGO: autoGo = checked; MustUpdateOptions = 1; break;
     case CMD_ANIM: DoAnimation = checked; MustUpdateOptions = 1; full_redraw = 1; break;
+    case CMD_WORLDANIM: world_anim = checked; full_redraw = 1; break;
     case CMD_MSGS: DoMessages = checked; MustUpdateOptions = 1; break;
     case CMD_AMBIENT: ambient_on = checked; break;
     case CMD_CLASSIC: classic_icons = checked; toolbar_dirty = 1; tb_label_only = 0; break;
@@ -1741,8 +1745,8 @@ static int real_main(int argc, char **argv)
         if (!strncmp(a, "show=", 5)) debug_show = 1;
         if (!strcmp(a, "show=about")) { show_about(); dbg_about = 1; }
         if (!strcmp(a, "newcity")) do_command(CMD_NEW, win, NULL);
-        if (!strncmp(a, "coast=", 6)) { coast_freeze = atoi(a + 6); DoAnimation = 1; }   /* debug: show one surf step (with det) */
-        if (!strcmp(a, "det")) { dbg_det = 1; DoAnimation = coast_freeze >= 0; ambient_on = 0; }
+        if (!strncmp(a, "coast=", 6)) { coast_freeze = atoi(a + 6); world_anim = 1; }   /* debug: show one surf step (with det) */
+        if (!strcmp(a, "det")) { dbg_det = 1; DoAnimation = 0; world_anim = coast_freeze >= 0; ambient_on = 0; }
         if (!strncmp(a, "dump=", 5)) strncpy(dbg_dump, a + 5, sizeof dbg_dump - 1);
         if (!strcmp(a, "show=eval")) open_info_panel(P_EVAL);              /* debug: open a panel at start */
         if (!strcmp(a, "show=graph")) open_info_panel(P_GRAPH);
@@ -1894,10 +1898,10 @@ static int real_main(int argc, char **argv)
         }
         sound_poll();
         if (anim_hold > 0) anim_hold--;
-        else if (DoAnimation && coast_seen) {                           /* surf: next step every 145 ms (only while shore is on the screen) */
+        else if (world_anim && coast_seen) {                           /* surf: next step every 145 ms (only while shore is on the screen) */
             struct timeval tn; int st;
             gettimeofday(&tn, NULL);
-            st = coast_freeze >= 0 ? coast_freeze : (int)((((unsigned long)tn.tv_sec & 0xFFFF) * 1000UL + (unsigned long)(tn.tv_usec / 1000)) / (anim_slow ? 290 : 145));   /* small enough for 32 bit longs and never negative (the old product overflowed on the Amiga) */
+            st = coast_freeze >= 0 ? coast_freeze : (int)((((unsigned long)tn.tv_sec & 0xFFFF) * 1000UL + (unsigned long)(tn.tv_usec / 1000)) / (anim_slow ? 380 : 190));   /* small enough for 32 bit longs and never negative (the old product overflowed on the Amiga) */
             if (st != coast_tick) { coast_tick = st; dirty = 1; }
         }
         { static int amb_frame; if ((++amb_frame & 31) == 0 || amb_frame == 1) ambient_update(); ambient_tick(); }

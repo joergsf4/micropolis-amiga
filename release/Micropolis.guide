@@ -87,8 +87,8 @@
 
   Project    new city, load, save, About, Help, quit
   Speed      pause / slow / medium / fast
-  Options    auto bulldoze, auto budget, disasters, auto goto, animation,
-             messages, message windows, sound options (window with the
+  Options    auto bulldoze, auto budget, disasters, auto goto, city animation,
+             world animation, messages, message windows, sound options (window with the
              switches and volume sliders), ask screen mode
   Level      Easy / Medium / Hard (start funds of a new city)
   Language   Automatic (system setting) / English / Deutsch / Polski (next start)
@@ -101,8 +101,10 @@
 @node ANIMATION "Animation"
 @toc MAIN
 
-  Options/Animation also switches the surf along the coasts (waves that roll
-  in and run back) and the gusts of wind that pass over woods.
+  Options/City animation switches the movement in the city itself (cars on
+  the roads, smoke, ...). Options/World animation switches the surf along the
+  coasts (waves that roll in and run back) and the gusts of wind that pass over
+  woods. Both are separate so that a slow machine can do without the second.
 @endnode
 
 @node DEMAND "The R C I bars"

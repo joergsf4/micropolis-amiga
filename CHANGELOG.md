@@ -2,6 +2,18 @@
 
 Older versions: see the release notes on GitHub (v0.1 to v0.8.1).
 
+## 0.8.5 (26 October 2026)
+
+### Changed
+- **City animation and world animation are separate switches** (#39): *Options > City animation* is the movement in the city itself
+  (cars, smoke: the original game's animation, which looked jerky when the waves slowed the picture down), *Options > World
+  animation* the surf and the wind. Both are on by default; each can be saved and switched off on its own.
+- **The surf costs a fraction of the processor time** (#39): each picture of the surf is made once and then copied (a tile takes
+  one 16x16 copy instead of a loop over its water pixels), the steps are 190 ms long (380 on a slow machine). In the emulator
+  profile A3000/030 the time to draw a frame with the animation on dropped from about 10 ms to 2 ms.
+- **The wind is visible again, but calm:** a gust lightens up to 7 of 16 bright pixels (14 was far too restless, 5 was not seen),
+  the strength is worked out per 4x4 block, which is much cheaper.
+
 ## 0.8.4 (25 October 2026)
 
 ### Fixed

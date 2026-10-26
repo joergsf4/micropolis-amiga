@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <string.h>
 #include "coast.h"
 
@@ -77,9 +78,8 @@ static unsigned hash2(int a, int b)
     return h ^ (h >> 16);
 }
 
-void coast_draw(UBYTE *dst, int stride, int tile, int wx, int wy, int tick)
+static void paint(UBYTE *dst, int stride, int tile, int wx, int wy, int t, int c)
 {
-    int t = tick % COAST_FRAMES, c = tick / COAST_FRAMES;
     const UBYTE *d = dist[tile];
     for (int k = 0; k < pn[tile]; k++) {
         {
@@ -106,4 +106,26 @@ void coast_draw(UBYTE *dst, int stride, int tile, int wx, int wy, int tick)
             if (col) dst[y * stride + x] = (UBYTE)col;
         }
     }
+}
+
+/* The surf of a tile only depends on the tile, the step of the cycle and one of four variants (chosen from the position and
+ * the cycle number), so every picture is made once and later just copied: drawing a shore tile costs one 16x16 copy instead
+ * of a loop over its water pixels (on a 68030 the loop took about half of the processor time). */
+#define VARIANTS 4
+#define CACHE_MAX (200 * 1024L)
+static UBYTE *cache[LAST_TILE + 1][COAST_FRAMES][VARIANTS];
+static long cache_bytes;
+
+void coast_draw(UBYTE *dst, int stride, int tile, int wx, int wy, int tick)
+{
+    int t = tick % COAST_FRAMES, c = tick / COAST_FRAMES;
+    int v = (int)(hash2((wx >> 4) + c * 5, (wy >> 4) + c * 3) & (VARIANTS - 1));
+    UBYTE *e = cache[tile][t][v];
+    if (!e && cache_bytes + 256 <= CACHE_MAX && (e = (UBYTE *)malloc(256)) != NULL) {
+        for (int y = 0; y < 16; y++) memcpy(e + y * 16, dst + y * stride, 16);        /* the tile as it is now (picture without surf) */
+        paint(e, 16, tile, v * 48 + 5, v * 80 + 3, t, v);                             /* fixed pattern per variant */
+        cache[tile][t][v] = e; cache_bytes += 256;
+    }
+    if (e) { for (int y = 0; y < 16; y++) memcpy(dst + y * stride, e + y * 16, 16); return; }
+    paint(dst, stride, tile, wx, wy, t, c);                                           /* cache full: draw it the slow way */
 }
