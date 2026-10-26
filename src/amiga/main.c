@@ -95,13 +95,14 @@ static int pref_ask = 1;
 static ULONG pref_mode = 0xffffffffUL;          /* remembered RTG mode id, picture size and depth */
 static int pref_w, pref_h, pref_depth;
 static int pref_level;                          /* difficulty 0 easy, 1 medium, 2 hard */
-enum { O_BULLDOZE, O_BUDGET, O_DISASTERS, O_SOUND, O_AUTOGO, O_ANIM, O_MSGS, O_NOTICES, O_SPEAK, O_STARTMENU, O_CLASSIC, O_AMBIENT, O_TRAFFIC, N_OPT };
+enum { O_BULLDOZE, O_BUDGET, O_DISASTERS, O_SOUND, O_AUTOGO, O_ANIM, O_MSGS, O_NOTICES, O_SPEAK, O_STARTMENU, O_CLASSIC, O_AMBIENT, O_TRAFFIC, O_WORLD, N_OPT };
 static int classic_icons;                        /* 1 = the original tool palette pictures, 0 = the uniform 32x32 set */
 static int start_pending;
 static int refresh_full;                   /* the next window refresh must be followed by a complete redraw (the picture changed while a requester covered it) */
 static int start_menu = 1;                       /* ask what to start with: new city, load, scenario */
-static const char *const opt_key[N_OPT] = { "AUTOBULLDOZE", "AUTOBUDGET", "DISASTERS", "SOUND", "AUTOGOTO", "ANIMATION", "MESSAGES", "MESSAGEWINDOWS", "SPEAKTOOLS", "STARTMENU", "CLASSICICONS", "AMBIENT", "TRAFFICRULES" };
-static int pref_opt[N_OPT] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };     /* -1 = not saved yet: keep the default */
+static const char *const opt_key[N_OPT] = { "AUTOBULLDOZE", "AUTOBUDGET", "DISASTERS", "SOUND", "AUTOGOTO", "ANIMATION", "MESSAGES", "MESSAGEWINDOWS", "SPEAKTOOLS", "STARTMENU", "CLASSICICONS", "AMBIENT", "TRAFFICRULES", "WORLDANIM" };
+static int world_anim = 1;                       /* surf along the coasts and gusts of wind over woods (the 'city' animation of cars and smoke is the core's DoAnimation) */
+static int pref_opt[N_OPT] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };     /* -1 = not saved yet: keep the default */
 static int pref_speed = -1;
 static int pref_fxvol = -1, pref_ambvol = -1;      /* volume sliders of the sound window (-1 = default) */
 static char pref_lang[24];                       /* "" = the system's preferred language, else "english" "deutsch" "polski" */
@@ -113,7 +114,7 @@ static int opt_get(int o)
     switch (o) {
     case O_BULLDOZE: return autoBulldoze;  case O_BUDGET: return autoBudget;  case O_DISASTERS: return !NoDisasters;
     case O_SOUND: return UserSoundOn;      case O_AUTOGO: return autoGo;      case O_ANIM: return DoAnimation;
-    case O_MSGS: return DoMessages;        case O_SPEAK: return speak_tools;   case O_STARTMENU: return start_menu;   case O_CLASSIC: return classic_icons;   case O_AMBIENT: return ambient_on;   case O_TRAFFIC: return TrafficRules;   default: return DoNotices;
+    case O_MSGS: return DoMessages;        case O_SPEAK: return speak_tools;   case O_STARTMENU: return start_menu;   case O_CLASSIC: return classic_icons;   case O_AMBIENT: return ambient_on;   case O_TRAFFIC: return TrafficRules;   case O_WORLD: return world_anim;   default: return DoNotices;
     }
 }
 static void opt_set(int o, int v)
@@ -121,7 +122,7 @@ static void opt_set(int o, int v)
     switch (o) {
     case O_BULLDOZE: autoBulldoze = v; break;  case O_BUDGET: autoBudget = v; break;  case O_DISASTERS: NoDisasters = !v; break;
     case O_SOUND: UserSoundOn = v; break;      case O_AUTOGO: autoGo = v; break;      case O_ANIM: DoAnimation = v; break;
-    case O_MSGS: DoMessages = v; break;        case O_SPEAK: speak_tools = v; break;   case O_STARTMENU: start_menu = v; break;   case O_CLASSIC: classic_icons = v; break;   case O_AMBIENT: ambient_on = v; break;   case O_TRAFFIC: TrafficRules = v; break;   default: DoNotices = v; break;
+    case O_MSGS: DoMessages = v; break;        case O_SPEAK: speak_tools = v; break;   case O_STARTMENU: start_menu = v; break;   case O_CLASSIC: classic_icons = v; break;   case O_AMBIENT: ambient_on = v; break;   case O_TRAFFIC: TrafficRules = v; break;   case O_WORLD: world_anim = v; break;   default: DoNotices = v; break;
     }
 }
 
@@ -404,6 +405,7 @@ static char last_line1[200], last_line2[200];
 
 static struct { long frames, tiles, bytes, render_us, sim_us, sim_steps; } stats;   /* no doubles: the ieee double library is unreliable */
 
+static int anim_hold, anim_slow;                  /* the animation stands still while the view scrolls (anim_hold frames); anim_slow: a slow machine, half the speed */
 static int coast_tick, coast_seen;                /* animation step of the surf (145 ms each); shore tiles seen in the last picture */
 static int coast_freeze = -1;                     /* debug: show this step only */
 
@@ -413,11 +415,11 @@ static void draw_tile(int col, int row, int tile)
     UBYTE *dst = fb + (BAR_H + row * 16) * SCR_W + TB_W + col * 16;
     for (int y = 0; y < 16; y++, src += 16, dst += SCR_W)
         memcpy(dst, src, 16);
-    if (DoAnimation && coast_has(tile))                          /* surf along the shore */
+    if (world_anim && coast_has(tile))                           /* surf along the shore */
         coast_draw(fb + (BAR_H + row * 16) * SCR_W + TB_W + col * 16, SCR_W, tile, (view_x + col) << 4, (view_y + row) << 4, coast_tick);
     if (DoAnimation && IsHwy(tile))                              /* cars on the highways */
         hwy_cars(fb + (BAR_H + row * 16) * SCR_W + TB_W + col * 16, SCR_W, tile, (view_x + col) << 4, (view_y + row) << 4, coast_tick);
-    if (DoAnimation && wind_has(tile))                           /* gusts over the woods */
+    if (world_anim && wind_has(tile))                           /* gusts over the woods */
         wind_draw(fb + (BAR_H + row * 16) * SCR_W + TB_W + col * 16, SCR_W, tile, (view_x + col) << 4, (view_y + row) << 4, coast_tick);
 }
 
@@ -772,7 +774,7 @@ static void panel_open(int i)
     if (y < bar) y = bar;
     p->win = OpenWindowTags(NULL, WA_CustomScreen, (ULONG)g_scr, WA_Left, x, WA_Top, y,
                             WA_InnerWidth, p->w, WA_InnerHeight, p->h, WA_Title, (ULONG)T(p->title),
-                            WA_DragBar, TRUE, WA_DepthGadget, TRUE, WA_CloseGadget, TRUE, WA_Activate, TRUE,
+                            WA_DragBar, TRUE, WA_DepthGadget, TRUE, WA_CloseGadget, TRUE, WA_Activate, TRUE, WA_NewLookMenus, TRUE,
                             WA_SimpleRefresh, TRUE, WA_ReportMouse, p->wants_move ? TRUE : FALSE,
                             WA_IDCMP, 0, TAG_DONE);
     if (!p->win) { *p->visible = 0; return; }
@@ -876,6 +878,7 @@ static void render_frame(struct Window *win)
     gettimeofday(&t_a, NULL);
     if (view_x != last_view_x || view_y != last_view_y) {
         int ddx = view_x - last_view_x, ddy = view_y - last_view_y;
+        anim_hold = 12;                                          /* scrolling: no animation steps until it has been still for a moment */
         if (!full_redraw && !first_present && last_view_x >= 0 && panels_open() == 0 &&
             ddx >= -6 && ddx <= 6 && ddy >= -6 && ddy <= 6)
             scroll_by(rp, ddx, ddy);
@@ -905,9 +908,9 @@ static void render_frame(struct Window *win)
                 if (blink && (tile & ZONEBIT) && !(tile & PWRBIT)) tile = LIGHTNINGBOLT;
                 else tile &= LOMASK;
             }
-            if (DoAnimation && coast_has(tile)) { coast_now++; if (coast_moved) redraw[row][col] = 1; }
+            if (world_anim && coast_has(tile)) { coast_now++; if (coast_moved) redraw[row][col] = 1; }
             else if (DoAnimation && IsHwy(tile)) { coast_now++; if (coast_moved) redraw[row][col] = 1; }   /* the cars move */
-            else if (DoAnimation && wind_has(tile)) {                /* only trees a gust touches now or touched one step ago */
+            else if (world_anim && wind_has(tile)) {                /* only trees a gust touches now or touched one step ago */
                 int wx = mx << 4, wy = my << 4;
                 coast_now++;
                 if (coast_moved && (wind_active(wx, wy, coast_tick) || wind_active(wx, wy, coast_drawn))) redraw[row][col] = 1;
@@ -967,7 +970,10 @@ static void render_frame(struct Window *win)
         gfx_colors(PEN_TEXT, PEN_BAR);
         gfx_print(DEM_X + 10, DEM_Y + 30, "R"); gfx_print(DEM_X + 46, DEM_Y + 30, "C"); gfx_print(DEM_X + 82, DEM_Y + 30, "I");
     }
-    stats.render_us += elapsed_us();
+    { long el = elapsed_us();
+      stats.render_us += el;
+      if (coast_moved) anim_slow = el > 60000 ? 1 : el < 30000 ? 0 : anim_slow;      /* an animation step that takes long: slow it down (with some hysteresis) */
+    }
 
     /* send the changes to the screen */
     if (first_present) {
@@ -1004,7 +1010,7 @@ static void render_frame(struct Window *win)
 /* ---------- menus and commands ---------- */
 enum { CMD_NEW = 1, CMD_LOAD, CMD_SAVE, CMD_SAVEAS, CMD_QUIT,
        CMD_PAUSE = 10, CMD_SLOW, CMD_MEDIUM, CMD_FAST,
-       CMD_AUTOBULLDOZE = 20, CMD_AUTOBUDGET, CMD_DISASTERS, CMD_SOUND, CMD_ASKMODE, CMD_AUTOGO, CMD_ANIM, CMD_MSGS, CMD_NOTICES, CMD_OVERLAY, CMD_LEVEL = 60, CMD_SPEAK = 65, CMD_STARTMENU = 66, CMD_CLASSIC = 67, CMD_LANG = 70, CMD_AMBIENT = 75, CMD_SOUNDWIN = 76, CMD_TRAFFIC = 77,
+       CMD_AUTOBULLDOZE = 20, CMD_AUTOBUDGET, CMD_DISASTERS, CMD_SOUND, CMD_ASKMODE, CMD_AUTOGO, CMD_ANIM, CMD_MSGS, CMD_NOTICES, CMD_OVERLAY, CMD_LEVEL = 60, CMD_SPEAK = 65, CMD_STARTMENU = 66, CMD_CLASSIC = 67, CMD_LANG = 70, CMD_AMBIENT = 75, CMD_SOUNDWIN = 76, CMD_TRAFFIC = 77, CMD_WORLDANIM = 78,
        CMD_ABOUT = 44, CMD_HELP = 45, CMD_SCEN = 200, CMD_BUDGET = 40, CMD_MAP = 41, CMD_EVAL = 42, CMD_GRAPHS = 43, CMD_MAPMODE = 100,
        CMD_FIRE = 30, CMD_FLOOD, CMD_TORNADO, CMD_QUAKE, CMD_MONSTER, CMD_MELTDOWN };
 
@@ -1051,7 +1057,8 @@ static struct Menu *make_menus(struct Screen *scr, APTR *vi_out)
     mi(NM_ITEM, T("Traffic rules (jams, rail, ports)"), NULL, CHECKIT | MENUTOGGLE | (TrafficRules ? CHECKED : 0), CMD_TRAFFIC);
     mi(NM_ITEM, T("Sound options..."), NULL, 0, CMD_SOUNDWIN);
     mi(NM_ITEM, T("Auto Goto (jump to events)"), NULL, CHECKIT | MENUTOGGLE | (autoGo ? CHECKED : 0), CMD_AUTOGO);
-    mi(NM_ITEM, T("Animation"), NULL, CHECKIT | MENUTOGGLE | (DoAnimation ? CHECKED : 0), CMD_ANIM);
+    mi(NM_ITEM, T("City animation"), NULL, CHECKIT | MENUTOGGLE | (DoAnimation ? CHECKED : 0), CMD_ANIM);
+    mi(NM_ITEM, T("World animation"), NULL, CHECKIT | MENUTOGGLE | (world_anim ? CHECKED : 0), CMD_WORLDANIM);
     mi(NM_ITEM, T("Messages"), NULL, CHECKIT | MENUTOGGLE | (DoMessages ? CHECKED : 0), CMD_MSGS);
     mi(NM_ITEM, T("Start menu at launch"), NULL, CHECKIT | MENUTOGGLE | (start_menu ? CHECKED : 0), CMD_STARTMENU);
     mi(NM_ITEM, T("Classic tool icons"), NULL, CHECKIT | MENUTOGGLE | (classic_icons ? CHECKED : 0), CMD_CLASSIC);
@@ -1088,7 +1095,7 @@ static struct Menu *make_menus(struct Screen *scr, APTR *vi_out)
     *vi_out = vi;
     if (!vi) return NULL;
     menu = CreateMenusA(newmenu, NULL);
-    if (menu && !LayoutMenusA(menu, vi, NULL)) { FreeMenus(menu); menu = NULL; }
+    if (menu && !LayoutMenus(menu, vi, GTMN_NewLookMenus, TRUE, TAG_DONE)) { FreeMenus(menu); menu = NULL; }   /* new look: the menus use the screen's pens (grey, 3D), not the 1.3 black-and-colour 1 look */
     if (menu) {                                               /* every title must be reachable: the last one has to end inside the screen */
         int right = 0; char lb[80];
         for (struct Menu *m = menu; m; m = m->NextMenu) if (m->LeftEdge + m->Width > right) right = m->LeftEdge + m->Width;
@@ -1272,6 +1279,7 @@ static void menu_sync(void)                                  /* make the check m
             case CMD_TRAFFIC: want = TrafficRules; break;
             case CMD_AUTOGO: want = autoGo; break;
             case CMD_ANIM: want = DoAnimation; break;
+            case CMD_WORLDANIM: want = world_anim; break;
             case CMD_MSGS: want = DoMessages; break;
             case CMD_NOTICES: want = DoNotices; break;
             default:
@@ -1346,6 +1354,7 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
     case CMD_SOUND: UserSoundOn = checked; break;
     case CMD_AUTOGO: autoGo = checked; MustUpdateOptions = 1; break;
     case CMD_ANIM: DoAnimation = checked; MustUpdateOptions = 1; full_redraw = 1; break;
+    case CMD_WORLDANIM: world_anim = checked; full_redraw = 1; break;
     case CMD_MSGS: DoMessages = checked; MustUpdateOptions = 1; break;
     case CMD_AMBIENT: ambient_on = checked; break;
     case CMD_CLASSIC: classic_icons = checked; toolbar_dirty = 1; tb_label_only = 0; break;
@@ -1692,6 +1701,15 @@ static int real_main(int argc, char **argv)
     if (!scr) { fail(T("Cannot open the RTG screen (mode 0x%08lx, %d bit)."), (unsigned long)id, depth); goto out; }
     g_scr = scr;
     logmsg("screen open");
+    {   struct DrawInfo *dri = GetScreenDrawInfo(scr);                 /* which pens will the menus use? (they are inverted when highlighted) */
+        if (dri) {
+            char b[160]; int n = dri->dri_NumPens < 12 ? dri->dri_NumPens : 12;
+            strcpy(b, "pens:");
+            for (int i = 0; i < n; i++) sprintf(b + strlen(b), " %d", (int)dri->dri_Pens[i]);
+            logmsg(b);
+            FreeScreenDrawInfo(scr, dri);
+        }
+    }
     {   /* the game picture fills the screen below the title bar */
         int top = scr->BarHeight + 1;
         scr_w = scr->Width > MAX_W ? MAX_W : scr->Width;
@@ -1714,7 +1732,7 @@ static int real_main(int argc, char **argv)
         idcmp_port = CreateMsgPort();
         if (!idcmp_port) { fail(T("Cannot create a message port.")); goto out; }
         win = OpenWindowTags(NULL, WA_CustomScreen, (ULONG)scr, WA_Left, 0, WA_Top, top, WA_Width, scr_w,
-                             WA_Height, scr_h, WA_Borderless, TRUE, WA_Backdrop, TRUE, WA_Activate, TRUE,
+                             WA_Height, scr_h, WA_Borderless, TRUE, WA_Backdrop, TRUE, WA_Activate, TRUE, WA_NewLookMenus, TRUE,
                              WA_ReportMouse, TRUE, WA_SimpleRefresh, TRUE, WA_IDCMP, 0, TAG_DONE);
         if (!win) { fail(T("Cannot open the game window.")); goto out; }
         win->UserPort = idcmp_port;
@@ -1764,8 +1782,8 @@ static int real_main(int argc, char **argv)
         if (!strncmp(a, "show=", 5)) debug_show = 1;
         if (!strcmp(a, "show=about")) { show_about(); dbg_about = 1; }
         if (!strcmp(a, "newcity")) do_command(CMD_NEW, win, NULL);
-        if (!strncmp(a, "coast=", 6)) { coast_freeze = atoi(a + 6); DoAnimation = 1; }   /* debug: show one surf step (with det) */
-        if (!strcmp(a, "det")) { dbg_det = 1; DoAnimation = coast_freeze >= 0; ambient_on = 0; }
+        if (!strncmp(a, "coast=", 6)) { coast_freeze = atoi(a + 6); world_anim = 1; }   /* debug: show one surf step (with det) */
+        if (!strcmp(a, "det")) { dbg_det = 1; DoAnimation = 0; world_anim = coast_freeze >= 0; ambient_on = 0; }
         if (!strncmp(a, "dump=", 5)) strncpy(dbg_dump, a + 5, sizeof dbg_dump - 1);
         if (!strcmp(a, "show=eval")) open_info_panel(P_EVAL);              /* debug: open a panel at start */
         if (!strcmp(a, "show=graph")) open_info_panel(P_GRAPH);
@@ -1908,7 +1926,7 @@ static int real_main(int argc, char **argv)
         }
         if (mouse_x >= 0 && !panning && (++frame & 3) == 0) {   /* edge scrolling */
             int ox = view_x, oy = view_y;
-            if (mouse_x >= TB_W && mouse_x < TB_W + 8) view_x--;        /* left: the strip next to the palette */
+            if ((mouse_x >= TB_W && mouse_x < TB_W + 8) || mouse_x < 3) view_x--;   /* left: the strip next to the palette or the very edge of the screen */
             if (mouse_x >= SCR_W - 8) view_x++;
             if (mouse_y < BAR_H + 8 && mouse_x >= TB_W) view_y--;       /* top: the status bar counts, too */
             if (mouse_y >= SCR_H - 8) view_y++;
@@ -1916,10 +1934,11 @@ static int real_main(int argc, char **argv)
             if (ox != view_x || oy != view_y) dirty = 1;
         }
         sound_poll();
-        if (DoAnimation && coast_seen) {                           /* surf: next step every 145 ms (only while shore is on the screen) */
+        if (anim_hold > 0) anim_hold--;
+        else if ((world_anim || DoAnimation) && coast_seen) {                           /* surf: next step every 145 ms (only while shore is on the screen) */
             struct timeval tn; int st;
             gettimeofday(&tn, NULL);
-            st = coast_freeze >= 0 ? coast_freeze : (int)((((unsigned long)tn.tv_sec & 0xFFFF) * 1000UL + (unsigned long)(tn.tv_usec / 1000)) / 145);   /* small enough for 32 bit longs and never negative */
+            st = coast_freeze >= 0 ? coast_freeze : (int)((((unsigned long)tn.tv_sec & 0xFFFF) * 1000UL + (unsigned long)(tn.tv_usec / 1000)) / (anim_slow ? 380 : 190));   /* small enough for 32 bit longs and never negative (the old product overflowed on the Amiga) */
             if (st != coast_tick) { coast_tick = st; dirty = 1; }
         }
         { static int amb_frame; if ((++amb_frame & 31) == 0 || amb_frame == 1) ambient_update(); ambient_tick(); }
@@ -1932,7 +1951,16 @@ static int real_main(int argc, char **argv)
             clamp_view(); dirty = 1;
         }
         if (debug_show && notice_visible && !dbg_about) notice_close();
-        if (dbg_scroll > 0 && (frame & 3) == 0) { view_x++; if (dbg_scroll & 1) view_y++; dbg_scroll--; clamp_view(); dirty = 1; }
+        if (dbg_scroll > 0 && (frame & 3) == 0) {
+            static struct timeval ts; static int steps;
+            if (!steps) gettimeofday(&ts, NULL);
+            steps++; view_x++; if (dbg_scroll & 1) view_y++; dbg_scroll--; clamp_view(); dirty = 1;
+            if (!dbg_scroll) {                                  /* debug: how long did the scroll test take? */
+                struct timeval te; char b[80]; gettimeofday(&te, NULL);
+                sprintf(b, "scroll test: %d steps in %ld ms (%d loops)", steps, (long)((te.tv_sec - ts.tv_sec) * 1000 + (te.tv_usec - ts.tv_usec) / 1000), frame);
+                logmsg(b);
+            }
+        }
         if (SimSpeed && ++tick >= delay[SimSpeed]) {
             struct timeval t0, t1;
             tick = 0;

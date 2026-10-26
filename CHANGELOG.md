@@ -2,9 +2,9 @@
 
 Older versions: see the release notes on GitHub (v0.1 to v0.8.1).
 
-## 0.8.3-traffic (25 October 2026, experiment)
+## 0.8.5-traffic (26 October 2026, experiment)
 
-Everything of 0.8.3 plus fundamental changes of the game rules (branch `traffic-experiments`, issue #37). Options > Traffic rules
+Everything of 0.8.5 plus fundamental changes of the game rules (branch `traffic-experiments`, issue #37). Options > Traffic rules
 switches the rules on and off. Cities with highways do not load correctly in the original Micropolis.
 
 - **Jams:** a busy road in front of a zone slows its growth (up to -840). The query tool shows traffic, rail link and effect.
@@ -17,6 +17,35 @@ switches the rules on and off. Cities with highways do not load correctly in the
   same water, airports any airport. Ships and planes sail and fly between them there and back. 1000 trips a year per hub, a
   warning at 80 % and 100 % in the status line, use shown in the query tool.
 - German and Polish texts and guides for all of it.
+
+## 0.8.5 (26 October 2026)
+
+### Changed
+- **City animation and world animation are separate switches** (#39): *Options > City animation* is the movement in the city itself
+  (cars, smoke: the original game's animation, which looked jerky when the waves slowed the picture down), *Options > World
+  animation* the surf and the wind. Both are on by default; each can be saved and switched off on its own.
+- **The surf costs a fraction of the processor time** (#39): each picture of the surf is made once and then copied (a tile takes
+  one 16x16 copy instead of a loop over its water pixels), the steps are 190 ms long (380 on a slow machine). In the emulator
+  profile A3000/030 the time to draw a frame with the animation on dropped from about 10 ms to 2 ms.
+- **The wind is visible again, but calm:** a gust lightens up to 7 of 16 bright pixels (14 was far too restless, 5 was not seen),
+  the strength is worked out per 4x4 block, which is much cheaper.
+
+## 0.8.4 (25 October 2026)
+
+### Fixed
+- **Scrolling is no longer slowed down by the animation** (#39): the surf and the wind stand still while the view scrolls and go on
+  a moment after it stopped; a slow machine (a step that takes long to draw) gets half the animation speed; the surf is drawn
+  from a list of the pixels it can touch instead of all 256.
+- **The surf could be drawn wrongly:** the animation clock overflowed the 32 bit numbers of the Amiga, its steps became negative
+  and the wave pattern read from outside its table (restless, wrong shapes). The clock is now always positive.
+- **Gusts of wind are calmer** (#39): fewer lighter pixels, a wider and slower band, a colour closer to the green.
+- **Menus use the "new look"** (#33): they follow the screen's pens like the Workbench (grey, 3D) instead of the 1.3 style with the
+  game's colour 1 as background, which turned the highlighted entry black with unreadable text on 256 colour screens.
+- **Autoscrolling at the left edge** (#34): the very left pixel columns of the screen scroll as well, not only the strip next to
+  the tool palette.
+
+### Other
+- The log (option `debug`) lists the pens of the screen (`pens:`) and times the `scroll=N` test.
 
 ## 0.8.3 (25 October 2026)
 

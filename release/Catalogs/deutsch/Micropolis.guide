@@ -98,7 +98,7 @@
   Szenarien    historische Städte mit Geschichte und Ziel
   Tempo        Pause / langsam / mittel / schnell
   Optionen     Auto-Abriss, Auto-Haushalt, Katastrophen, Auto-Sprung,
-               Animation, Meldungen, Meldungsfenster, Tonoptionen (Fenster mit
+               Animation Stadt, Animation Welt, Meldungen, Meldungsfenster, Tonoptionen (Fenster mit
                Schaltern und Lautstärkereglern), Verkehrsregeln,
                Bildschirmmodus fragen
   Stufe        Leicht / Mittel / Schwer (Startgeld einer neuen Stadt)
@@ -142,9 +142,11 @@
 @node ANIMATION "Animation"
 @toc MAIN
 
-  Optionen/Animation schaltet auch die Brandung an den Küsten (Wellen, die
-  anrollen und zurückfließen), die Windböen über den Wäldern und die
-  Autos auf den Autobahnen.
+  Optionen/Animation Stadt schaltet die Bewegung in der Stadt selbst (Autos
+  auf den Straßen und Autobahnen, Rauch, ...). Optionen/Animation Welt schaltet
+  die Brandung an den Küsten (Wellen, die anrollen und zurückfließen) und die
+  Windböen über den Wäldern. Beide sind getrennt, damit ein langsamer Rechner
+  auf die zweite verzichten kann.
 @endnode
 
 @node DEMAND "Die R-C-I-Balken"

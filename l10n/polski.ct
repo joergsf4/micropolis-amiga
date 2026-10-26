@@ -280,9 +280,12 @@ Ustawienia dzwieku...
 S_12929962
 Auto-skok (do zdarzen)
 ; Auto Goto (jump to events)
-S_41E389FD
-Animacja
-; Animation
+S_23466D04
+Animacja miasta
+; City animation
+S_04251D81
+Animacja swiata
+; World animation
 S_78611FD5
 Komunikaty
 ; Messages

@@ -79,8 +79,8 @@ Start          at launch you choose: New city, Load city, Scenario or the defaul
 Tool icons     uniform 32x32 set by default; Options/Classic tool icons switches to the original pictures
 Level          menu Level: Easy/Medium/Hard (start funds of a new city, saved in the preferences)
 Ambient sounds quiet sea / city / nature loops that follow the visible part of the map (Options > Sound options)
-Options        Auto Goto, Animation, Messages, Message windows can be switched off; sound switches, volume sliders and "Speak tool names" (off by default) are in Options > Sound options
-Animation      Options/Animation also switches the surf along the coasts, the gusts of wind over woods and the cars on highways
+Options        Auto Goto, City animation, World animation, Messages, Message windows can be switched off; sound switches, volume sliders and "Speak tool names" (off by default) are in Options > Sound options
+Animation      Options/City animation: cars (also on highways), smoke; Options/World animation: the surf along the coasts and the gusts of wind over woods
 Traffic rules  Options/Traffic rules: jams slow zones, trips by rail attract growth (up to +150, by the share of the way on rails) and do not load the roads, failed trips
                cost growth; the Highway tool builds jam-free roads; sea ports and airports (with power and a road) link separated
                areas, ships and planes sail and fly between them there and back; each carries 1000 trips a year, the status line
