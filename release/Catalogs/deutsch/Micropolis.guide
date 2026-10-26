@@ -98,7 +98,7 @@
   Tempo        Pause / langsam / mittel / schnell
   Optionen     Auto-Abriss, Auto-Haushalt, Katastrophen, Auto-Sprung,
                Animation Stadt, Animation Welt, Meldungen, Meldungsfenster, Tonoptionen (Fenster mit
-               Schaltern und Lautstärkereglern), Bildschirmmodus fragen
+               Schaltern, Lautstärkereglern und der Ausgabe: System oder AHI), Bildschirmmodus fragen
   Stufe        Leicht / Mittel / Schwer (Startgeld einer neuen Stadt)
   Sprache      Automatisch (Systemeinstellung) / English / Deutsch / Polski
                (gilt ab dem nächsten Start)

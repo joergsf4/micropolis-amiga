@@ -78,7 +78,7 @@ Start          at launch you choose: New city, Load city, Scenario or the defaul
 Tool icons     uniform 32x32 set by default; Options/Classic tool icons switches to the original pictures
 Level          menu Level: Easy/Medium/Hard (start funds of a new city, saved in the preferences)
 Ambient sounds quiet sea / city / nature loops that follow the visible part of the map (Options > Sound options)
-Options        Auto Goto, City animation, World animation, Messages, Message windows can be switched off; sound switches, volume sliders and "Speak tool names" (off by default) are in Options > Sound options
+Options        Auto Goto, City animation, World animation, Messages, Message windows can be switched off; sound switches, volume sliders, the output (system sound or AHI, units 0 to 3) and "Speak tool names" (off by default) are in Options > Sound options
 Animation      Options/City animation: cars, smoke; Options/World animation: the surf along the coasts and the gusts of wind over woods
 Scenarios      menu Scenarios: 8 historic disasters/challenges with story and goal
 Help           Help key, or menu Project/Help (Micropolis.guide, AmigaGuide)

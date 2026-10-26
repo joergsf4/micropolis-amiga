@@ -2,6 +2,16 @@
 
 Older versions: see the release notes on GitHub (v0.1 to v0.8.1).
 
+## Next version (AHI, in the sources)
+
+### New
+- **Sound through AHI** (#40): the sound window has a button *Output* that chooses the system sound (sound.datatype, Paula) or an
+  AHI unit (0 to 3); it is saved. With AHI the effects and the three ambient loops are mixed by AHI: no fighting over Paula's
+  channels, and a sound card with an AHI driver can be used. The 8SVX samples are read by the game itself, a loop is played as a
+  stream of short chunks that follow each other without a gap (its volume follows the map within a fraction of a second). If
+  `ahi.device` or the unit cannot be opened, the game stays with the system sound. Tested in the emulator (AHI 4.18 with the
+  Paula driver); a real sound card is still to be tested.
+
 ## 0.8.5 (26 October 2026)
 
 ### Changed

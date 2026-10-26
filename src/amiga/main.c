@@ -103,7 +103,7 @@ static const char *const opt_key[N_OPT] = { "AUTOBULLDOZE", "AUTOBUDGET", "DISAS
 static int world_anim = 1;                       /* surf along the coasts and gusts of wind over woods (the 'city' animation of cars and smoke is the core's DoAnimation) */
 static int pref_opt[N_OPT] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };     /* -1 = not saved yet: keep the default */
 static int pref_speed = -1;
-static int pref_fxvol = -1, pref_ambvol = -1;      /* volume sliders of the sound window (-1 = default) */
+static int pref_fxvol = -1, pref_ambvol = -1, pref_sndout;      /* volume sliders of the sound window (-1 = default) */
 static char pref_lang[24];                       /* "" = the system's preferred language, else "english" "deutsch" "polski" */
 static char arg_lang[24];                        /* lang= argument or LANGUAGE tooltype: wins over the preferences */
 #define N_WINPOS 7                              /* NPANELS */
@@ -140,6 +140,7 @@ static void prefs_load(void)
             else if (!strncmp(line, "DEPTH=", 6)) pref_depth = atoi(line + 6);
             else if (!strncmp(line, "LANGUAGE=", 9)) { strncpy(pref_lang, line + 9, sizeof pref_lang - 1); pref_lang[strcspn(pref_lang, "\r\n")] = 0; }
             else if (!strncmp(line, "SPEED=", 6)) { pref_speed = atoi(line + 6); if (pref_speed < 0 || pref_speed > 3) pref_speed = -1; }
+            else if (!strncmp(line, "SOUNDOUT=", 9)) { pref_sndout = atoi(line + 9); if (pref_sndout < 0 || pref_sndout > 4) pref_sndout = 0; }
             else if (!strncmp(line, "SFXVOL=", 7)) { pref_fxvol = atoi(line + 7); if (pref_fxvol < 0 || pref_fxvol > 100) pref_fxvol = -1; }
             else if (!strncmp(line, "AMBVOL=", 7)) { pref_ambvol = atoi(line + 7); if (pref_ambvol < 0 || pref_ambvol > 100) pref_ambvol = -1; }
             else if (!strncmp(line, "WIN", 3) && line[3] >= '0' && line[3] < '0' + N_WINPOS && line[4] == '=') {
@@ -167,7 +168,7 @@ static void prefs_save(void)
         fprintf(f, "ASK=%d\nMODE=%lx\nSIZE=%dx%d\nDEPTH=%d\nLEVEL=%d\n", pref_ask, (unsigned long)pref_mode, pref_w, pref_h, pref_depth, pref_level);
         for (int o = 0; o < N_OPT; o++) fprintf(f, "%s=%d\n", opt_key[o], pref_opt[o] >= 0 ? pref_opt[o] : opt_get(o));
         fprintf(f, "SPEED=%d\n", pref_speed >= 0 ? pref_speed : 3);
-        fprintf(f, "SFXVOL=%d\nAMBVOL=%d\n", sound_fx_vol, sound_amb_vol);
+        fprintf(f, "SFXVOL=%d\nAMBVOL=%d\nSOUNDOUT=%d\n", sound_fx_vol, sound_amb_vol, sound_output);
         fprintf(f, "LANGUAGE=%s\n", pref_lang);
         for (int i = 0; i < N_WINPOS; i++) if (pref_wx[i] >= 0) fprintf(f, "WIN%d=%d,%d\n", i, pref_wx[i], pref_wy[i]);
         fclose(f);
@@ -1705,6 +1706,7 @@ static int real_main(int argc, char **argv)
 
     logmsg("window open");
     sound_init();
+    if (pref_sndout) sound_set_output(pref_sndout);               /* AHI from the preferences (falls back to the system sound when the unit cannot be opened) */
     if (GadToolsBase) {
         menu = make_menus(scr, &vi);
         g_menu = menu;

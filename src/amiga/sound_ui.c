@@ -23,8 +23,9 @@ int speak_tools;
 #define ROW_SOUND  36
 #define ROW_AMB    62
 #define ROW_SPEAK  88
-#define ROW_FX     136                           /* slider rows: label above, track below */
-#define ROW_AMBVOL 186
+#define ROW_OUT    118                           /* the button that chooses the output: system sound or AHI */
+#define ROW_FX     166                           /* slider rows: label above, track below */
+#define ROW_AMBVOL 216
 #define BTN_Y      (SND_H - 34)
 
 static int drag = -1;                            /* slider being dragged: 0 effects, 1 ambient */
@@ -65,6 +66,11 @@ void sound_ui_draw(UBYTE *fb, int stride)
     checkbox(fb, stride, ROW_SOUND, UserSoundOn, T("Sound"));
     checkbox(fb, stride, ROW_AMB, ambient_on, T("Ambient sounds"));
     checkbox(fb, stride, ROW_SPEAK, speak_tools, T("Speak tool names"));
+    {   char lb[48];                                                       /* output button */
+        rect(fb, stride, SND_X + 16, SND_Y + ROW_OUT - 14, SND_W - 32, 22, PEN_BTN);
+        gfx_colors(PEN_TEXT, PEN_BTN);
+        gfx_print_c(SND_X + SND_W / 2, SND_Y + ROW_OUT + 2, sound_output_label(lb));
+    }
     slider(fb, stride, ROW_FX, sound_fx_vol, T("Effects volume"));
     slider(fb, stride, ROW_AMBVOL, sound_amb_vol, T("Ambient volume"));
     rect(fb, stride, SND_X + SND_W / 2 - 50, SND_Y + BTN_Y, 100, 24, PEN_SEL);
@@ -88,6 +94,7 @@ int sound_ui_mouse(int x, int y, int kind)
     if (y >= ROW_SOUND - 12 && y < ROW_SOUND + 6 && x >= 16 && x < SND_W - 16) { UserSoundOn = !UserSoundOn; return 1; }
     if (y >= ROW_AMB - 12 && y < ROW_AMB + 6 && x >= 16 && x < SND_W - 16) { ambient_on = !ambient_on; return 1; }
     if (y >= ROW_SPEAK - 12 && y < ROW_SPEAK + 6 && x >= 16 && x < SND_W - 16) { speak_tools = !speak_tools; return 1; }
+    if (y >= ROW_OUT - 14 && y < ROW_OUT + 8 && x >= 16 && x < SND_W - 16) { sound_cycle_output(); return 1; }
     if (y >= ROW_FX + 6 && y < ROW_FX + 34 && x >= TRACK_X && x < TRACK_X + TRACK_W) { drag = 0; set_from_x(0, x); return 1; }
     if (y >= ROW_AMBVOL + 6 && y < ROW_AMBVOL + 34 && x >= TRACK_X && x < TRACK_X + TRACK_W) { drag = 1; set_from_x(1, x); return 1; }
     if (y >= BTN_Y && y < BTN_Y + 24 && x >= SND_W / 2 - 50 && x < SND_W / 2 + 50) { sound_ui_close(); return 1; }

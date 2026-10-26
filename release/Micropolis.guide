@@ -89,7 +89,7 @@
   Speed      pause / slow / medium / fast
   Options    auto bulldoze, auto budget, disasters, auto goto, city animation,
              world animation, messages, message windows, sound options (window with the
-             switches and volume sliders), ask screen mode
+             switches, volume sliders and the output: system or AHI), ask screen mode
   Level      Easy / Medium / Hard (start funds of a new city)
   Language   Automatic (system setting) / English / Deutsch / Polski (next start)
   Windows    budget, evaluation, graphs, map

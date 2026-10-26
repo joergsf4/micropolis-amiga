@@ -529,6 +529,15 @@ Zasieg strazy
 S_175C873F
 Zasieg policji
 ; Police coverage
+S_6D0CE0C1
+Wyjscie: AHI unit %d
+; Output: AHI unit %d
+S_2CDAA744
+Wyjscie: AHI niedostepne (system)
+; Output: AHI not available (system)
+S_605709A7
+Wyjscie: system (Paula)
+; Output: system (Paula)
 S_365AA42E
 Dzwiek: brak datatypes.library
 ; Sound: datatypes.library missing

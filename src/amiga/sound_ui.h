@@ -9,7 +9,7 @@ extern int speak_tools;                       /* spoken tool names when a tool i
 #define SND_X 0
 #define SND_Y 0
 #define SND_W 360
-#define SND_H 264
+#define SND_H 292
 void sound_ui_draw(UBYTE *fb, int stride);    /* panel graphics and text (gfx_target is set by the caller) */
 int  sound_ui_mouse(int x, int y, int kind);  /* kind 0 = button down, 1 = mouse moved, 2 = button up; returns 1 when the picture changes */
 void sound_ui_close(void);

@@ -529,6 +529,15 @@ Feuerwehr-Abdeckung
 S_175C873F
 Polizei-Abdeckung
 ; Police coverage
+S_6D0CE0C1
+Ausgabe: AHI Unit %d
+; Output: AHI unit %d
+S_2CDAA744
+Ausgabe: AHI nicht verfügbar (System)
+; Output: AHI not available (system)
+S_605709A7
+Ausgabe: System (Paula)
+; Output: system (Paula)
 S_365AA42E
 Ton: datatypes.library fehlt
 ; Sound: datatypes.library missing
