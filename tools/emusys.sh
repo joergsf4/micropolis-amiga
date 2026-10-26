@@ -14,7 +14,7 @@ rm -f out/syswork/result.txt* out/syswork/Micropolis/micropolis.log* out/syswork
 [ -n "${PREFS:-}" ] && printf "$PREFS" > out/syswork/Micropolis/Micropolis.prefs   # PREFS="ASK=0\nMODE=50051000\nSIZE=1024x768\nDEPTH=8\n"
 cp "$ROM" out/kick.rom
 printf '%s\n' "$CMD" > out/syswork/cmd.script
-printf 'FailAt 21\nAssign Picasso96: "Work:Picasso96"\nExecute Work:cmd.script >Work:result.txt\necho DONE >>Work:result.txt\n' > out/sys/us.txt
+printf 'FailAt 21\nAssign Picasso96: "Work:Picasso96"\nIf EXISTS Devs:AudioModes\n  C:AddAudioModes\nEndIf\nExecute Work:cmd.script >Work:result.txt\necho DONE >>Work:result.txt\n' > out/sys/us.txt   # AHI (if installed in the image): register its audio modes
 docker run --rm -v "$PWD/out/sys":/s -e USE_SM="${USE_SM:-}" sacredbanana/amiga-compiler:m68k-amigaos sh -c 'xdftool /s/system.hdf delete s/user-startup 2>/dev/null; xdftool /s/system.hdf write /s/us.txt s/user-startup; [ -f /s/sm.prefs ] && [ -n "$USE_SM" ] && { xdftool /s/system.hdf delete prefs/env-archive/sys/screenmode.prefs; xdftool /s/system.hdf write /s/sm.prefs prefs/env-archive/sys/screenmode.prefs; }; true' >/dev/null
 docker run --rm -i -v "$PWD":/project -w /project -e HOME=/tmp -e TMO="$TMO" -e M="${MODEL:-A4000/040}" -e G="${GFX:-uaegfx-z3}" -e GM="${GFXMEM:-16384}" -e X="${EXTRA:-}" -e SHOTS="${SHOTS:-}" -e SOUND="${SOUND:-}" -e WW="${WW:-1280}" -e WH="${WH:-800}" dnd-amiga-emutest bash -s <<'EOS'
 Xvfb :99 -screen 0 1600x1200x24 >/dev/null 2>&1 &
