@@ -2,6 +2,21 @@
 
 Older versions: see the release notes on GitHub (v0.1 to v0.8.1).
 
+## 0.8.8 (27 October 2026)
+
+### Changed
+- **Menus look the same on every screen depth** (#43): on 16 and 32 bit screens the menus used the system default pens (black
+  background, white text, "OS 1.3 look"). The screen now gets its own system pens (black, grey, white, blue), so the menus are
+  grey with black text and a highlighted title, like on palette screens and like the Workbench.
+- **The tool palette is redrawn less when the mouse moves over the icons** (#30): only the label above the icons (name and
+  price) is redrawn, no longer the whole palette with all icons. In the emulator profile A3000/030 a frame in which the hover
+  changes every time took 6.5 ms before and 3.5 ms now. Whether this cures the jumping mouse pointer on a real 68030 has to be
+  tested.
+
+### Other
+- `tools/emusys.sh` can send mouse input to the emulator (`XDO=...`), so that open menus can be photographed in tests.
+- Debug options `hoverwalk` (the hover moves to another icon every frame) and `undotest`.
+
 ## 0.8.7 (27 October 2026)
 
 ### New

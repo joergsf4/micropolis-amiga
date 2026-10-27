@@ -210,6 +210,7 @@ static void end_drag(void)                 /* the button went up somewhere else 
 static int map_drag;
 static int sound_ui_ready;                /* set when the main loop runs: UI sounds (tool select, speed) only from then on */
 static int shake_frames, shake_bx, shake_by;   /* earthquake: the view jitters by a tile for about a second */
+static int dbg_hoverwalk;               /* test option hoverwalk: the tool under the mouse changes every frame */
 static int dbg_about, dbg_det;                 /* test options: keep the About box open / deterministic picture (no blinking, no animation, no ambient sound) */
 static char dbg_dump[120];                  /* test option dump=PATH: write the frame buffer and the panel scratch buffer at exit */
 static int dbg_quit_loops;                 /* test option quit=N: leave the game after N seconds (checks the clean shutdown) */
@@ -487,6 +488,9 @@ static int tool_at(int mx, int my)
 static void draw_toolbar(void)
 {
     char line[40];
+    if (tb_label_only) {                                         /* the mouse only moved to another icon: just the label above the icons (name and price) */
+        for (int y = BAR_H; y < BAR_H + 56 && y < SCR_H; y++) memset(fb + y * SCR_W, PEN_BAR, TB_W);
+    } else {
     for (int y = BAR_H; y < SCR_H; y++) memset(fb + y * SCR_W, PEN_BAR, TB_W);
     if (!classic_icons && toolicons2) {
         const UBYTE *px0 = toolicons2 + 4 + toolicons2_n * 3;
@@ -510,6 +514,7 @@ static void draw_toolbar(void)
                 for (int x = 0; x < w; x++) fb[dy * SCR_W + tooldef[i].x + x] = px[y * w + x] ? px[y * w + x] : PEN_BAR;
             }
         }
+    }
     }
     {   int t = tool_hover >= 0 ? tool_hover : editor.tool_state;              /* name and cost of the tool under the mouse, else of the chosen one */
         if (t >= 0 && t < NTOOLS) {
@@ -1664,14 +1669,17 @@ static int real_main(int argc, char **argv)
     { char b[100]; sprintf(b, "screen mode 0x%08lx, depth %d", (unsigned long)id, depth); logmsg(b); }
     {   /* palette screens get Workbench-like window pens from our palette (grey borders, blue title bars) */
         static UWORD pens[] = { 0, PEN_GREY, 0, PEN_TEXT, 0, PEN_BTN, PEN_TEXT, PEN_GREY, PEN_TEXT, 0, PEN_GREY, 0, (UWORD)~0 };
-        ULONG pen_tag = true_color ? TAG_IGNORE : SA_Pens;
+        UWORD *pens_p = pens;
+        static UWORD tc_pens[] = { 0, 1, 0, 2, 0, 3, 2, 1, 2, 0, 1, 0, (UWORD)~0 };     /* true colour screens: system pens 0..3 = black, grey, white, blue, so that the menus look like on a palette screen */
+        ULONG pen_tag = SA_Pens;
+        if (true_color) pens_p = tc_pens;
         scr = OpenScreenTags(NULL, SA_DisplayID, id, SA_Width, scr_w, SA_Height, scr_h, SA_Depth, depth,
                              SA_Title, (ULONG)"Micropolis", SA_ShowTitle, TRUE, SA_Draggable, TRUE,
-                             pen_tag, (ULONG)pens, TAG_DONE);
+                             pen_tag, (ULONG)pens_p, TAG_DONE);
         if (!scr) {                                               /* some drivers insist on the mode's own size */
             logmsg("OpenScreen with our size failed: trying the mode's own size");
             scr = OpenScreenTags(NULL, SA_DisplayID, id, SA_Depth, depth, SA_Title, (ULONG)"Micropolis",
-                                 SA_ShowTitle, TRUE, SA_Draggable, TRUE, pen_tag, (ULONG)pens, TAG_DONE);
+                                 SA_ShowTitle, TRUE, SA_Draggable, TRUE, pen_tag, (ULONG)pens_p, TAG_DONE);
         }
     }
     if (!scr) { fail(T("Cannot open the RTG screen (mode 0x%08lx, %d bit)."), (unsigned long)id, depth); goto out; }
@@ -1698,6 +1706,13 @@ static int real_main(int argc, char **argv)
         if (true_color) {
             for (int i = 0; i < 256; i++)
                 ctable[i] = ((ULONG)palette[i * 3] << 16) | ((ULONG)palette[i * 3 + 1] << 8) | palette[i * 3 + 2];
+            {   static const UBYTE sys[4][3] = { {0x00,0x00,0x00}, {0xaa,0xaa,0xaa}, {0xff,0xff,0xff}, {0x40,0x48,0x70} };   /* the system pens of this screen (menus, window borders) */
+                ULONG sp[2 + 4 * 3];
+                sp[0] = (4UL << 16);
+                for (int i = 0; i < 12; i++) sp[1 + i] = (ULONG)sys[i / 3][i % 3] * 0x01010101UL;
+                sp[13] = 0;
+                LoadRGB32(&scr->ViewPort, sp);
+            }
         } else {
             ULONG pal[2 + 256 * 3];
             pal[0] = (256UL << 16);
@@ -1746,6 +1761,7 @@ static int real_main(int argc, char **argv)
         if (!strcmp(a, "help")) show_help();
         if (!strcmp(a, "savetest")) { save_city(win, "PROGDIR:cities/savetest.cty"); logmsg(status_msg); }   /* debug */
         if (!strncmp(a, "hover=", 6)) tool_hover = atoi(a + 6);   /* debug */
+        if (!strcmp(a, "hoverwalk")) dbg_hoverwalk = 1;           /* debug: the hover moves to the next tool every frame, like a mouse wandering over the palette */
         if (!strcmp(a, "undotest")) {                  /* debug: draw a road, undo, redo, and say what happened to the map and the funds */
             int bx = (view_x + 8) << 4, by = (view_y + 6) << 4, n0 = 0, n1 = 0, n2 = 0, n3 = 0; char lb[120]; long f0, f1, f2, f3;
             for (int x = 0; x < WORLD_X; x++) for (int y = 0; y < WORLD_Y; y++) n0 += ((Map[x][y] & LOMASK) >= 64 && (Map[x][y] & LOMASK) < 80);
@@ -1917,6 +1933,7 @@ static int real_main(int argc, char **argv)
             dirty = 1;
         }
         frame++;
+        if (dbg_hoverwalk) { int th = (frame % 36) / 2; if (th < NTOOLS && th != tool_hover) { tool_hover = th; if (!toolbar_dirty) tb_label_only = 1; toolbar_dirty = 1; dirty = 1; } }
         {   int ex = 0, ey = 0;                                           /* edge scrolling: which way does the mouse push? */
             if (mouse_x >= 0 && !panning) {
                 if ((mouse_x >= TB_W && mouse_x < TB_W + 8) || mouse_x < 3) ex = -1;   /* left: the strip next to the palette or the very edge of the screen */
