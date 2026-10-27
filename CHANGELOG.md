@@ -2,9 +2,9 @@
 
 Older versions: see the release notes on GitHub (v0.1 to v0.8.1).
 
-## 0.8.5-traffic (26 October 2026, experiment)
+## 0.8.7-traffic (27 October 2026, experiment)
 
-Everything of 0.8.5 plus fundamental changes of the game rules (branch `traffic-experiments`, issue #37). Options > Traffic rules
+Everything of 0.8.7 plus fundamental changes of the game rules (branch `traffic-experiments`, issue #37). Options > Traffic rules
 switches the rules on and off. Cities with highways do not load correctly in the original Micropolis.
 
 - **Jams:** a busy road in front of a zone slows its growth (up to -840). The query tool shows traffic, rail link and effect.
@@ -17,6 +17,31 @@ switches the rules on and off. Cities with highways do not load correctly in the
   same water, airports any airport. Ships and planes sail and fly between them there and back. 1000 trips a year per hub, a
   warning at 80 % and 100 % in the status line, use shown in the query tool.
 - German and Polish texts and guides for all of it.
+
+## 0.8.7 (27 October 2026)
+
+### New
+- **Undo / Redo** (#41): *Project > Undo* (Amiga+U) and *Redo* (Amiga+Z) take back and repeat the last 5 building actions. A road,
+  rail or wire drawn with one drag is one step. Undo gives back the money the action cost and puts back only the tiles that still
+  show what the action built, so what the simulation did in the meantime (a zone that grew) is not touched. A new city or a
+  loaded city empties the history.
+- **The sound output button has arrows** (#40): `<` goes back, `>` goes on, so that it looks like a selector.
+
+### Changed
+- **Scrolling at the edge** (#42, #44): the mouse has to stay at the edge for a third of a second before the map scrolls, so passing
+  over it on the way to the menu bar does nothing; the top zone is only the strip under the status bar, not the status bar itself.
+  The longer the mouse stays, the faster it scrolls (1 tile per 4 loops, then per 2, then 2 tiles per loop).
+- **AHI needs less processor time** (#40): the loop chunks are twice as long and are looked after every third frame.
+
+## 0.8.6 (26 October 2026)
+
+### New
+- **Sound through AHI** (#40): the sound window has a button *Output* that chooses the system sound (sound.datatype, Paula) or an
+  AHI unit (0 to 3); it is saved. With AHI the effects and the three ambient loops are mixed by AHI: no fighting over Paula's
+  channels, and a sound card with an AHI driver can be used. The 8SVX samples are read by the game itself, a loop is played as a
+  stream of short chunks that follow each other without a gap (its volume follows the map within a fraction of a second). If
+  `ahi.device` or the unit cannot be opened, the game stays with the system sound. Tested in the emulator (AHI 4.18 with the
+  Paula driver); a real sound card is still to be tested.
 
 ## 0.8.5 (26 October 2026)
 

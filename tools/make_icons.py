@@ -118,6 +118,12 @@ def main():
     }
     for name, data in files.items():
         open(os.path.join(out, name), 'wb').write(data)
+    custom = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'release', 'icons')   # hand-made icons replace the generated ones
+    for name in os.listdir(custom) if os.path.isdir(custom) else []:
+        if name in files:
+            data = open(os.path.join(custom, name), 'rb').read()
+            open(os.path.join(out, name), 'wb').write(data)
+            files[name] = data
     if len(sys.argv) > 2:
         sheet = Image.new("RGB", (5 * 280 + 20, 36 * 4 + 20), (170, 170, 170))
         for i, im in enumerate([tool, inverted(tool), drawer, inverted(drawer), doc]):

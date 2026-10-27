@@ -13,6 +13,7 @@
 #include "gfx.h"
 #include "sound.h"
 #include "sound_ui.h"
+#include "undo.h"
 #include "coast.h"
 #include "wind.h"
 #include "hwy.h"
@@ -104,7 +105,7 @@ static const char *const opt_key[N_OPT] = { "AUTOBULLDOZE", "AUTOBUDGET", "DISAS
 static int world_anim = 1;                       /* surf along the coasts and gusts of wind over woods (the 'city' animation of cars and smoke is the core's DoAnimation) */
 static int pref_opt[N_OPT] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };     /* -1 = not saved yet: keep the default */
 static int pref_speed = -1;
-static int pref_fxvol = -1, pref_ambvol = -1;      /* volume sliders of the sound window (-1 = default) */
+static int pref_fxvol = -1, pref_ambvol = -1, pref_sndout;      /* volume sliders of the sound window (-1 = default) */
 static char pref_lang[24];                       /* "" = the system's preferred language, else "english" "deutsch" "polski" */
 static char arg_lang[24];                        /* lang= argument or LANGUAGE tooltype: wins over the preferences */
 #define N_WINPOS 7                              /* NPANELS */
@@ -141,6 +142,7 @@ static void prefs_load(void)
             else if (!strncmp(line, "DEPTH=", 6)) pref_depth = atoi(line + 6);
             else if (!strncmp(line, "LANGUAGE=", 9)) { strncpy(pref_lang, line + 9, sizeof pref_lang - 1); pref_lang[strcspn(pref_lang, "\r\n")] = 0; }
             else if (!strncmp(line, "SPEED=", 6)) { pref_speed = atoi(line + 6); if (pref_speed < 0 || pref_speed > 3) pref_speed = -1; }
+            else if (!strncmp(line, "SOUNDOUT=", 9)) { pref_sndout = atoi(line + 9); if (pref_sndout < 0 || pref_sndout > 4) pref_sndout = 0; }
             else if (!strncmp(line, "SFXVOL=", 7)) { pref_fxvol = atoi(line + 7); if (pref_fxvol < 0 || pref_fxvol > 100) pref_fxvol = -1; }
             else if (!strncmp(line, "AMBVOL=", 7)) { pref_ambvol = atoi(line + 7); if (pref_ambvol < 0 || pref_ambvol > 100) pref_ambvol = -1; }
             else if (!strncmp(line, "WIN", 3) && line[3] >= '0' && line[3] < '0' + N_WINPOS && line[4] == '=') {
@@ -168,7 +170,7 @@ static void prefs_save(void)
         fprintf(f, "ASK=%d\nMODE=%lx\nSIZE=%dx%d\nDEPTH=%d\nLEVEL=%d\n", pref_ask, (unsigned long)pref_mode, pref_w, pref_h, pref_depth, pref_level);
         for (int o = 0; o < N_OPT; o++) fprintf(f, "%s=%d\n", opt_key[o], pref_opt[o] >= 0 ? pref_opt[o] : opt_get(o));
         fprintf(f, "SPEED=%d\n", pref_speed >= 0 ? pref_speed : 3);
-        fprintf(f, "SFXVOL=%d\nAMBVOL=%d\n", sound_fx_vol, sound_amb_vol);
+        fprintf(f, "SFXVOL=%d\nAMBVOL=%d\nSOUNDOUT=%d\n", sound_fx_vol, sound_amb_vol, sound_output);
         fprintf(f, "LANGUAGE=%s\n", pref_lang);
         for (int i = 0; i < N_WINPOS; i++) if (pref_wx[i] >= 0) fprintf(f, "WIN%d=%d,%d\n", i, pref_wx[i], pref_wy[i]);
         fclose(f);
@@ -206,7 +208,7 @@ static int dragging;
 static int drag_x, drag_y;                 /* where the tool was last dragged (world pixels) */
 static void end_drag(void)                 /* the button went up somewhere else (a window opened over the map): finish the line where it was, do not let it follow the mouse */
 {
-    if (dragging) { ToolUp(&editor, drag_x, drag_y); dragging = 0; }
+    if (dragging) { ToolUp(&editor, drag_x, drag_y); undo_commit(); dragging = 0; }
 }
 static int map_drag;
 static int sound_ui_ready;                /* set when the main loop runs: UI sounds (tool select, speed) only from then on */
@@ -218,6 +220,8 @@ static int dbg_scroll;                  /* test option scroll=N: scroll N tiles 
 static int debug_show;                  /* test option show=eval|graph: keep messages away so the panel can be photographed */
 static const int panning = 0;            /* (right button is the menu button now) */
 static int mouse_x = -1, mouse_y = -1;   /* last window position, for edge scrolling */
+static int edge_on, edge_n;               /* the mouse is at an edge: since when (edge_t0), loops counted */
+static struct timeval edge_t0;
 
 #define NTOOLS 19
 static UBYTE *toolicons2;              /* toolicons2.bin: uniform 32x32 set (colours from pen 48 up) */
@@ -1010,7 +1014,7 @@ static void render_frame(struct Window *win)
 /* ---------- menus and commands ---------- */
 enum { CMD_NEW = 1, CMD_LOAD, CMD_SAVE, CMD_SAVEAS, CMD_QUIT,
        CMD_PAUSE = 10, CMD_SLOW, CMD_MEDIUM, CMD_FAST,
-       CMD_AUTOBULLDOZE = 20, CMD_AUTOBUDGET, CMD_DISASTERS, CMD_SOUND, CMD_ASKMODE, CMD_AUTOGO, CMD_ANIM, CMD_MSGS, CMD_NOTICES, CMD_OVERLAY, CMD_LEVEL = 60, CMD_SPEAK = 65, CMD_STARTMENU = 66, CMD_CLASSIC = 67, CMD_LANG = 70, CMD_AMBIENT = 75, CMD_SOUNDWIN = 76, CMD_TRAFFIC = 77, CMD_WORLDANIM = 78,
+       CMD_AUTOBULLDOZE = 20, CMD_AUTOBUDGET, CMD_DISASTERS, CMD_SOUND, CMD_ASKMODE, CMD_AUTOGO, CMD_ANIM, CMD_MSGS, CMD_NOTICES, CMD_OVERLAY, CMD_LEVEL = 60, CMD_SPEAK = 65, CMD_STARTMENU = 66, CMD_CLASSIC = 67, CMD_LANG = 70, CMD_AMBIENT = 75, CMD_SOUNDWIN = 76, CMD_TRAFFIC = 77, CMD_WORLDANIM = 78, CMD_UNDO = 79, CMD_REDO = 80,
        CMD_ABOUT = 44, CMD_HELP = 45, CMD_SCEN = 200, CMD_BUDGET = 40, CMD_MAP = 41, CMD_EVAL = 42, CMD_GRAPHS = 43, CMD_MAPMODE = 100,
        CMD_FIRE = 30, CMD_FLOOD, CMD_TORNADO, CMD_QUAKE, CMD_MONSTER, CMD_MELTDOWN };
 
@@ -1038,6 +1042,9 @@ static struct Menu *make_menus(struct Screen *scr, APTR *vi_out)
     mi(NM_ITEM, T("Load City..."), "L", 0, CMD_LOAD);
     mi(NM_ITEM, T("Save City"), "S", 0, CMD_SAVE);
     mi(NM_ITEM, T("Save City As..."), NULL, 0, CMD_SAVEAS);
+    mi(NM_ITEM, (const char *)NM_BARLABEL, NULL, 0, 0);
+    mi(NM_ITEM, T("Undo"), "U", 0, CMD_UNDO);
+    mi(NM_ITEM, T("Redo"), "Z", 0, CMD_REDO);
     mi(NM_ITEM, (const char *)NM_BARLABEL, NULL, 0, 0);
     mi(NM_ITEM, T("Quit"), "Q", 0, CMD_QUIT);
     mi(NM_TITLE, T("Scenarios"), NULL, 0, 0);
@@ -1302,7 +1309,7 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
         return 1;
     }
     if (id > CMD_SCEN && id <= CMD_SCEN + 8) {            /* scenario: load it and show its story, as the original does */
-        EraseOverlay(); LoadScenario((short)(id - CMD_SCEN)); clean_time = (long)CityTime; tool_used = 0;
+        undo_clear(); EraseOverlay(); LoadScenario((short)(id - CMD_SCEN)); clean_time = (long)CityTime; tool_used = 0;
         recenter();
         notice_show(id - CMD_SCEN); notice_dirty = 1;
         return 1;
@@ -1324,12 +1331,18 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
     switch (id) {
     case CMD_HELP: show_help(); break;
     case CMD_ABOUT: show_about(); break;
+    case CMD_UNDO: case CMD_REDO: {
+        int n = id == CMD_UNDO ? undo_undo() : undo_redo();
+        if (n < 0) sprintf(status_msg, id == CMD_UNDO ? T("Nothing to undo") : T("Nothing to redo"));
+        else { sprintf(status_msg, id == CMD_UNDO ? T("Undone: %d tiles") : T("Redone: %d tiles"), n); tool_used = 1; full_redraw = 1; map_dirty = 1; }
+        break;
+    }
     case CMD_NEW:
-        EraseOverlay(); GenerateNewCity(); CityTax = 7; SetGameLevelFunds((short)pref_level); setSpeed(2); clean_time = (long)CityTime; tool_used = 0; recenter();
+        undo_clear(); EraseOverlay(); GenerateNewCity(); CityTax = 7; SetGameLevelFunds((short)pref_level); setSpeed(2); clean_time = (long)CityTime; tool_used = 0; recenter();
         sprintf(status_msg, T("New city generated.")); break;
     case CMD_LOAD:
         if (ask_file(win, 0, path, sizeof path)) {
-            if (LoadCity(path)) { EraseOverlay(); recenter(); clean_time = (long)CityTime; tool_used = 0; sprintf(status_msg, T("Loaded %s"), path); }
+            if (LoadCity(path)) { undo_clear(); EraseOverlay(); recenter(); clean_time = (long)CityTime; tool_used = 0; sprintf(status_msg, T("Loaded %s"), path); }
             else sprintf(status_msg, T("Could not load %s"), path);
         }
         break;
@@ -1429,7 +1442,7 @@ static void start_choice(struct Window *win)             /* what to start with *
     for (;;) {
         int r = easy(win, T("Welcome to Micropolis!\nWhat do you want to start with?"), T("New city|Load city...|Scenario...|Current city"));
         if (r == 1) { do_command(CMD_NEW, win, NULL); return; }
-        if (r == 2) { if (ask_file(win, 0, path, sizeof path) && LoadCity(path)) { EraseOverlay(); recenter(); sprintf(status_msg, T("Loaded %s"), path); return; } }
+        if (r == 2) { if (ask_file(win, 0, path, sizeof path) && LoadCity(path)) { undo_clear(); EraseOverlay(); recenter(); sprintf(status_msg, T("Loaded %s"), path); return; } }
         else if (r == 3) { int sc = pick_scenario(win); if (sc) { do_command(CMD_SCEN + sc, win, NULL); return; } }
         else return;                                       /* Current city (the default one) */
     }
@@ -1742,6 +1755,7 @@ static int real_main(int argc, char **argv)
 
     logmsg("window open");
     sound_init();
+    if (pref_sndout) sound_set_output(pref_sndout);               /* AHI from the preferences (falls back to the system sound when the unit cannot be opened) */
     if (GadToolsBase) {
         menu = make_menus(scr, &vi);
         g_menu = menu;
@@ -1769,6 +1783,20 @@ static int real_main(int argc, char **argv)
         if (!strcmp(a, "help")) show_help();
         if (!strcmp(a, "savetest")) { save_city(win, "PROGDIR:cities/savetest.cty"); logmsg(status_msg); }   /* debug */
         if (!strncmp(a, "hover=", 6)) tool_hover = atoi(a + 6);   /* debug */
+        if (!strcmp(a, "undotest")) {                  /* debug: draw a road, undo, redo, and say what happened to the map and the funds */
+            int bx = (view_x + 8) << 4, by = (view_y + 6) << 4, n0 = 0, n1 = 0, n2 = 0, n3 = 0; char lb[120]; long f0, f1, f2, f3;
+            for (int x = 0; x < WORLD_X; x++) for (int y = 0; y < WORLD_Y; y++) n0 += ((Map[x][y] & LOMASK) >= 64 && (Map[x][y] & LOMASK) < 80);
+            f0 = (long)TotalFunds; editor.tool_state = roadState;
+            undo_begin(); ToolDown(&editor, bx, by); for (int k = 1; k <= 8; k++) ToolDrag(&editor, bx + k * 16, by); ToolUp(&editor, bx + 8 * 16, by); undo_commit();
+            for (int x = 0; x < WORLD_X; x++) for (int y = 0; y < WORLD_Y; y++) n1 += ((Map[x][y] & LOMASK) >= 64 && (Map[x][y] & LOMASK) < 80);
+            f1 = (long)TotalFunds; do_command(CMD_UNDO, win, NULL);
+            for (int x = 0; x < WORLD_X; x++) for (int y = 0; y < WORLD_Y; y++) n2 += ((Map[x][y] & LOMASK) >= 64 && (Map[x][y] & LOMASK) < 80);
+            f2 = (long)TotalFunds; do_command(CMD_REDO, win, NULL);
+            for (int x = 0; x < WORLD_X; x++) for (int y = 0; y < WORLD_Y; y++) n3 += ((Map[x][y] & LOMASK) >= 64 && (Map[x][y] & LOMASK) < 80);
+            f3 = (long)TotalFunds;
+            sprintf(lb, "undotest: road tiles %d -> %d -> undo %d -> redo %d; funds %ld -> %ld -> %ld -> %ld", n0, n1, n2, n3, f0, f1, f2, f3); logmsg(lb);
+            editor.tool_state = queryState;
+        }
         if (!strncmp(a, "chalk", 5)) {                 /* debug: a note on the map */
             int bx = (view_x + 8) << 4, by = (view_y + 6) << 4;
             editor.tool_state = chalkState;
@@ -1910,12 +1938,13 @@ static int real_main(int argc, char **argv)
                             if (UserSoundOn && speak_tools && editor.tool_state >= 0 && editor.tool_state < 19) sound_play(tool_sound[editor.tool_state]);   /* like the original palette */
                         }
                     } else if (inview) {
+                        if (editor.tool_state != queryState && editor.tool_state != chalkState && editor.tool_state != eraserState) undo_begin();   /* undo: remember the map before the stroke */
                         ToolDown(&editor, wx, wy);
                         if (editor.tool_state != queryState && editor.tool_state != chalkState && editor.tool_state != eraserState) tool_used = 1;
                         dragging = 1; drag_x = wx; drag_y = wy;
                     }
                 } else if (cls == IDCMP_MOUSEBUTTONS && code == SELECTUP) {
-                    if (dragging) { ToolUp(&editor, inview ? wx : drag_x, inview ? wy : drag_y); dragging = 0; }
+                    if (dragging) { ToolUp(&editor, inview ? wx : drag_x, inview ? wy : drag_y); undo_commit(); dragging = 0; }
                 } else if (cls == IDCMP_MOUSEMOVE && dragging && !(qual & IEQUALIFIER_LEFTBUTTON)) {
                     end_drag();                                          /* the button is up but we never saw it (it went up over another window) */
                 } else if (cls == IDCMP_MOUSEMOVE && dragging && inview) {
@@ -1924,14 +1953,25 @@ static int real_main(int argc, char **argv)
             }
             dirty = 1;
         }
-        if (mouse_x >= 0 && !panning && (++frame & 3) == 0) {   /* edge scrolling */
-            int ox = view_x, oy = view_y;
-            if ((mouse_x >= TB_W && mouse_x < TB_W + 8) || mouse_x < 3) view_x--;   /* left: the strip next to the palette or the very edge of the screen */
-            if (mouse_x >= SCR_W - 8) view_x++;
-            if (mouse_y < BAR_H + 8 && mouse_x >= TB_W) view_y--;       /* top: the status bar counts, too */
-            if (mouse_y >= SCR_H - 8) view_y++;
-            clamp_view();
-            if (ox != view_x || oy != view_y) dirty = 1;
+        frame++;
+        {   int ex = 0, ey = 0;                                           /* edge scrolling: which way does the mouse push? */
+            if (mouse_x >= 0 && !panning) {
+                if ((mouse_x >= TB_W && mouse_x < TB_W + 8) || mouse_x < 3) ex = -1;   /* left: the strip next to the palette or the very edge of the screen */
+                else if (mouse_x >= SCR_W - 8) ex = 1;
+                if (mouse_y >= BAR_H && mouse_y < BAR_H + 8 && mouse_x >= TB_W) ey = -1;   /* top: the strip under the status bar; the status bar and the way up to the menu bar do not scroll (#44) */
+                else if (mouse_y >= SCR_H - 8) ey = 1;
+            }
+            if (!ex && !ey) edge_on = 0;
+            else {
+                struct timeval tn; long ms;
+                gettimeofday(&tn, NULL);
+                if (!edge_on) { edge_on = 1; edge_t0 = tn; edge_n = 0; }
+                ms = (long)(tn.tv_sec - edge_t0.tv_sec) * 1000L + (long)(tn.tv_usec - edge_t0.tv_usec) / 1000L;
+                if (ms >= 300) {                                         /* a short dwell first: just passing over the edge does nothing; then faster the longer it stays (#42) */
+                    int every = ms < 900 ? 4 : ms < 1800 ? 2 : 1, step = ms >= 1800 ? 2 : 1;
+                    if (!(++edge_n % every)) { view_x += ex * step; view_y += ey * step; clamp_view(); dirty = 1; }
+                }
+            }
         }
         sound_poll();
         if (anim_hold > 0) anim_hold--;

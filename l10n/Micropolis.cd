@@ -145,6 +145,10 @@ S_4DDE0BE7 (1306397671//)
 Save City
 S_4C833401 (1283666945//)
 Save City As...
+S_71FD4ACF (1912425167//)
+Undo
+S_7412E5E9 (1947395561//)
+Redo
 S_47B3D356 (1202967382//)
 Quit
 S_2BFE5074 (738087028//)
@@ -287,6 +291,14 @@ S_6C33113B (1815286075//)
 Easy
 S_64EFA7FC (1693427708//)
 Hard
+S_63161433 (1662391347//)
+Nothing to undo
+S_1B4406A5 (457442981//)
+Nothing to redo
+S_17051F34 (386211636//)
+Undone: %d tiles
+S_4C1563FA (1276470266//)
+Redone: %d tiles
 S_7E6206A1 (2120353441//)
 New city generated.
 S_6EB4B2A4 (1857335972//)
@@ -357,6 +369,12 @@ S_3804B5AD (939832749//)
 Fire coverage
 S_175C873F (391939903//)
 Police coverage
+S_6D0CE0C1 (1829560513//)
+Output: AHI unit %d
+S_2CDAA744 (752527172//)
+Output: AHI not available (system)
+S_605709A7 (1616316839//)
+Output: system (Paula)
 S_365AA42E (911909934//)
 Sound: datatypes.library missing
 S_1B092D66 (453586278//)

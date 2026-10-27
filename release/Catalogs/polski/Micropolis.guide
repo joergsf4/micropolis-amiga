@@ -70,6 +70,7 @@
   0 1 2 3                pauza, wolno, srednio, szybko
   b r p t x z            skroty narzedzi jak w oryginale (spychacz,
                          droga, park, linia, tory, zapytanie)
+  Amiga+U / Amiga+Z      cofnij / ponow ostatnie akcje budowy (do 5)
   Esc                    zamyka aktywne okno; konczy gre, gdy zadne nie
                          jest otwarte
   Help                   ta pomoc
@@ -90,12 +91,12 @@
 @node MENUS "Menu"
 @toc MAIN
 
-  Projekt      nowe miasto, wczytaj, zapisz, O programie, Pomoc, zakoncz
+  Projekt      nowe miasto, wczytaj, zapisz, cofnij / ponow, O programie, Pomoc, zakoncz
   Scenariusze  historyczne miasta z opowiescia i celem
   Tempo        pauza / wolno / srednio / szybko
   Opcje        auto-burzenie, auto-budzet, katastrofy, auto-skok, animacja miasta, animacja swiata,
                komunikaty, okna komunikatow, opcje dzwieku (okno z
-               przelacznikami i suwakami glosnosci), zasady ruchu,
+               przelacznikami, suwakami glosnosci i wyjsciem: system lub AHI), zasady ruchu,
                pytaj o tryb ekranu
   Poziom       Latwy / Sredni / Trudny (srodki na start nowego miasta)
   Jezyk        Automatycznie (ustawienie systemu) / English / Deutsch / Polski

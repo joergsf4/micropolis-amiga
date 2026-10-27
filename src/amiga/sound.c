@@ -18,6 +18,7 @@
 #include "sound.h"
 #include "l10n.h"
 #include "stack.h"             /* app_log() */
+#include "sound_ahi.h"
 
 #define MAX_OBJ 20
 
@@ -48,6 +49,8 @@ struct Library *DataTypesBase;
 static int played_count, failed_load, trigger_count;
 int sound_fx_vol = 100;                                /* 0..100: volume of the sound effects (slider in the sound window) */
 int sound_amb_vol = 50;                                /* 0..100: volume of the ambient loops */
+int sound_output;                                      /* 0 = the system (sound.datatype, Paula), 1..4 = AHI unit 0..3 */
+static int ahi_missing;                                /* the last try to open AHI failed */
 
 void sound_init(void)
 {
@@ -78,6 +81,13 @@ static Object *load(const char *name)
 
 void sound_play(const char *id)
 {
+    if (ahi_is_open()) {                                   /* AHI: lower case name, no channel games needed */
+        char nm[40]; int k;
+        for (k = 0; id[k] && k < 38; k++) nm[k] = (id[k] >= 'A' && id[k] <= 'Z') ? id[k] + 32 : id[k];
+        nm[k] = 0;
+        ahi_effect(nm, sound_fx_vol);
+        return;
+    }
     char name[40];
     Object *o;
     int i;
@@ -120,8 +130,26 @@ void ambient_set(int sea, int city, int nature)              /* wanted volumes 0
     amb_target[AMB_SEA] = sea < 3 ? 0 : sea; amb_target[AMB_CITY] = city < 3 ? 0 : city; amb_target[AMB_NATURE] = nature < 3 ? 0 : nature;   /* nothing audible is not worth a channel */
 }
 
+static void ambient_tick_ahi(void)                             /* the same fading, played by AHI: no channel conflicts, no restarts */
+{
+    int n = 0, weakest = -1;
+    for (int i = 0; i < AMB_N; i++) if (amb_target[i] > 0) { n++; if (weakest < 0 || amb_target[i] < amb_target[weakest]) weakest = i; }
+    if (n > 2) amb_target[weakest] = 0;                       /* two loops are enough, and keep the mix calm */
+    { static int svc; if (++svc % 3 == 0) ahi_service(); }      /* the chunks last 0.7 s: looking after them every third frame is enough (less processor time) */
+    if (++amb_tick_no & 1) return;
+    for (int i = 0; i < AMB_N; i++) {
+        int v = amb_vol[i];
+        if (v < amb_target[i]) v++; else if (v > amb_target[i]) v--;
+        if (v > 0 && !ahi_loop_active(i)) { if (!ahi_loop_start(i, amb_file[i], v)) { amb_target[i] = 0; v = 0; } }
+        else if (v == 0 && ahi_loop_active(i)) ahi_loop_stop(i);
+        else if (ahi_loop_active(i)) ahi_loop_volume(i, v);
+        amb_vol[i] = v;
+    }
+}
+
 void ambient_tick(void)                                       /* once per frame: move the volumes towards the targets (about 1 s from silence to 25) */
 {
+    if (ahi_is_open()) { ambient_tick_ahi(); return; }
     if (!DataTypesBase) return;
     int fx_free = now_after(&fx_end);
     {   int n = 0, weakest = -1;                              /* at most two loops: the weakest of three is silenced */
@@ -167,15 +195,47 @@ void ambient_tick(void)                                       /* once per frame:
 void ambient_off(void)
 {
     ambient_set(0, 0, 0);
+    for (int i = 0; i < AMB_N; i++) if (ahi_loop_active(i)) ahi_loop_stop(i);
     for (int i = 0; i < AMB_N; i++) {
         if (amb_obj[i]) { amb_trigger(amb_obj[i], STM_STOP); DisposeDTObject(amb_obj[i]); amb_obj[i] = NULL; }
         amb_vol[i] = 0;
     }
 }
 
+/* ---- the output: the system (sound.datatype) or AHI ---- */
+int sound_set_output(int sel)                                  /* 0 = system, 1..4 = AHI unit 0..3; returns 1 when it is in use now */
+{
+    ambient_off();
+    if (ahi_is_open()) ahi_close();
+    ahi_missing = 0;
+    sound_output = 0;
+    if (sel >= 1 && sel <= 4) {
+        if (ahi_open(sel - 1)) sound_output = sel;
+        else { ahi_missing = 1; app_log("sound: ahi.device unit cannot be opened, staying with the system sound"); }
+    }
+    return sound_output == sel;
+}
+
+int sound_cycle_output(int dir)                                /* the button of the sound window: system, AHI unit 0, 1, 2, 3, system ... (dir -1: the other way round) */
+{
+    int next = (sound_output + dir + 5) % 5;
+    while (next > 0 && !sound_set_output(next)) next = (next + dir + 5) % 5;   /* a unit that cannot be opened is skipped */
+    if (next == 0) { int missing = ahi_missing; sound_set_output(0); ahi_missing = missing; }
+    return sound_output;
+}
+
+const char *sound_output_label(char *buf)
+{
+    if (sound_output > 0) sprintf(buf, T("Output: AHI unit %d"), sound_output - 1);
+    else if (ahi_missing) strcpy(buf, T("Output: AHI not available (system)"));
+    else strcpy(buf, T("Output: system (Paula)"));
+    return buf;
+}
+
 void sound_exit(void)
 {
     ambient_off();
+    if (ahi_is_open()) ahi_close();
     for (int i = 0; i < AMB_N; i++) if (amb_sig[i] >= 0) { FreeSignal(amb_sig[i]); amb_sig[i] = -1; }
     for (int i = 0; i < ncache; i++) DisposeDTObject(cache[i].obj);
     ncache = 0;
@@ -184,7 +244,8 @@ void sound_exit(void)
 
 const char *sound_status(char *buf)            /* one line for the About box */
 {
-    if (!DataTypesBase) sprintf(buf, "%s", T("Sound: datatypes.library missing"));
+    if (ahi_is_open()) sprintf(buf, "Sound: AHI unit %d, %d played", ahi_unit(), ahi_played());
+    else if (!DataTypesBase) sprintf(buf, "%s", T("Sound: datatypes.library missing"));
     else sprintf(buf, T("Sound: datatype, %d played, %d not loadable"), played_count, failed_load);
     return buf;
 }
