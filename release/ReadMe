@@ -1,9 +1,9 @@
-Short:        Micropolis (open-source SimCity) with RTG graphics
+Short:        Micropolis (open-source SimCity) with RTG or AGA/ECS graphics
 Author:       Electronic Arts / Will Wright / Don Hopkins (original), Amiga port: joergsf4
 Uploader:     joergsf4
 Type:         game/strategy
 Version:      0.7.1
-Requires:     AmigaOS 3.x, 68020+, RTG card (Picasso96 or CyberGraphX), 2 MB Chip + 2 MB Fast
+Requires:     AmigaOS 3.x, 68020+, RTG card (Picasso96 or CyberGraphX) or AGA/ECS chipset, 2 MB Chip + 2 MB Fast
 Architecture: m68k-amigaos >= 3.0.0
 
 MICROPOLIS FOR AMIGAOS 3 - EARLY ALPHA
@@ -22,6 +22,8 @@ REQUIREMENTS
 - RTG graphics card with Picasso96 or CyberGraphX (cybergraphics.library 40+) and a screen mode between
   640x480 and 800x600 (4:3 or 5:4 shape) with 8, 15, 16, 24 or 32 bit (8 bit is used if available).
   In FS-UAE: graphics_card = uaegfx-z3
+  OR no graphics card at all: the Amiga chipset with Kickstart 3.1 (graphics.library 40), in a hires
+  interlaced mode of at least 640x400 (PAL 640x512): AGA with 256 colours, OCS/ECS with 16 colours.
 - LIBS: mathieeedoubbas.library, mathieeedoubtrans.library, gadtools.library, asl.library
   (all are part of a normal Workbench)
 - The CPU library for your processor (68030.library, 68040.library, ...) as AmigaOS 3.2 asks for
@@ -42,11 +44,12 @@ ToolTypes of the icon (Information; remove the parentheses to switch one on):
   DEBUG                   writes micropolis.log
 Command line: Micropolis [city] [SIZE=WxH] [ASK] [DEBUG]
 
-SCREEN MODE: by default Micropolis asks for the RTG screen mode at every start (screen mode requester, then
+SCREEN MODE: by default Micropolis asks for the screen mode (RTG or chipset) at every start (screen mode requester, then
 "Always use this screen mode? - Always use it / Ask me next time"). "Always use it" saves the mode in
 ENVARC:Micropolis.prefs; the menu Options/Ask for screen mode at start switches the question on again.
 SIZE= (ToolType or argument) skips the question; the argument ASK forces it once.
-Startup problems (no RTG, no suitable screen mode, missing data) are reported in a requester.
+Startup problems (no suitable screen mode, missing data) are reported in a requester.
+On AGA the picture has 256 colours; on OCS/ECS the game colours are reduced to a fixed palette of 16.
 The Tools drawer has RTGTest (shows a colour gradient in a RTG screen - to check your setup)
 and ListModes (lists all screen modes the system knows).
 

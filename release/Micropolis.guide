@@ -157,9 +157,11 @@
 @node SETTINGS "Screen mode and settings"
 @toc MAIN
 
-  At start a screen mode requester lists the usable RTG modes (640x480
-  up to 800x600). You can choose "always use it"; Options/Ask for screen
-  mode at start turns the question on again.
+  At start a screen mode requester lists the usable modes: RTG modes
+  (640x480 up to 800x600) and, without a graphics card, the Amiga chipset
+  modes (AGA 256 colours, OCS/ECS 16 colours; from 640x400, e.g. PAL:High
+  Res Laced). You can choose "always use it"; Options/Ask for screen mode
+  at start turns the question on again.
 
   Settings are stored in ENVARC:Micropolis.prefs. ToolTypes of the icon:
   SIZE=800x600 (fixed size, no question), CITY=<file>, LANGUAGE=deutsch (or

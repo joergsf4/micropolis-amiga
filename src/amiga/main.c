@@ -29,6 +29,7 @@
 #include <intuition/intuition.h>
 #include <intuition/screens.h>
 #include <cybergraphx/cybergraphics.h>
+#include <graphics/displayinfo.h>
 #include <proto/exec.h>
 #include <proto/dos.h>
 #include <proto/intuition.h>
@@ -213,6 +214,7 @@ static void end_drag(void)                 /* the button went up somewhere else 
 static int map_drag;
 static int sound_ui_ready;                /* set when the main loop runs: UI sounds (tool select, speed) only from then on */
 static int shake_frames, shake_bx, shake_by;   /* earthquake: the view jitters by a tile for about a second */
+static int dbg_hoverwalk;               /* test option hoverwalk: the tool under the mouse changes every frame */
 static int dbg_about, dbg_det;                 /* test options: keep the About box open / deterministic picture (no blinking, no animation, no ambient sound) */
 static char dbg_dump[120];                  /* test option dump=PATH: write the frame buffer and the panel scratch buffer at exit */
 static int dbg_quit_loops;                 /* test option quit=N: leave the game after N seconds (checks the clean shutdown) */
@@ -515,6 +517,9 @@ static int tool_at(int mx, int my)
 static void draw_toolbar(void)
 {
     char line[40];
+    if (tb_label_only) {                                         /* the mouse only moved to another icon: just the label above the icons (name and price) */
+        for (int y = BAR_H; y < BAR_H + 56 && y < SCR_H; y++) memset(fb + y * SCR_W, PEN_BAR, TB_W);
+    } else {
     for (int y = BAR_H; y < SCR_H; y++) memset(fb + y * SCR_W, PEN_BAR, TB_W);
     if (!classic_icons && toolicons2) {
         const UBYTE *px0 = toolicons2 + 4 + toolicons2_n * 3;
@@ -538,6 +543,7 @@ static void draw_toolbar(void)
                 for (int x = 0; x < w; x++) fb[dy * SCR_W + tooldef[i].x + x] = px[y * w + x] ? px[y * w + x] : PEN_BAR;
             }
         }
+    }
     }
     {   int t = tool_hover >= 0 ? tool_hover : editor.tool_state;              /* name and cost of the tool under the mouse, else of the chosen one */
         if (t >= 0 && t < NTOOLS) {
@@ -703,12 +709,73 @@ static int panels_open(void)
 }
 
 static int true_color;                     /* screen deeper than 8 bit: blit through a colour table */
+static int planar;                         /* chipset screen (OCS/ECS/AGA): bitplanes, chunky data goes through WriteChunkyPixels */
+static int planar16;                       /* ... with only 16 colours (OCS/ECS hires): every pixel goes through lut16 first */
+static UBYTE lut16[256];                   /* palette index -> one of the 16 screen colours */
+static UBYTE pal16[16 * 3];                /* the 16 screen colours */
+
+/* 16 colour palette from the game's 256: slots 0..3 are the system pens (black, grey, white, the dark blue of the panels), the other
+ * twelve are chosen by how much of the tile art each colour covers (farthest point first, then a few k-means rounds). */
+static void build_pal16(void)
+{
+    static const UBYTE fixed[4][3] = { {0x00,0x00,0x00}, {0xaa,0xaa,0xaa}, {0xff,0xff,0xff}, {0x20,0x28,0x50} };
+    long hist[256], w[256];
+    int cn = 4;
+    long cen[16][3];
+    memset(hist, 0, sizeof hist);
+    if (tiles) for (long i = 0; i < 960L * 256; i++) hist[tiles[i]]++;
+    for (int i = 0; i < 256; i++) w[i] = hist[i] + (i >= 32 ? 400 : 0);       /* the user interface colours count, too */
+    for (int i = 0; i < 4; i++) for (int k = 0; k < 3; k++) cen[i][k] = fixed[i][k];
+    #define D2(i, c) ((long)(palette[(i)*3]-cen[c][0])*(palette[(i)*3]-cen[c][0])*2 + (long)(palette[(i)*3+1]-cen[c][1])*(palette[(i)*3+1]-cen[c][1])*4 + (long)(palette[(i)*3+2]-cen[c][2])*(palette[(i)*3+2]-cen[c][2])*3)
+    while (cn < 16) {                                      /* the colour that is worst represented (weighted) becomes a new centre */
+        long best = -1; int bi = 0;
+        for (int i = 0; i < 256; i++) {
+            long d = -1;
+            for (int c = 0; c < cn; c++) { long e = D2(i, c); if (d < 0 || e < d) d = e; }
+            d = (d >> 4) * (w[i] > 0 ? (w[i] > 20000 ? 20000 : w[i]) : 0);
+            if (d > best) { best = d; bi = i; }
+        }
+        for (int k = 0; k < 3; k++) cen[cn][k] = palette[bi * 3 + k];
+        cn++;
+    }
+    for (int it = 0; it < 6; it++) {                       /* the twelve free centres move to the weighted mean of their colours */
+        long sum[16][3], cnt[16];
+        memset(sum, 0, sizeof sum); memset(cnt, 0, sizeof cnt);
+        for (int i = 0; i < 256; i++) {
+            long d = -1; int bc = 0;
+            for (int c = 0; c < 16; c++) { long e = D2(i, c); if (d < 0 || e < d) { d = e; bc = c; } }
+            sum[bc][0] += palette[i * 3] * w[i]; sum[bc][1] += palette[i * 3 + 1] * w[i]; sum[bc][2] += palette[i * 3 + 2] * w[i]; cnt[bc] += w[i];
+        }
+        for (int c = 4; c < 16; c++) if (cnt[c]) for (int k = 0; k < 3; k++) cen[c][k] = sum[c][k] / cnt[c];
+    }
+    for (int i = 0; i < 256; i++) {
+        long d = -1; int bc = 0;
+        for (int c = 0; c < 16; c++) { long e = D2(i, c); if (d < 0 || e < d) { d = e; bc = c; } }
+        lut16[i] = (UBYTE)bc;
+    }
+    lut16[0] = 0;
+    for (int c = 0; c < 16; c++) for (int k = 0; k < 3; k++) pal16[c * 3 + k] = (UBYTE)cen[c][k];
+    #undef D2
+}
 static ULONG ctable[256];                  /* 0x00RRGGBB for each palette index */
 
 /* copy a rectangle of a chunky buffer into a window's rastport (palette screens: LUT8, deeper screens: colour table) */
 static void blit_buf(UBYTE *buf, int stride, int sx, int sy, struct RastPort *rp, int dx, int dy, int w, int h)
 {
-    if (true_color)
+    if (planar16) {
+        static UBYTE band[MAX_W * 16];
+        for (int y0 = 0; y0 < h; y0 += 16) {
+            int n = h - y0 < 16 ? h - y0 : 16;
+            UBYTE *d = band;
+            for (int r = 0; r < n; r++) {
+                const UBYTE *src = buf + (sy + y0 + r) * stride + sx;
+                for (int x = 0; x < w; x++) *d++ = lut16[src[x]];
+            }
+            WriteChunkyPixels(rp, dx, dy + y0, dx + w - 1, dy + y0 + n - 1, band, w);
+        }
+    } else if (planar)
+        WriteChunkyPixels(rp, dx, dy, dx + w - 1, dy + h - 1, buf + sy * stride + sx, stride);
+    else if (true_color)
         WriteLUTPixelArray(buf + sy * stride + sx, 0, 0, stride, rp, ctable, dx, dy, w, h, CTABFMT_XRGB8);
     else
         WritePixelArray(buf, sx, sy, stride, rp, dx, dy, w, h, RECTFMT_LUT8);
@@ -1512,28 +1579,55 @@ static void read_tooltypes(int argc, char **argv)
     }
 }
 
-/* Sensible modes only: RTG modes between 640x480 and 800x600 with a 4:3 / 5:4 shape and at least 8 bit. */
+/* Sensible modes only: RTG modes between 640x480 and 800x600 with a 4:3 / 5:4 shape and at least 8 bit, and chipset
+ * (OCS/ECS/AGA) modes of at least 640x400 with 8 bit (AGA, 256 colours). */
 static int relax_filter;                  /* the card has no mode that passes the strict rules: accept any RTG mode >= 640x480 */
+
+static int is_rtg(ULONG id) { return CyberGfxBase && IsCyberModeID(id); }
+
+/* size and depth of a mode: RTG through cybergraphics, chipset modes through the display database (depth = what the chipset can do) */
+static int mode_dims(ULONG id, long *w, long *h, long *d)
+{
+    if (is_rtg(id)) {
+        *w = (long)GetCyberIDAttr(CYBRIDATTR_WIDTH, id); *h = (long)GetCyberIDAttr(CYBRIDATTR_HEIGHT, id);
+        *d = (long)GetCyberIDAttr(CYBRIDATTR_DEPTH, id);
+        return 1;
+    } else {
+        struct DimensionInfo di;
+        struct DisplayInfo dp;
+        memset(&di, 0, sizeof di); memset(&dp, 0, sizeof dp);
+        if (GetDisplayInfoData(NULL, (UBYTE *)&dp, sizeof dp, DTAG_DISP, id) <= 0) return 0;
+        if (dp.NotAvailable || (dp.PropertyFlags & (DIPF_IS_HAM | DIPF_IS_EXTRAHALFBRITE | DIPF_IS_DUALPF | DIPF_IS_FOREIGN))) return 0;
+        if (GetDisplayInfoData(NULL, (UBYTE *)&di, sizeof di, DTAG_DIMS, id) <= 0) return 0;
+        *w = (long)(di.Nominal.MaxX - di.Nominal.MinX + 1); *h = (long)(di.Nominal.MaxY - di.Nominal.MinY + 1);
+        *d = (long)di.MaxDepth;
+        return 1;
+    }
+}
 
 static int mode_ok(ULONG id)
 {
     long w, h, d;
-    if (id == INVALID_ID || !IsCyberModeID(id)) return 0;
-    w = (long)GetCyberIDAttr(CYBRIDATTR_WIDTH, id); h = (long)GetCyberIDAttr(CYBRIDATTR_HEIGHT, id);
-    d = (long)GetCyberIDAttr(CYBRIDATTR_DEPTH, id);
+    if (id == INVALID_ID) return 0;
+    if (!mode_dims(id, &w, &h, &d)) return 0;
+    if (!is_rtg(id)) {                                     /* chipset: AGA 256 colours / ECS 16 colours, bitplanes through WriteChunkyPixels (graphics.library 40) */
+        if (GfxBase->LibNode.lib_Version < 40) return 0;
+        return w >= 640 && w <= MAX_W && h >= 400 && h <= MAX_H && d >= 4;
+    }
     if (w < 640 || h < 480 || d < 8) return 0;
     if (relax_filter) return 1;
     if (w > MAX_W || h > MAX_H) return 0;
     return w * 10 >= h * 12 && w * 10 <= h * 14;          /* aspect ratio 1.2 .. 1.4 */
 }
 
-/* does the card offer any mode that passes the strict rules? (the names of the modes do not matter, only size and depth) */
+/* does the card offer any RTG mode that passes the strict rules? (the names of the modes do not matter, only size and depth) */
 static void check_filter(void)
 {
     ULONG m = INVALID_ID;
     int n = 0;
     relax_filter = 0;
-    while ((m = NextDisplayInfo(m)) != INVALID_ID) n += mode_ok(m);
+    if (!CyberGfxBase) return;
+    while ((m = NextDisplayInfo(m)) != INVALID_ID) n += is_rtg(m) && mode_ok(m);
     if (!n) { relax_filter = 1; logmsg("no mode passes the strict screen mode rules: accepting any RTG mode >= 640x480"); }
 }
 
@@ -1552,8 +1646,8 @@ static ULONG ask_mode(int *w, int *h, int *depth)
     if (!AslBase) return INVALID_ID;
     filter_hook.h_Entry = (ULONG (*)())mode_filter;
     sr = (struct ScreenModeRequester *)AllocAslRequestTags(ASL_ScreenModeRequest,
-            ASLSM_TitleText, (ULONG)T("Micropolis: choose an RTG screen mode (640x480 to 800x600)"),
-            ASLSM_MinWidth, 640, ASLSM_MinHeight, 480, ASLSM_MinDepth, 8,
+            ASLSM_TitleText, (ULONG)T("Micropolis: choose a screen mode (RTG 640x480 up to 800x600, AGA from 640x400)"),
+            ASLSM_MinWidth, 640, ASLSM_MinHeight, 400, ASLSM_MinDepth, 4,
             ASLSM_InitialDisplayID, (pref_mode != 0xffffffffUL) ? pref_mode : 0,
             ASLSM_FilterFunc, (ULONG)&filter_hook, TAG_DONE);
     if (sr) {
@@ -1562,13 +1656,12 @@ static ULONG ask_mode(int *w, int *h, int *depth)
             if (mode_ok(sr->sm_DisplayID)) {
                 id = sr->sm_DisplayID;
                 /* size and depth come from the mode itself: the requester's own width/height fields default to 640x480 */
-                *w = (int)GetCyberIDAttr(CYBRIDATTR_WIDTH, id); *h = (int)GetCyberIDAttr(CYBRIDATTR_HEIGHT, id);
-                *depth = (int)GetCyberIDAttr(CYBRIDATTR_DEPTH, id);
+                {   long lw, lh, ld; mode_dims(id, &lw, &lh, &ld); *w = (int)lw; *h = (int)lh; *depth = is_rtg(id) ? (int)ld : ld >= 8 ? 8 : 4; }
                 break;
             }
             {   struct EasyStruct es;                              /* the list also holds the Amiga chipset modes */
                 es.es_StructSize = sizeof(struct EasyStruct); es.es_Flags = 0;
-                es.es_Title = (CONST_STRPTR)"Micropolis"; es.es_TextFormat = (CONST_STRPTR)T("That is not a usable RTG mode.\nPlease choose one of the listed RTG modes\n(640x480 up to 800x600).");
+                es.es_Title = (CONST_STRPTR)"Micropolis"; es.es_TextFormat = (CONST_STRPTR)T("That is not a usable screen mode.\nPlease choose one of the listed modes\n(RTG 640x480 up to 800x600, AGA from 640x400).");
                 es.es_GadgetFormat = (CONST_STRPTR)T("Choose again");
                 EasyRequestArgs(NULL, &es, NULL, NULL);
             }
@@ -1586,11 +1679,21 @@ static ULONG pick_mode(int *depth_out)
         int d = order[k];
         ULONG id;
         if (force_depth && d != force_depth) continue;
+        if (!CyberGfxBase) break;
         id = BestCModeIDTags(CYBRBIDTG_NominalWidth, req_w, CYBRBIDTG_NominalHeight, req_h, CYBRBIDTG_Depth, d, TAG_DONE);
         if (id == INVALID_ID || !IsCyberModeID(id)) continue;
         if (GetCyberIDAttr(CYBRIDATTR_WIDTH, id) < req_w || GetCyberIDAttr(CYBRIDATTR_HEIGHT, id) < req_h) continue;
         *depth_out = (int)GetCyberIDAttr(CYBRIDATTR_DEPTH, id);
         return id;
+    }
+    if (!force_depth || force_depth == 8 || force_depth == 4) {      /* no RTG card (or no mode): the best chipset mode (AGA 256 colours, otherwise ECS 16 colours) */
+        for (int d = 8; d >= 4; d -= 4) {
+            ULONG id = BestModeID(BIDTAG_NominalWidth, req_w, BIDTAG_NominalHeight, req_h, BIDTAG_Depth, d, TAG_DONE);
+            long w_ = 0, h_ = 0, d_ = 0; char b[100];
+            int ok_ = id != INVALID_ID && !is_rtg(id) && mode_dims(id, &w_, &h_, &d_) && mode_ok(id);
+            sprintf(b, "chipset best mode for depth %d: 0x%08lx, %ldx%ld, depth %ld (%s)", d, (unsigned long)id, w_, h_, d_, ok_ ? "ok" : "rejected"); logmsg(b);
+            if (ok_) { *depth_out = d_ >= 8 ? 8 : 4; return id; }
+        }
     }
     return INVALID_ID;
 }
@@ -1631,10 +1734,7 @@ static int real_main(int argc, char **argv)
     { char b[80]; struct Task *t = FindTask(NULL);
       sprintf(b, "stack: %ld bytes", (long)((char *)t->tc_SPUpper - (char *)t->tc_SPLower)); logmsg(b); }
     logmsg("start");
-    if (!CyberGfxBase && !test_mode) {
-        fail(T("cybergraphics.library (version 40) not found.\nMicropolis needs an RTG graphics card with\nPicasso96 or CyberGraphX installed and running."));
-        goto out;
-    }
+    if (!CyberGfxBase) logmsg("no cybergraphics.library: chipset screen modes only");
     logmsg("libs ok");
     if (!load_assets()) {
         fail(T("Cannot find the program data (res drawer).\nPlease keep the Micropolis program, its res and\ncities drawers together in one drawer."));
@@ -1668,8 +1768,7 @@ static int real_main(int argc, char **argv)
         int use_saved = !ask_mode_flag && !pref_ask && pref_mode != 0xffffffffUL && mode_ok(pref_mode);
         if (use_saved) {                                  /* "always use this mode" */
             id = pref_mode;                                   /* size and depth from the mode (older prefs files saved the wrong size) */
-            req_w = (int)GetCyberIDAttr(CYBRIDATTR_WIDTH, id); req_h = (int)GetCyberIDAttr(CYBRIDATTR_HEIGHT, id);
-            depth = (int)GetCyberIDAttr(CYBRIDATTR_DEPTH, id);
+            {   long lw, lh, ld; mode_dims(id, &lw, &lh, &ld); req_w = (int)lw; req_h = (int)lh; depth = is_rtg(id) ? (int)ld : ld >= 8 ? 8 : 4; }
         } else {
             int w = 0, h = 0, d = 8;
             id = ask_mode(&w, &h, &d);
@@ -1691,27 +1790,33 @@ static int real_main(int argc, char **argv)
         }
     }
     if (id == INVALID_ID) {
-        fail(T("No suitable RTG screen mode found.\nMicropolis needs a mode of at least 640x480 pixels\nwith 8, 15, 16, 24 or 32 bit colour."));
+        fail(T("No suitable screen mode found.\nMicropolis needs a mode of at least 640x480 pixels\nwith 8, 15, 16, 24 or 32 bit colour (RTG)\nor an AGA mode of at least 640x400 pixels."));
         goto out;
     }
     scr_w = req_w < 640 ? 640 : req_w > MAX_W ? MAX_W : req_w;           /* requested screen size */
-    scr_h = req_h < 480 ? 480 : req_h > MAX_H + 16 ? MAX_H + 16 : req_h;
+    scr_h = req_h < 400 ? 400 : req_h > MAX_H + 16 ? MAX_H + 16 : req_h;
     true_color = depth > 8;
+    planar = !is_rtg(id);
+    planar16 = planar && depth < 8;
+    if (planar16) build_pal16();
     scr_mode_shown = (int)id; scr_depth_shown = depth;
     { char b[100]; sprintf(b, "screen mode 0x%08lx, depth %d", (unsigned long)id, depth); logmsg(b); }
     {   /* palette screens get Workbench-like window pens from our palette (grey borders, blue title bars) */
         static UWORD pens[] = { 0, PEN_GREY, 0, PEN_TEXT, 0, PEN_BTN, PEN_TEXT, PEN_GREY, PEN_TEXT, 0, PEN_GREY, 0, (UWORD)~0 };
-        ULONG pen_tag = true_color ? TAG_IGNORE : SA_Pens;
+        UWORD *pens_p = pens;
+        static UWORD tc_pens[] = { 0, 1, 0, 2, 0, 3, 2, 1, 2, 0, 1, 0, (UWORD)~0 };     /* true colour screens: system pens 0..3 = black, grey, white, blue, so that the menus look like on a palette screen */
+        ULONG pen_tag = SA_Pens;
+        if (true_color || planar16) pens_p = tc_pens;
         scr = OpenScreenTags(NULL, SA_DisplayID, id, SA_Width, scr_w, SA_Height, scr_h, SA_Depth, depth,
                              SA_Title, (ULONG)"Micropolis", SA_ShowTitle, TRUE, SA_Draggable, TRUE,
-                             pen_tag, (ULONG)pens, TAG_DONE);
+                             pen_tag, (ULONG)pens_p, TAG_DONE);
         if (!scr) {                                               /* some drivers insist on the mode's own size */
             logmsg("OpenScreen with our size failed: trying the mode's own size");
             scr = OpenScreenTags(NULL, SA_DisplayID, id, SA_Depth, depth, SA_Title, (ULONG)"Micropolis",
-                                 SA_ShowTitle, TRUE, SA_Draggable, TRUE, pen_tag, (ULONG)pens, TAG_DONE);
+                                 SA_ShowTitle, TRUE, SA_Draggable, TRUE, pen_tag, (ULONG)pens_p, TAG_DONE);
         }
     }
-    if (!scr) { fail(T("Cannot open the RTG screen (mode 0x%08lx, %d bit)."), (unsigned long)id, depth); goto out; }
+    if (!scr) { fail(T("Cannot open the screen (mode 0x%08lx, %d bit)."), (unsigned long)id, depth); goto out; }
     g_scr = scr;
     logmsg("screen open");
     {   struct DrawInfo *dri = GetScreenDrawInfo(scr);                 /* which pens will the menus use? (they are inverted when highlighted) */
@@ -1735,6 +1840,19 @@ static int real_main(int argc, char **argv)
         if (true_color) {
             for (int i = 0; i < 256; i++)
                 ctable[i] = ((ULONG)palette[i * 3] << 16) | ((ULONG)palette[i * 3 + 1] << 8) | palette[i * 3 + 2];
+            {   static const UBYTE sys[4][3] = { {0x00,0x00,0x00}, {0xaa,0xaa,0xaa}, {0xff,0xff,0xff}, {0x40,0x48,0x70} };   /* the system pens of this screen (menus, window borders) */
+                ULONG sp[2 + 4 * 3];
+                sp[0] = (4UL << 16);
+                for (int i = 0; i < 12; i++) sp[1 + i] = (ULONG)sys[i / 3][i % 3] * 0x01010101UL;
+                sp[13] = 0;
+                LoadRGB32(&scr->ViewPort, sp);
+            }
+        } else if (planar16) {
+            ULONG pal[2 + 16 * 3];
+            pal[0] = (16UL << 16);
+            for (int i = 0; i < 16 * 3; i++) pal[1 + i] = (ULONG)pal16[i] * 0x01010101UL;
+            pal[1 + 16 * 3] = 0;
+            LoadRGB32(&scr->ViewPort, pal);
         } else {
             ULONG pal[2 + 256 * 3];
             pal[0] = (256UL << 16);
@@ -1775,7 +1893,7 @@ static int real_main(int argc, char **argv)
         if (!strcmp(a, "modes")) {               /* debug: which display modes pass the filter */
             ULONG m = INVALID_ID; int n = 0;
             while ((m = NextDisplayInfo(m)) != INVALID_ID) {
-                if (mode_ok(m)) { char lb[90]; sprintf(lb, "mode ok: 0x%08lx %ldx%ld %ld bit", (unsigned long)m, (long)GetCyberIDAttr(CYBRIDATTR_WIDTH, m), (long)GetCyberIDAttr(CYBRIDATTR_HEIGHT, m), (long)GetCyberIDAttr(CYBRIDATTR_DEPTH, m)); logmsg(lb); n++; }
+                long w_, h_, d_; if (mode_ok(m) && mode_dims(m, &w_, &h_, &d_)) { char lb[90]; sprintf(lb, "mode ok: 0x%08lx %ldx%ld %ld bit", (unsigned long)m, w_, h_, d_); logmsg(lb); n++; }
             }
             { char lb[40]; sprintf(lb, "modes accepted: %d", n); logmsg(lb); }
         }
@@ -1783,6 +1901,7 @@ static int real_main(int argc, char **argv)
         if (!strcmp(a, "help")) show_help();
         if (!strcmp(a, "savetest")) { save_city(win, "PROGDIR:cities/savetest.cty"); logmsg(status_msg); }   /* debug */
         if (!strncmp(a, "hover=", 6)) tool_hover = atoi(a + 6);   /* debug */
+        if (!strcmp(a, "hoverwalk")) dbg_hoverwalk = 1;           /* debug: the hover moves to the next tool every frame, like a mouse wandering over the palette */
         if (!strcmp(a, "undotest")) {                  /* debug: draw a road, undo, redo, and say what happened to the map and the funds */
             int bx = (view_x + 8) << 4, by = (view_y + 6) << 4, n0 = 0, n1 = 0, n2 = 0, n3 = 0; char lb[120]; long f0, f1, f2, f3;
             for (int x = 0; x < WORLD_X; x++) for (int y = 0; y < WORLD_Y; y++) n0 += ((Map[x][y] & LOMASK) >= 64 && (Map[x][y] & LOMASK) < 80);
@@ -1954,6 +2073,7 @@ static int real_main(int argc, char **argv)
             dirty = 1;
         }
         frame++;
+        if (dbg_hoverwalk) { int th = (frame % 36) / 2; if (th < NTOOLS && th != tool_hover) { tool_hover = th; if (!toolbar_dirty) tb_label_only = 1; toolbar_dirty = 1; dirty = 1; } }
         {   int ex = 0, ey = 0;                                           /* edge scrolling: which way does the mouse push? */
             if (mouse_x >= 0 && !panning) {
                 if ((mouse_x >= TB_W && mouse_x < TB_W + 8) || mouse_x < 3) ex = -1;   /* left: the strip next to the palette or the very edge of the screen */

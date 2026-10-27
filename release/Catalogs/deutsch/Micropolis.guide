@@ -172,8 +172,10 @@
 @node SETTINGS "Bildschirmmodus und Einstellungen"
 @toc MAIN
 
-  Beim Start listet ein Requester die nutzbaren RTG-Modi (640x480 bis
-  800x600) auf. Sie können "Immer verwenden" wählen; Optionen/Bildschirmmodus
+  Beim Start listet ein Requester die nutzbaren Modi auf: RTG-Modi
+  (640x480 bis 800x600) und, ohne Grafikkarte, die Modi des Amiga-Chipsatzes
+  (AGA 256 Farben, OCS/ECS 16 Farben; ab 640x400, z. B. PAL:High Res
+  Laced). Sie können "Immer verwenden" wählen; Optionen/Bildschirmmodus
   beim Start fragen schaltet die Frage wieder ein.
 
   Die Einstellungen stehen in ENVARC:Micropolis.prefs. ToolTypes des Icons:
