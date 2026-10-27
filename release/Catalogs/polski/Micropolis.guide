@@ -133,9 +133,11 @@
 @node SETTINGS "Tryb ekranu i ustawienia"
 @toc MAIN
 
-  Na starcie requester pokazuje uzyteczne tryby RTG (od 640x480 do
-  800x600). Mozna wybrac "Zawsze uzywac"; Opcje/Pytaj o tryb ekranu przy
-  starcie wlacza pytanie ponownie.
+  Na starcie requester pokazuje uzyteczne tryby: tryby RTG (od 640x480 do
+  800x600) oraz, bez karty graficznej, tryby ukladu Amigi (AGA 256 kolorow,
+  OCS/ECS 16 kolorow; od 640x400, np. PAL:High Res Laced). Mozna wybrac
+  "Zawsze uzywac"; Opcje/Pytaj o tryb ekranu przy starcie wlacza pytanie
+  ponownie.
 
   Ustawienia sa w ENVARC:Micropolis.prefs. ToolTypes ikony:
   SIZE=800x600 (staly rozmiar, bez pytania), CITY=<plik>,

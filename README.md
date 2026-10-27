@@ -1,7 +1,7 @@
 # Micropolis for AmigaOS 3
 
 Micropolis (the open-source version of the original SimCity) for the Amiga with a native
-Intuition front end and **RTG** graphics (Picasso96 / CyberGraphX). The simulation is the original
+Intuition front end and **RTG** graphics (Picasso96 / CyberGraphX) or the **AGA / ECS chipset** (no graphics card needed). The simulation is the original
 C code; Tcl/Tk and X11 were replaced by an Amiga user interface.
 
 ![status](https://img.shields.io/badge/status-early%20alpha-orange)
@@ -13,7 +13,7 @@ C code; Tcl/Tk and X11 were replaced by an Amiga user interface.
 | **OS** | AmigaOS 3.x (developed and tested on 3.2 only). Kickstart 3.2 recommended |
 | **CPU** | 68020 or better (tested on an emulated 68040; a 68030/50 MHz is the performance target) |
 | **RAM** | 2 MB Chip + 2 MB Fast or more (the program itself takes about 1.5 MB) |
-| **Graphics** | RTG card with Picasso96 or CyberGraphX (`cybergraphics.library` 40+) and a screen mode between 640x480 and 800x600 (4:3 / 5:4 shape; 8, 15, 16, 24 or 32 bit; 8 bit is used when available) |
+| **Graphics** | RTG card with Picasso96 or CyberGraphX (`cybergraphics.library` 40+) and a screen mode between 640x480 and 800x600 (4:3 / 5:4 shape; 8, 15, 16, 24 or 32 bit; 8 bit is used when available). **Or the Amiga chipset** (Kickstart 3.1, no card needed): AGA with 256 colours, OCS/ECS with 16 colours, in a hires interlaced mode of at least 640x400 (PAL 640x512, NTSC 640x400) |
 | **System files** | `mathieeedoubbas.library`, `mathieeedoubtrans.library` (in `LIBS:` of any Workbench), `gadtools.library`, `asl.library` |
 | **Sound** | via the system `sound.datatype` (datatypes.library, OS 3.0+): the original sound effects as 8SVX samples; they are loaded when first played |
 | **CPU libraries** | the right `680x0.library` for your CPU (68030/68040/68060), as AmigaOS 3.2 asks for |
@@ -37,10 +37,12 @@ ToolTypes (icon information; remove the parentheses to switch one on): `CITY=cit
 `DEBUG` write `micropolis.log`.
 Command line: `Micropolis [city] [SIZE=WxH] [ASK] [DEBUG]`.
 
-**Screen mode:** by default Micropolis asks for the RTG screen mode at every start (a screen mode requester, then
+**Screen mode:** by default Micropolis asks for the screen mode (RTG or chipset) at every start (a screen mode requester, then
 "Always use this screen mode? - Always use it / Ask me next time"). With *Always use it* the mode is saved in
 `ENVARC:Micropolis.prefs` and used without asking; the menu *Options > Ask for screen mode at start* switches the
-question on again. `SIZE=` (ToolType or argument) skips the question and uses that size, `ASK` forces the question once. Startup problems (no RTG, no suitable screen mode, missing data) are shown in a requester.
+question on again. `SIZE=` (ToolType or argument) skips the question and uses that size, `ASK` forces the question once. Startup problems (no suitable screen mode, missing data) are shown in a requester.
+
+**AGA / ECS (no RTG card):** the list of the screen mode requester then shows the chipset modes (e.g. *PAL:High Res Laced*). On AGA the picture has all 256 colours; on OCS/ECS (16 colours) the game colours are reduced to a fixed palette of 16 (picked from the colours the tiles use most), which looks plainer but is fully playable. A 68020 or better is still needed; interlaced modes flicker on a normal monitor, a scan doubler / flicker fixer helps.
 
 ## Looks and feels like an Amiga program
 
@@ -95,7 +97,7 @@ See the [issues](../../issues).
 
 ## Troubleshooting
 
-- *A requester says no RTG / no screen mode:* Picasso96 or CyberGraphX is not running, or the card offers no mode of at least 640x480.
+- *A requester says no screen mode:* Picasso96 or CyberGraphX is not running and the Amiga chipset offers no mode of at least 640x400 (needs Kickstart 3.1, graphics.library 40), or the card offers no mode of at least 640x480.
 - *"Cannot find the program data":* keep the `Micropolis` program together with its `res` and `cities` drawers.
 - *Software failure when quitting:* an early crash on quit seems fixed in 0.2; if you see it, please report the error number.
 - `micropolis.log` is only written with the DEBUG option; attach it to bug reports.

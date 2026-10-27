@@ -478,18 +478,15 @@ Witamy w Micropolis!\nOd czego chcesz zaczac?
 S_26C979C5
 Nowe miasto|Wczytaj miasto...|Scenariusz...|Biezace miasto
 ; New city|Load city...|Scenario...|Current city
-S_7153DD68
-Micropolis: wybierz tryb ekranu RTG (640x480 do 800x600)
-; Micropolis: choose an RTG screen mode (640x480 to 800x600)
-S_4077A8F2
-To nie jest uzyteczny tryb RTG.\nWybierz jeden z wymienionych trybow RTG\n(640x480 do 800x600).
-; That is not a usable RTG mode.\nPlease choose one of the listed RTG modes\n(640x480 up to 800x600).
+S_63610A28
+Micropolis: wybierz tryb ekranu (RTG 640x480 do 800x600, AGA od 640x400)
+; Micropolis: choose a screen mode (RTG 640x480 up to 800x600, AGA from 640x400)
+S_54F7BEEA
+To nie jest uzyteczny tryb ekranu.\nWybierz jeden z wymienionych trybow\n(RTG 640x480 do 800x600, AGA od 640x400).
+; That is not a usable screen mode.\nPlease choose one of the listed modes\n(RTG 640x480 up to 800x600, AGA from 640x400).
 S_4C2020AC
 Wybierz ponownie
 ; Choose again
-S_6ADE8C48
-Nie znaleziono cybergraphics.library (wersja 40).\nMicropolis wymaga karty graficznej RTG z\nzainstalowanym i dzialajacym Picasso96 lub CyberGraphX.
-; cybergraphics.library (version 40) not found.\nMicropolis needs an RTG graphics card with\nPicasso96 or CyberGraphX installed and running.
 S_05E3FEC7
 Nie znaleziono danych programu (katalog res).\nTrzymaj program Micropolis oraz katalogi res i\ncities razem w jednym katalogu.
 ; Cannot find the program data (res drawer).\nPlease keep the Micropolis program, its res and\ncities drawers together in one drawer.
@@ -502,12 +499,12 @@ Zawsze uzywac tego trybu ekranu (%ldx%ld, %ld bit)?\nOpcje > "Pytaj o tryb ekran
 S_764B37B7
 Zawsze uzywac|Zapytaj nastepnym razem
 ; Always use it|Ask me next time
-S_1D648ECD
-Nie znaleziono odpowiedniego trybu RTG.\nMicropolis potrzebuje trybu o rozdzielczosci co najmniej 640x480\ni glebi 8, 15, 16, 24 lub 32 bity.
-; No suitable RTG screen mode found.\nMicropolis needs a mode of at least 640x480 pixels\nwith 8, 15, 16, 24 or 32 bit colour.
-S_304ED817
-Nie mozna otworzyc ekranu RTG (tryb 0x%08lx, %d bit).
-; Cannot open the RTG screen (mode 0x%08lx, %d bit).
+S_23CFC858
+Nie znaleziono odpowiedniego trybu ekranu.\nMicropolis potrzebuje trybu o rozmiarze co najmniej 640x480 pikseli\nz kolorem 8, 15, 16, 24 lub 32 bity (RTG)\nalbo trybu AGA o rozmiarze co najmniej 640x400 pikseli.
+; No suitable screen mode found.\nMicropolis needs a mode of at least 640x480 pixels\nwith 8, 15, 16, 24 or 32 bit colour (RTG)\nor an AGA mode of at least 640x400 pixels.
+S_0DB97FFE
+Nie mozna otworzyc ekranu (tryb 0x%08lx, %d bit).
+; Cannot open the screen (mode 0x%08lx, %d bit).
 S_225A54C9
 Za malo pamieci na ekran %dx%d.
 ; Not enough memory for a %dx%d screen.

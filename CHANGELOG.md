@@ -2,6 +2,17 @@
 
 Older versions: see the release notes on GitHub (v0.1 to v0.8.1).
 
+## 0.8.9 (27 October 2026)
+
+### Added
+- **Amiga chipset version, no graphics card needed** (#45): the screen mode requester at the start now also lists the chipset
+  modes of at least 640x400 (e.g. *PAL:High Res Laced*, 640x512). On **AGA** machines the picture has all 256 colours; on
+  **OCS/ECS** machines (16 colours) the game colours are reduced to a fixed palette of 16, built at the start from the colours
+  the tile art uses most (grey, white, black and the dark blue of the panels are always in it). The panels and menus look the
+  same as on RTG screens. Needs Kickstart 3.1 (graphics.library 40). Without `cybergraphics.library` the program now starts, too.
+  Tested in the emulator on an A1200 (AGA) and an A3000 (ECS); real hardware not yet.
+- Two screen tests (`aga`, `ecs`) in `tools/test/screens.py`.
+
 ## 0.8.8 (27 October 2026)
 
 ### Changed

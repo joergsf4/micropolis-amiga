@@ -65,11 +65,11 @@ def read_dump(path):
     return fb, scr
 
 
-def run_case(args, timeout=60):
+def run_case(args, timeout=60, env=None):
     out = os.path.join(ROOT, 'out', 'syswork')
-    cmd = 'Work:Micropolis/micropolis size=640x480 debug %s det dump=Work:dump.raw quit=14' % args
+    cmd = 'Work:Micropolis/micropolis %s debug %s det dump=Work:dump.raw quit=14' % ('' if 'size=' in args else 'size=640x480', args)
     subprocess.run([os.path.join(ROOT, 'tools', 'emusys.sh'), cmd, str(timeout)], cwd=ROOT, check=False,
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=dict(os.environ, **(env or {})))
     dump = os.path.join(out, 'dump.raw')
     log = open(os.path.join(out, 'Micropolis', 'micropolis.log'), encoding='latin-1').read() if os.path.exists(os.path.join(out, 'Micropolis', 'micropolis.log')) else ''
     if not os.path.exists(dump):
@@ -94,18 +94,25 @@ CASES = [
     ('save', 'show=none savetest', [('log', 'Saved PROGDIR:cities/savetest.cty', True)]),
     ('tax-new', 'newcity show=budget', [('scr', '  7%', True)]),
 ]
+# chipset machines without a graphics card: A1200 (AGA, 256 colours) and A3000 (ECS, 16 colours), both in 640x512 interlaced
+AGA = {'MODEL': 'A1200', 'ROMFILE': 'kicka1200.rom', 'GFX': 'none', 'EXTRA': '--fast_memory=8192'}
+ECS = {'MODEL': 'A3000', 'ROMFILE': 'kicka3000.rom', 'GFX': 'none'}
+CHIPSET_CASES = [
+    ('aga', 'size=640x512 show=none', [('log', 'screen mode 0x00029004, depth 8', True), ('fb', 'Funds:', True), ('fb', 'Query', True)], AGA),
+    ('ecs', 'size=640x512 show=none', [('log', 'screen mode 0x00029004, depth 4', True), ('fb', 'Funds:', True), ('fb', 'Query', True)], ECS),
+]
 # the menu bar must fit into the screen in every language (a title beyond the right edge cannot be opened)
 MENU_CASES = [('menu-en', 'show=none'), ('menu-de', 'show=none lang=deutsch'), ('menu-pl', 'show=none lang=polski')]
-QUICK = ['start-en', 'budget-en', 'status-de', 'menu-de']
+QUICK = ['start-en', 'budget-en', 'status-de', 'menu-de', 'aga', 'ecs']
 
 
 def main():
     names = [a for a in sys.argv[1:] if not a.startswith('--')]
-    cases = [(n, a, [('menu', None, True)]) for n, a in MENU_CASES] + CASES
+    cases = [(n, a, [('menu', None, True)], None) for n, a in MENU_CASES] + [c + (None,) for c in CASES] + CHIPSET_CASES
     cases = [c for c in cases if (not names and ('--quick' not in sys.argv or c[0] in QUICK)) or c[0] in names]
     failed = 0
-    for name, args, checks in cases:
-        fb, scr, log = run_case(args)
+    for name, args, checks, env in cases:
+        fb, scr, log = run_case(args, env=env)
         problems = []
         if 'main() is returning' not in log:
             problems.append('no clean shutdown in the log')
