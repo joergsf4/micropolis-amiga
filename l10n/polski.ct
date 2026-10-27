@@ -214,6 +214,12 @@ Zapisz miasto
 S_4C833401
 Zapisz miasto jako...
 ; Save City As...
+S_71FD4ACF
+Cofnij
+; Undo
+S_7412E5E9
+Ponow
+; Redo
 S_47B3D356
 Zakoncz
 ; Quit
@@ -424,6 +430,18 @@ Latwy
 S_64EFA7FC
 Trudny
 ; Hard
+S_63161433
+Nic do cofniecia
+; Nothing to undo
+S_1B4406A5
+Nic do ponowienia
+; Nothing to redo
+S_17051F34
+Cofnieto: %d pol
+; Undone: %d tiles
+S_4C1563FA
+Ponowiono: %d pol
+; Redone: %d tiles
 S_7E6206A1
 Utworzono nowe miasto.
 ; New city generated.

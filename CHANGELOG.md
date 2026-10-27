@@ -2,6 +2,21 @@
 
 Older versions: see the release notes on GitHub (v0.1 to v0.8.1).
 
+## 0.8.7 (27 October 2026)
+
+### New
+- **Undo / Redo** (#41): *Project > Undo* (Amiga+U) and *Redo* (Amiga+Z) take back and repeat the last 5 building actions. A road,
+  rail or wire drawn with one drag is one step. Undo gives back the money the action cost and puts back only the tiles that still
+  show what the action built, so what the simulation did in the meantime (a zone that grew) is not touched. A new city or a
+  loaded city empties the history.
+- **The sound output button has arrows** (#40): `<` goes back, `>` goes on, so that it looks like a selector.
+
+### Changed
+- **Scrolling at the edge** (#42, #44): the mouse has to stay at the edge for a third of a second before the map scrolls, so passing
+  over it on the way to the menu bar does nothing; the top zone is only the strip under the status bar, not the status bar itself.
+  The longer the mouse stays, the faster it scrolls (1 tile per 4 loops, then per 2, then 2 tiles per loop).
+- **AHI needs less processor time** (#40): the loop chunks are twice as long and are looked after every third frame.
+
 ## 0.8.6 (26 October 2026)
 
 ### New

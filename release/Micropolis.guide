@@ -65,6 +65,7 @@
   0 1 2 3             pause, slow, medium, fast
   b r p t x z         tool shortcuts as in the original (bulldozer,
                       road, park, wire, rail, query)
+  Amiga+U / Amiga+Z   undo / redo of the last building actions (up to 5)
   Esc                 closes the active window; quits when none is open
   Help                this guide
 
@@ -85,7 +86,7 @@
 @node MENUS "Menus"
 @toc MAIN
 
-  Project    new city, load, save, About, Help, quit
+  Project    new city, load, save, undo / redo, About, Help, quit
   Speed      pause / slow / medium / fast
   Options    auto bulldoze, auto budget, disasters, auto goto, city animation,
              world animation, messages, message windows, sound options (window with the

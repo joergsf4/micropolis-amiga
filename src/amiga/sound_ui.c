@@ -70,6 +70,8 @@ void sound_ui_draw(UBYTE *fb, int stride)
         rect(fb, stride, SND_X + 16, SND_Y + ROW_OUT - 14, SND_W - 32, 22, PEN_BTN);
         gfx_colors(PEN_TEXT, PEN_BTN);
         gfx_print_c(SND_X + SND_W / 2, SND_Y + ROW_OUT + 2, sound_output_label(lb));
+        gfx_print(SND_X + 24, SND_Y + ROW_OUT + 2, "<");                    /* the button is a selector: < goes back, > goes on */
+        gfx_print_r(SND_X + SND_W - 24, SND_Y + ROW_OUT + 2, ">");
     }
     slider(fb, stride, ROW_FX, sound_fx_vol, T("Effects volume"));
     slider(fb, stride, ROW_AMBVOL, sound_amb_vol, T("Ambient volume"));
@@ -94,7 +96,7 @@ int sound_ui_mouse(int x, int y, int kind)
     if (y >= ROW_SOUND - 12 && y < ROW_SOUND + 6 && x >= 16 && x < SND_W - 16) { UserSoundOn = !UserSoundOn; return 1; }
     if (y >= ROW_AMB - 12 && y < ROW_AMB + 6 && x >= 16 && x < SND_W - 16) { ambient_on = !ambient_on; return 1; }
     if (y >= ROW_SPEAK - 12 && y < ROW_SPEAK + 6 && x >= 16 && x < SND_W - 16) { speak_tools = !speak_tools; return 1; }
-    if (y >= ROW_OUT - 14 && y < ROW_OUT + 8 && x >= 16 && x < SND_W - 16) { sound_cycle_output(); return 1; }
+    if (y >= ROW_OUT - 14 && y < ROW_OUT + 8 && x >= 16 && x < SND_W - 16) { sound_cycle_output(x < 72 ? -1 : 1); return 1; }
     if (y >= ROW_FX + 6 && y < ROW_FX + 34 && x >= TRACK_X && x < TRACK_X + TRACK_W) { drag = 0; set_from_x(0, x); return 1; }
     if (y >= ROW_AMBVOL + 6 && y < ROW_AMBVOL + 34 && x >= TRACK_X && x < TRACK_X + TRACK_W) { drag = 1; set_from_x(1, x); return 1; }
     if (y >= BTN_Y && y < BTN_Y + 24 && x >= SND_W / 2 - 50 && x < SND_W / 2 + 50) { sound_ui_close(); return 1; }

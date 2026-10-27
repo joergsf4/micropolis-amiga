@@ -7,6 +7,7 @@
 cd "$(dirname "$0")/../.."
 fail=0
 echo "== notifications";  python3 tools/test/check_handlers.py || fail=1
+echo "== undo";           tools/test/undo_test.sh | tail -1 | grep -q "UNDO TEST PASSED" && echo ok || fail=1
 echo "== screens";        python3 tools/test/screens.py "$@" || fail=1
 if [ "$1" != "--quick" ]; then echo "== core parity"; python3 tools/test/core_parity.py || fail=1; fi
 [ $fail = 0 ] && echo "ALL TESTS PASSED" || echo "TESTS FAILED"

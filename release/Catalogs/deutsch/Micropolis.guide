@@ -71,6 +71,7 @@
   0 1 2 3            Pause, langsam, mittel, schnell
   b r p t x z        Werkzeugkürzel wie im Original (Planierraupe,
                      Straße, Park, Leitung, Schiene, Abfrage)
+  Amiga+U / Amiga+Z  Rückgängig / Wiederholen der letzten Bauaktionen (bis 5)
   Esc                schließt das aktive Fenster; beendet das Spiel, wenn
                      keines offen ist
   Help               diese Hilfe
@@ -93,7 +94,8 @@
 @node MENUS "Menüs"
 @toc MAIN
 
-  Projekt      neue Stadt, laden, speichern, Über, Hilfe, beenden
+  Projekt      neue Stadt, laden, speichern, rückgängig / wiederholen,
+               Über, Hilfe, beenden
   Szenarien    historische Städte mit Geschichte und Ziel
   Tempo        Pause / langsam / mittel / schnell
   Optionen     Auto-Abriss, Auto-Haushalt, Katastrophen, Auto-Sprung,

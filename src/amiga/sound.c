@@ -135,7 +135,7 @@ static void ambient_tick_ahi(void)                             /* the same fadin
     int n = 0, weakest = -1;
     for (int i = 0; i < AMB_N; i++) if (amb_target[i] > 0) { n++; if (weakest < 0 || amb_target[i] < amb_target[weakest]) weakest = i; }
     if (n > 2) amb_target[weakest] = 0;                       /* two loops are enough, and keep the mix calm */
-    ahi_service();
+    { static int svc; if (++svc % 3 == 0) ahi_service(); }      /* the chunks last 0.7 s: looking after them every third frame is enough (less processor time) */
     if (++amb_tick_no & 1) return;
     for (int i = 0; i < AMB_N; i++) {
         int v = amb_vol[i];
@@ -216,10 +216,10 @@ int sound_set_output(int sel)                                  /* 0 = system, 1.
     return sound_output == sel;
 }
 
-int sound_cycle_output(void)                                   /* the button of the sound window: system, AHI unit 0, 1, 2, 3, system ... */
+int sound_cycle_output(int dir)                                /* the button of the sound window: system, AHI unit 0, 1, 2, 3, system ... (dir -1: the other way round) */
 {
-    int next = (sound_output + 1) % 5;
-    while (next > 0 && !sound_set_output(next)) next = (next + 1) % 5;   /* a unit that cannot be opened is skipped */
+    int next = (sound_output + dir + 5) % 5;
+    while (next > 0 && !sound_set_output(next)) next = (next + dir + 5) % 5;   /* a unit that cannot be opened is skipped */
     if (next == 0) { int missing = ahi_missing; sound_set_output(0); ahi_missing = missing; }
     return sound_output;
 }

@@ -3,7 +3,7 @@
 extern int sound_fx_vol, sound_amb_vol;     /* 0..100 */
 extern int sound_output;                   /* 0 = system sound, 1..4 = AHI unit 0..3 */
 int  sound_set_output(int sel);            /* 1 when the wanted output is in use */
-int  sound_cycle_output(void);             /* next output (system, AHI units that open); returns the one in use */
+int  sound_cycle_output(int dir);          /* next (dir 1) or previous (dir -1) output: system, AHI units that open; returns the one in use */
 const char *sound_output_label(char *buf);
 void sound_init(void);                     /* opens audio.device, silent when it is not available */
 void sound_play(const char *id);           /* id as in the core's "UIMakeSound <channel> <id>"; plays res/sounds/<id>.snd */

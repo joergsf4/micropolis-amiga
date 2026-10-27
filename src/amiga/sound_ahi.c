@@ -16,7 +16,7 @@
 
 #define FX_REQS 6              /* sound effects that can play at the same time */
 #define MAX_SND 24             /* cached effect files */
-#define CHUNK 4096             /* samples per loop chunk (0.37 s) */
+#define CHUNK 8192             /* samples per loop chunk (0.74 s): fewer requests, so less processor time; the volume follows within that time */
 #define MIXVOL 0x10000L        /* AHI's "1.0" */
 
 struct snd { char name[32]; UBYTE *buf, *pcm; ULONG len, rate; };
