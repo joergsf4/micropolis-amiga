@@ -894,6 +894,7 @@ static void scroll_by(struct RastPort *rp, int dx, int dy)
     if (dx > 0) { sx += dx * 16; w -= dx * 16; } else if (dx < 0) { tx -= dx * 16; w += dx * 16; }
     if (dy > 0) { sy += dy * 16; h -= dy * 16; } else if (dy < 0) { ty -= dy * 16; h += dy * 16; }
     ClipBlit(rp, sx, sy, rp, tx, ty, w, h, 0xC0);
+    if (planar) WaitBlit();                               /* the blitter must be done before the CPU writes bitplanes (WriteChunkyPixels) into the same memory */
     memcpy(old, shown, sizeof old);                       /* what each tile cell showed before */
     for (int r = 0; r < VIEW_ROWS; r++)
         for (int c = 0; c < VIEW_COLS; c++) {
@@ -1770,13 +1771,20 @@ static int real_main(int argc, char **argv)
         static UWORD tc_pens[] = { 0, 1, 0, 2, 0, 3, 2, 1, 2, 0, 1, 0, (UWORD)~0 };     /* true colour screens: system pens 0..3 = black, grey, white, blue, so that the menus look like on a palette screen */
         ULONG pen_tag = SA_Pens;
         if (true_color || planar16) pens_p = tc_pens;
-        scr = OpenScreenTags(NULL, SA_DisplayID, id, SA_Width, scr_w, SA_Height, scr_h, SA_Depth, depth,
-                             SA_Title, (ULONG)"Micropolis", SA_ShowTitle, TRUE, SA_Draggable, TRUE,
-                             pen_tag, (ULONG)pens_p, TAG_DONE);
-        if (!scr) {                                               /* some drivers insist on the mode's own size */
-            logmsg("OpenScreen with our size failed: trying the mode's own size");
-            scr = OpenScreenTags(NULL, SA_DisplayID, id, SA_Depth, depth, SA_Title, (ULONG)"Micropolis",
-                                 SA_ShowTitle, TRUE, SA_Draggable, TRUE, pen_tag, (ULONG)pens_p, TAG_DONE);
+        /* several tries: some drivers want the mode's own size, the other depth number for 24/32 bit modes (the cybergraphics depth of
+         * a 32 bit BGRA mode is 24 on one card, 32 on another), or no pens; every failure is logged with its error code */
+        static const struct { int own_size, depth_alt, pens; } tries[] = { {0,0,1}, {1,0,1}, {0,1,1}, {1,1,1}, {1,0,0}, {1,1,0} };
+        for (int k = 0; k < 6 && !scr; k++) {
+            int d = depth;
+            ULONG err = 0;
+            if (tries[k].depth_alt) { if (depth == 24) d = 32; else if (depth == 32) d = 24; else continue; }
+            if (k) { char b[100]; sprintf(b, "OpenScreen failed: try %d (own size %d, depth %d, pens %d)", k, tries[k].own_size, d, tries[k].pens); logmsg(b); }
+            scr = OpenScreenTags(NULL, SA_DisplayID, id, SA_Depth, d, SA_Title, (ULONG)"Micropolis", SA_ShowTitle, TRUE, SA_Draggable, TRUE,
+                                 SA_ErrorCode, (ULONG)&err,
+                                 tries[k].own_size ? TAG_IGNORE : SA_Width, scr_w, tries[k].own_size ? TAG_IGNORE : SA_Height, scr_h,
+                                 tries[k].pens ? pen_tag : TAG_IGNORE, (ULONG)pens_p, TAG_DONE);
+            if (!scr) { char b[100]; sprintf(b, "OpenScreen error code %lu", (unsigned long)err); logmsg(b); }
+            else if (d != depth) { depth = d; scr_depth_shown = d; }
         }
     }
     if (!scr) { fail(T("Cannot open the screen (mode 0x%08lx, %d bit)."), (unsigned long)id, depth); goto out; }
@@ -2041,7 +2049,7 @@ static int real_main(int argc, char **argv)
             if (mouse_x >= 0 && !panning) {
                 if ((mouse_x >= TB_W && mouse_x < TB_W + 8) || mouse_x < 3) ex = -1;   /* left: the strip next to the palette or the very edge of the screen */
                 else if (mouse_x >= SCR_W - 8) ex = 1;
-                if (mouse_y >= BAR_H && mouse_y < BAR_H + 8 && mouse_x >= TB_W) ey = -1;   /* top: the strip under the status bar; the status bar and the way up to the menu bar do not scroll (#44) */
+                if (mouse_y >= 0 && mouse_y < BAR_H + 8 && mouse_x >= TB_W) ey = -1;   /* top: the status bar and the strip under it, up to the screen title bar (#44); the dwell time keeps the way to the menu bar quiet */
                 else if (mouse_y >= SCR_H - 8) ey = 1;
             }
             if (!ex && !ey) edge_on = 0;

@@ -2,6 +2,20 @@
 
 Older versions: see the release notes on GitHub (v0.1 to v0.8.1).
 
+## 0.8.10 (31 October 2026)
+
+### Fixed
+- **32 bit screens** (#43): on a card whose 32 bit mode could not be opened the program only said "cannot open the screen". It now tries
+  other ways (the mode's own size, the other depth number 24/32, without the system pens) and writes the error code of every try to
+  `micropolis.log` (option `debug`). Please report the log if it still fails.
+- **Scrolling on chipset screens** (#45): after the blitter moved the picture the CPU wrote the new tiles into the bitplanes at once,
+  which can corrupt colours (green flashes on roads) on real hardware. The program now waits for the blitter first.
+  Not verified on real hardware.
+
+### Changed
+- **Autoscrolling at the top edge** (#44): the whole game status bar and the strip under it are now the scroll zone (as wished),
+  not only the strip below the status bar. The dwell time of 0.3 s still keeps the way up to the menu bar quiet.
+
 ## 0.8.9 (27 October 2026)
 
 ### Added
