@@ -2,6 +2,18 @@
 
 Older versions: see the release notes on GitHub (v0.1 to v0.8.1).
 
+## 0.8.11 (31 October 2026)
+
+### Fixed
+- **Speed menu without check mark** (#48): the Speed menu now shows a check mark in front of the current speed (Pause, Slow, Medium,
+  Fast), also when the speed is changed with the keys 0 to 3 or by the game.
+- **Scrolling under panel windows** (#42): the map no longer scrolls at the edge while the pointer is over a panel window (e.g. one
+  opened from the Windows menu at the top) or up in the menu bar. At the top edge only the game status bar scrolls, not the first row
+  of the map.
+- **Scrolling on chipset screens** (#45): the picture is moved by the CPU (memory copy of the bitplanes) instead of the blitter. The blitter
+  shift is suspected of the green flashes on real hardware (the wait for the blitter of 0.8.10 did not help).
+  Not verified on real hardware.
+
 ## 0.8.10 (31 October 2026)
 
 ### Fixed

@@ -893,8 +893,19 @@ static void scroll_by(struct RastPort *rp, int dx, int dy)
     int sx = TB_W, sy = BAR_H, w = VIEW_COLS * 16, h = VIEW_ROWS * 16, tx = sx, ty = sy;
     if (dx > 0) { sx += dx * 16; w -= dx * 16; } else if (dx < 0) { tx -= dx * 16; w += dx * 16; }
     if (dy > 0) { sy += dy * 16; h -= dy * 16; } else if (dy < 0) { ty -= dy * 16; h += dy * 16; }
-    ClipBlit(rp, sx, sy, rp, tx, ty, w, h, 0xC0);
-    if (planar) WaitBlit();                               /* the blitter must be done before the CPU writes bitplanes (WriteChunkyPixels) into the same memory */
+    if (planar) {                                         /* chipset screen: move the bitplane bytes with the CPU (the blitter shift made green flashes on real hardware, #45) */
+        struct BitMap *bm = rp->BitMap;
+        int top = main_window_ptr ? main_window_ptr->TopEdge : 0, bx = w / 8;           /* x offsets are multiples of 16 pixels = whole words */
+        WaitBlit();
+        for (int pl = 0; pl < bm->Depth; pl++) {
+            UBYTE *base = (UBYTE *)bm->Planes[pl];
+            for (int i = 0; i < h; i++) {
+                int r = ty > sy ? h - 1 - i : i;                            /* overlapping rows: copy away from the target first */
+                memmove(base + (ty + top + r) * bm->BytesPerRow + tx / 8, base + (sy + top + r) * bm->BytesPerRow + sx / 8, bx);
+            }
+        }
+    } else
+        ClipBlit(rp, sx, sy, rp, tx, ty, w, h, 0xC0);
     memcpy(old, shown, sizeof old);                       /* what each tile cell showed before */
     for (int r = 0; r < VIEW_ROWS; r++)
         for (int c = 0; c < VIEW_COLS; c++) {
@@ -1087,10 +1098,10 @@ static struct Menu *make_menus(struct Screen *scr, APTR *vi_out)
         for (int i = 0; i < 8; i++) mi(NM_ITEM, T(scen[i]), NULL, 0, CMD_SCEN + i + 1);
     }
     mi(NM_TITLE, T("Speed"), NULL, 0, 0);
-    mi(NM_ITEM, T("Pause"), "0", 0, CMD_PAUSE);
-    mi(NM_ITEM, T("Slow"), "1", 0, CMD_SLOW);
-    mi(NM_ITEM, T("Medium"), "2", 0, CMD_MEDIUM);
-    mi(NM_ITEM, T("Fast"), "3", 0, CMD_FAST);
+    mi_excl = 0xe; mi(NM_ITEM, T("Pause"), "0", CHECKIT | (SimSpeed == 0 ? CHECKED : 0), CMD_PAUSE);      /* the check mark shows the speed (#48) */
+    mi_excl = 0xd; mi(NM_ITEM, T("Slow"), "1", CHECKIT | (SimSpeed == 1 ? CHECKED : 0), CMD_SLOW);
+    mi_excl = 0xb; mi(NM_ITEM, T("Medium"), "2", CHECKIT | (SimSpeed == 2 ? CHECKED : 0), CMD_MEDIUM);
+    mi_excl = 0x7; mi(NM_ITEM, T("Fast"), "3", CHECKIT | (SimSpeed == 3 ? CHECKED : 0), CMD_FAST);
     mi(NM_TITLE, T("Options"), NULL, 0, 0);
     mi(NM_ITEM, T("Auto Bulldoze"), NULL, CHECKIT | MENUTOGGLE | (autoBulldoze ? CHECKED : 0), CMD_AUTOBULLDOZE);
     mi(NM_ITEM, T("Auto Budget"), NULL, CHECKIT | MENUTOGGLE | (autoBudget ? CHECKED : 0), CMD_AUTOBUDGET);
@@ -1300,6 +1311,7 @@ static void save_city(struct Window *win, const char *path)
     }
 }
 
+static int menu_speed = -1;                                   /* the speed the check marks of the Speed menu show */
 static void menu_sync(void)                                  /* make the check marks of the menu match the game's variables (after loading a city) */
 {
     struct Window *w[1 + NPANELS]; int n = 0;
@@ -1321,6 +1333,7 @@ static void menu_sync(void)                                  /* make the check m
             case CMD_WORLDANIM: want = world_anim; break;
             case CMD_MSGS: want = DoMessages; break;
             case CMD_NOTICES: want = DoNotices; break;
+            case CMD_PAUSE: case CMD_SLOW: case CMD_MEDIUM: case CMD_FAST: want = (SimSpeed == id - CMD_PAUSE); break;
             default:
                 if (id >= CMD_LEVEL && id < CMD_LEVEL + 3) want = (GameLevel == id - CMD_LEVEL);
             }
@@ -2044,12 +2057,21 @@ static int real_main(int argc, char **argv)
             dirty = 1;
         }
         frame++;
+        if (SimSpeed != menu_speed) { menu_speed = SimSpeed; menu_sync(); }      /* keys, game events and the menu: the check mark follows the speed */
         if (dbg_hoverwalk) { int th = (frame % 36) / 2; if (th < NTOOLS && th != tool_hover) { tool_hover = th; if (!toolbar_dirty) tb_label_only = 1; toolbar_dirty = 1; dirty = 1; } }
         {   int ex = 0, ey = 0;                                           /* edge scrolling: which way does the mouse push? */
-            if (mouse_x >= 0 && !panning) {
+            int under = 0;                                    /* the pointer is really over the game window, not in the menu bar and not under a panel window (#42) */
+            {   int sx = win->MouseX, sy = win->MouseY + win->TopEdge;
+                if (win->MouseX < 0 || win->MouseY < 0 || win->MouseX >= SCR_W || win->MouseY >= SCR_H) under = 1;
+                for (int i = 0; i < NPANELS; i++) {
+                    struct Window *pw = panels[i].win;
+                    if (pw && sx >= pw->LeftEdge && sx < pw->LeftEdge + pw->Width && sy >= pw->TopEdge && sy < pw->TopEdge + pw->Height) under = 1;
+                }
+            }
+            if (mouse_x >= 0 && !panning && !under) {
                 if ((mouse_x >= TB_W && mouse_x < TB_W + 8) || mouse_x < 3) ex = -1;   /* left: the strip next to the palette or the very edge of the screen */
                 else if (mouse_x >= SCR_W - 8) ex = 1;
-                if (mouse_y >= 0 && mouse_y < BAR_H + 8 && mouse_x >= TB_W) ey = -1;   /* top: the status bar and the strip under it, up to the screen title bar (#44); the dwell time keeps the way to the menu bar quiet */
+                if (mouse_y >= 0 && mouse_y < BAR_H && mouse_x >= TB_W) ey = -1;   /* top: the status bar, up to the screen title bar (#44), but not the first row of the map (#42); the dwell time keeps the way to the menu bar quiet */
                 else if (mouse_y >= SCR_H - 8) ey = 1;
             }
             if (!ex && !ey) edge_on = 0;
