@@ -111,7 +111,7 @@
 @node DEMAND "The R C I bars"
 @toc MAIN
 
-  The three bars at the top right show the demand for Residential,
+  The three bars below the tool icons (left) show the demand for Residential,
   Commercial and Industrial zones. Up means people want more of it,
   down means there is too much.
 @endnode

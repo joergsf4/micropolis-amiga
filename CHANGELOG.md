@@ -2,6 +2,16 @@
 
 Older versions: see the release notes on GitHub (v0.1 to v0.8.1).
 
+## 0.8.12 (1 November 2026)
+
+### Changed
+- **Screen layout** (#49): the R C I demand bars moved from the top right into the tool palette, below the last icons, with a white zero
+  line (above it demand, below it too much; marked + and -). The status bar is one line now (date, funds, population, speed and the last
+  message) instead of two, so the map gets one more row of tiles. The label of the tool under the mouse (name and price) and the
+  icons sit 14 pixels higher.
+- **Scrolling on chipset screens** (#45): back to the blitter of 0.8.10: the CPU copy of 0.8.11 was slower (the picture "jumped" and the
+  animations were jerkier, as reported). The issue stays open; double buffering is the next idea.
+
 ## 0.8.11 (31 October 2026)
 
 ### Fixed

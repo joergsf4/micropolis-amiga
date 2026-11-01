@@ -69,8 +69,10 @@ static char guide_path[200];                       /* open help document */
 static int scr_w = 640, scr_h = 480;
 #define SCR_W scr_w
 #define SCR_H scr_h
-#define BAR_H 32                       /* status bar on top */
+#define BAR_H 16                       /* status bar on top: one line (#49) */
 #define TB_W 144                       /* tool palette on the left */
+#define TB_UP 14                       /* the icons start this much higher than in the original palette (the label above them sits closer to the top, #49) */
+#define TB_LABEL_H 40                  /* height of the label (name and cost) above the icons */
 #define MAX_COLS ((MAX_W - TB_W) / 16)
 #define MAX_ROWS ((MAX_H - BAR_H) / 16)
 static int view_cols = 35, view_rows = 28;
@@ -381,7 +383,7 @@ static struct rect prev_spr[MAX_SPR];
 static int n_prev_spr;
 static struct rect prev_cursor;
 static int have_prev_cursor;
-static char last_line1[200], last_line2[200];
+static char last_line1[200];
 
 static struct { long frames, tiles, bytes, render_us, sim_us, sim_steps; } stats;   /* no doubles: the ieee double library is unreliable */
 
@@ -471,7 +473,7 @@ static void draw_cursor(const struct rect *r)
 }
 
 static int tool_x(int i)  { return (classic_icons || !toolicons2) ? tooldef[i].x : 8 + (i % 3) * 40; }
-static int tool_y(int i)  { return (classic_icons || !toolicons2) ? tooldef[i].y : 58 + (i / 3) * 38; }
+static int tool_y(int i)  { return (classic_icons || !toolicons2) ? tooldef[i].y - TB_UP : 58 - TB_UP + (i / 3) * 38; }
 static int tool_w(int i)  { return (classic_icons || !toolicons2) ? (toolicons ? toolicons[2 + i * 10] : 34) : toolicons2_t; }
 static int tool_h(int i)  { return (classic_icons || !toolicons2) ? (toolicons ? toolicons[2 + i * 10 + 1] : 34) : toolicons2_t; }
 
@@ -490,7 +492,7 @@ static void draw_toolbar(void)
 {
     char line[40];
     if (tb_label_only) {                                         /* the mouse only moved to another icon: just the label above the icons (name and price) */
-        for (int y = BAR_H; y < BAR_H + 56 && y < SCR_H; y++) memset(fb + y * SCR_W, PEN_BAR, TB_W);
+        for (int y = BAR_H; y < BAR_H + TB_LABEL_H && y < SCR_H; y++) memset(fb + y * SCR_W, PEN_BAR, TB_W);
     } else {
     for (int y = BAR_H; y < SCR_H; y++) memset(fb + y * SCR_W, PEN_BAR, TB_W);
     if (!classic_icons && toolicons2) {
@@ -510,7 +512,7 @@ static void draw_toolbar(void)
             int w = tab[i * 10], h = tab[i * 10 + 1];
             const UBYTE *px = toolicons + *(const ULONG *)(tab + i * 10 + (i == editor.tool_state ? 6 : 2));
             for (int y = 0; y < h; y++) {
-                int dy = BAR_H + tooldef[i].y + y;
+                int dy = BAR_H + tooldef[i].y - TB_UP + y;
                 if (dy >= SCR_H) break;
                 for (int x = 0; x < w; x++) fb[dy * SCR_W + tooldef[i].x + x] = px[y * w + x] ? px[y * w + x] : PEN_BAR;
             }
@@ -522,9 +524,9 @@ static void draw_toolbar(void)
             gfx_target(fb, SCR_W);
             gfx_colors(tool_hover >= 0 ? PEN_V_YELLOW : PEN_TEXT, PEN_BAR);
             sprintf(line, "%-17.17s", T(tooldef[t].name));
-            gfx_print(6, BAR_H + 22, line);
+            gfx_print(6, BAR_H + 14, line);
             if (tooldef[t].cost) sprintf(line, T("Cost: $%d"), tooldef[t].cost); else strcpy(line, "                ");
-            gfx_print(6, BAR_H + 40, line);
+            gfx_print(6, BAR_H + 30, line);
         }
     }
 }
@@ -867,18 +869,24 @@ static long elapsed_us(void)
 
 /* residential / commercial / industrial demand bars in the status bar (what the city needs) */
 #define DEM_W 100
-#define DEM_X (SCR_W - DEM_W - 6)             /* at the right end of the status bar */
-#define DEM_Y 0
-#define DEM_H 32
+#define DEM_X ((TB_W - DEM_W) / 2)            /* in the tool palette, below the last icons (#49) */
+#define DEM_H 52
+static int dem_y(void)                        /* top of the demand display (fb coordinates) */
+{
+    int b = 0;
+    for (int i = 0; i < NTOOLS; i++) if (tool_y(i) + tool_h(i) > b) b = tool_y(i) + tool_h(i);
+    return BAR_H + b + 14;
+}
 static void draw_demand(void)
 {
     static const UBYTE pen[3] = { PEN_V_LGREEN, PEN_V_LBLUE, PEN_V_YELLOW };
     int v[3] = { demand_r, demand_c, demand_i };
-    for (int y = 0; y < DEM_H; y++) memset(fb + (DEM_Y + y) * SCR_W + DEM_X, PEN_BAR, DEM_W);
+    int dy = dem_y(), y0 = dy + 22;                                    /* zero line */
+    for (int y = 0; y < DEM_H; y++) memset(fb + (dy + y) * SCR_W + DEM_X, PEN_BAR, DEM_W);
+    for (int x = 0; x < DEM_W - 8; x++) fb[y0 * SCR_W + DEM_X + 4 + x] = PEN_TEXT;      /* the white line: above it demand (+), below it surplus (-) */
     for (int k = 0; k < 3; k++) {
-        int h = (v[k] > 15 ? 15 : v[k] < -15 ? -15 : v[k]) * 9 / 15;     /* +-9 pixels */
-        int x0 = DEM_X + 4 + k * 36, y0 = DEM_Y + 12;          /* zero line at y0 */
-        for (int x = 0; x < 20; x++) fb[(y0) * SCR_W + x0 + x] = PEN_TEXT;
+        int h = (v[k] > 15 ? 15 : v[k] < -15 ? -15 : v[k]) * 18 / 15;   /* +-18 pixels */
+        int x0 = DEM_X + 14 + k * 30;
         if (h > 0) for (int y = 1; y <= h; y++) memset(fb + (y0 - y) * SCR_W + x0, pen[k], 20);
         else for (int y = 1; y <= -h; y++) memset(fb + (y0 + y) * SCR_W + x0, pen[k], 20);
     }
@@ -893,19 +901,8 @@ static void scroll_by(struct RastPort *rp, int dx, int dy)
     int sx = TB_W, sy = BAR_H, w = VIEW_COLS * 16, h = VIEW_ROWS * 16, tx = sx, ty = sy;
     if (dx > 0) { sx += dx * 16; w -= dx * 16; } else if (dx < 0) { tx -= dx * 16; w += dx * 16; }
     if (dy > 0) { sy += dy * 16; h -= dy * 16; } else if (dy < 0) { ty -= dy * 16; h += dy * 16; }
-    if (planar) {                                         /* chipset screen: move the bitplane bytes with the CPU (the blitter shift made green flashes on real hardware, #45) */
-        struct BitMap *bm = rp->BitMap;
-        int top = main_window_ptr ? main_window_ptr->TopEdge : 0, bx = w / 8;           /* x offsets are multiples of 16 pixels = whole words */
-        WaitBlit();
-        for (int pl = 0; pl < bm->Depth; pl++) {
-            UBYTE *base = (UBYTE *)bm->Planes[pl];
-            for (int i = 0; i < h; i++) {
-                int r = ty > sy ? h - 1 - i : i;                            /* overlapping rows: copy away from the target first */
-                memmove(base + (ty + top + r) * bm->BytesPerRow + tx / 8, base + (sy + top + r) * bm->BytesPerRow + sx / 8, bx);
-            }
-        }
-    } else
-        ClipBlit(rp, sx, sy, rp, tx, ty, w, h, 0xC0);
+    ClipBlit(rp, sx, sy, rp, tx, ty, w, h, 0xC0);
+    if (planar) WaitBlit();                               /* the blitter must be done before the CPU writes bitplanes (WriteChunkyPixels) into the same memory */
     memcpy(old, shown, sizeof old);                       /* what each tile cell showed before */
     for (int r = 0; r < VIEW_ROWS; r++)
         for (int c = 0; c < VIEW_COLS; c++) {
@@ -1004,20 +1001,21 @@ static void render_frame(struct Window *win)
     if (toolbar_dirty) {
         draw_toolbar();
     }
-    {   /* status lines (top left) */
+    {   /* status line: date, funds, population, speed, then the last message in the rest of the line */
         char line[200];
         gfx_colors(PEN_TEXT, PEN_BAR);
-        sprintf(line, " %-9s %-21s %s %-7ld %s %d%s", status_date, status_funds, T("Pop"), (long)CityPop, T("Speed"), (int)SimSpeed,
+        sprintf(line, " %-9s %-18s %s %-6ld %s %d%s", status_date, status_funds, T("Pop"), (long)CityPop, T("Speed"), (int)SimSpeed,
                 SimSpeed ? "" : T(" (Pause)"));
-        { char pad[200]; sprintf(pad, "%-66.66s", line); strcpy(line, pad); }     /* overwrite what an earlier, longer line (" (Pause)") left behind */
+        { char pad[200]; sprintf(pad, "%s   %s", line, status_msg); sprintf(line, "%-78.78s", pad); }     /* padded: overwrites what an earlier, longer line left behind */
         if (strcmp(line, last_line1)) { gfx_print(4, 12, line); strcpy(last_line1, line); status_dirty = 1; }
-        sprintf(line, " %-58.58s", status_msg);
-        if (strcmp(line, last_line2)) { gfx_print(4, 27, line); strcpy(last_line2, line); status_dirty = 1; }
     }
+    if (toolbar_dirty && !tb_label_only) demand_dirty = 1;      /* the palette was cleared: draw the demand display again */
     if (demand_dirty) {
         draw_demand();
         gfx_colors(PEN_TEXT, PEN_BAR);
-        gfx_print(DEM_X + 10, DEM_Y + 30, "R"); gfx_print(DEM_X + 46, DEM_Y + 30, "C"); gfx_print(DEM_X + 82, DEM_Y + 30, "I");
+        { int dy = dem_y();
+          gfx_print(DEM_X + 20, dy + 50, "R"); gfx_print(DEM_X + 50, dy + 50, "C"); gfx_print(DEM_X + 80, dy + 50, "I");
+          gfx_print(DEM_X + 2, dy + 18, "+"); gfx_print(DEM_X + 2, dy + 33, "-"); }
     }
     { long el = elapsed_us();
       stats.render_us += el;
@@ -1039,9 +1037,9 @@ static void render_frame(struct Window *win)
                 blit(rp, TB_W + c0 * 16, BAR_H + row * 16, (col - c0) * 16, 16);
             }
         }
-        if (toolbar_dirty) blit(rp, 0, BAR_H, TB_W, tb_label_only ? 56 : SCR_H - BAR_H);
-        if (demand_dirty) blit(rp, DEM_X, DEM_Y, DEM_W, DEM_H);
-        if (status_dirty) blit(rp, 0, 0, DEM_X, BAR_H);
+        if (toolbar_dirty) blit(rp, 0, BAR_H, TB_W, tb_label_only ? TB_LABEL_H : SCR_H - BAR_H);
+        if (demand_dirty) blit(rp, DEM_X, dem_y(), DEM_W, DEM_H);
+        if (status_dirty) blit(rp, 0, 0, SCR_W, BAR_H);
     }
 
     toolbar_dirty = 0; tb_label_only = 0; status_dirty = 0; demand_dirty = 0;
@@ -1959,7 +1957,7 @@ static int real_main(int argc, char **argv)
             if (cls == IDCMP_REFRESHWINDOW) {                    /* part of a window was uncovered: draw it again */
                 BeginRefresh(mw);
                 if (pi >= 0) panel_render(pi);
-                else { full_redraw = 1; first_present = 1; toolbar_dirty = status_dirty = demand_dirty = 1; tb_label_only = 0; last_line1[0] = last_line2[0] = 0; render_frame(win); }
+                else { full_redraw = 1; first_present = 1; toolbar_dirty = status_dirty = demand_dirty = 1; tb_label_only = 0; last_line1[0] = 0; render_frame(win); }
                 EndRefresh(mw, TRUE);
                 if (refresh_full && pi < 0) { refresh_full = 0; full_redraw = 1; dirty = 1; }
                 continue;

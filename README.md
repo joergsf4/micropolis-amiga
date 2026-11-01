@@ -83,8 +83,8 @@ question on again. `SIZE=` (ToolType or argument) skips the question and uses th
 | Quit | Esc or Project > Quit |
 | Version | Project > About Micropolis (version, build, CPU, screen mode, free memory) |
 
-The bars at the top right show what the city needs: **R**esidential, **C**ommercial, **I**ndustrial
-(up = demand, down = too many). Events and warnings open a message window (Continue / Return / Space).
+The bars below the tool icons show what the city needs: **R**esidential, **C**ommercial, **I**ndustrial
+(up from the white line = demand, down = too many). Events and warnings open a message window (Continue / Return / Space).
 
 You can load and save cities (`.cty`, the original Micropolis format; `cities/` has the classic scenarios).
 
