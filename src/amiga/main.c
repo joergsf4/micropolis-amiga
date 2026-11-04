@@ -477,15 +477,65 @@ static int tool_y(int i)  { return (classic_icons || !toolicons2) ? tooldef[i].y
 static int tool_w(int i)  { return (classic_icons || !toolicons2) ? (toolicons ? toolicons[2 + i * 10] : 34) : toolicons2_t; }
 static int tool_h(int i)  { return (classic_icons || !toolicons2) ? (toolicons ? toolicons[2 + i * 10 + 1] : 34) : toolicons2_t; }
 
-static int tool_hover = -1;            /* tool icon under the mouse: its name and cost show in the label (a fixed-place tooltip) */
+static int tool_hover = -1;            /* tool icon under the mouse (100 + n: one of the small buttons): its name and cost show in the label (a fixed-place tooltip) */
+
+/* six small buttons below the demand display: undo, redo and the four speeds (#49) */
+#define NBTN 6
+#define BTN_W 22
+#define BTN_H 20
+#define BTN_X(i) (4 + (i) * 23)
+static int dem_y(void);
+static int btn_y(void);
+static int btn_at(int mx, int my)
+{
+    int y = btn_y();
+    if (mx < 0 || mx >= TB_W || my < y || my >= y + BTN_H) return -1;
+    for (int i = 0; i < NBTN; i++) if (mx >= BTN_X(i) && mx < BTN_X(i) + BTN_W) return 100 + i;
+    return -1;
+}
 
 static int tool_at(int mx, int my)
 {
+    if (mx < TB_W && my >= BAR_H) { int b = btn_at(mx, my); if (b >= 0) return b; }
     if (mx >= TB_W || my < BAR_H) return -1;
     for (int i = 0; i < NTOOLS; i++) {
         if (mx >= tool_x(i) && mx < tool_x(i) + tool_w(i) && my >= BAR_H + tool_y(i) && my < BAR_H + tool_y(i) + tool_h(i)) return i;
     }
     return -1;
+}
+
+static void bpx(int x, int y, UBYTE pen) { if (x >= 0 && x < SCR_W && y >= 0 && y < SCR_H) fb[y * SCR_W + x] = pen; }
+
+/* the symbols are drawn pixel by pixel into the frame buffer (every screen depth): kind 0 undo, 1 redo, 2 pause, 3..5 play x1..x3 */
+static void btn_glyph(int kind, int x, int y, UBYTE pen)
+{
+    if (kind < 2) {                                      /* arrow with a tail: undo points left, redo right */
+        int dir = kind == 0 ? 1 : -1, tip = kind == 0 ? x + 3 : x + 15;
+        for (int r = 0; r < 5; r++) for (int k = 0; k <= r; k++) { bpx(tip + dir * k, y + 5 - r, pen); bpx(tip + dir * k, y + 5 + r, pen); }
+        for (int k = 0; k < 9; k++) { bpx(tip + dir * (4 + k), y + 5, pen); bpx(tip + dir * (4 + k), y + 6, pen); }
+        for (int k = 0; k < 4; k++) { bpx(tip + dir * 12, y + 7 + k, pen); bpx(tip + dir * 11, y + 7 + k, pen); }
+    } else if (kind == 2) {                              /* two bars */
+        for (int r = 0; r < 10; r++) for (int k = 0; k < 3; k++) { bpx(x + 4 + k, y + 1 + r, pen); bpx(x + 11 + k, y + 1 + r, pen); }
+    } else {                                              /* one to three triangles pointing right */
+        int n = kind - 2, start = x + (18 - (4 + (n - 1) * 5)) / 2;
+        for (int t = 0; t < n; t++)
+            for (int c = 0; c < 4; c++)
+                for (int r = 0; r < 5 - c; r++) {         /* the half height shrinks towards the tip */
+                    bpx(start + t * 5 + c, y + 5 - r, pen);
+                    bpx(start + t * 5 + c, y + 5 + r, pen);
+                }
+    }
+}
+
+static void draw_tool_buttons(void)
+{
+    int y = btn_y();
+    if (y + BTN_H > SCR_H) return;
+    for (int i = 0; i < NBTN; i++) {
+        UBYTE bg = (i >= 2 && SimSpeed == i - 2) ? PEN_SEL : PEN_BTN;
+        for (int r = 0; r < BTN_H; r++) memset(fb + (y + r) * SCR_W + BTN_X(i), bg, BTN_W);
+        btn_glyph(i, BTN_X(i) + 2, y + 4, PEN_TEXT);
+    }
 }
 
 static void draw_toolbar(void)
@@ -518,8 +568,18 @@ static void draw_toolbar(void)
             }
         }
     }
+    draw_tool_buttons();
     }
-    {   int t = tool_hover >= 0 ? tool_hover : editor.tool_state;              /* name and cost of the tool under the mouse, else of the chosen one */
+    if (tool_hover >= 100) {                                           /* a small button: its name */
+        static const char *const bname[NBTN] = { N_("Undo"), N_("Redo"), N_("Pause"), N_("Slow"), N_("Medium"), N_("Fast") };
+        if (tool_hover - 100 < NBTN) {
+            gfx_target(fb, SCR_W);
+            gfx_colors(PEN_V_YELLOW, PEN_BAR);
+            sprintf(line, "%-17.17s", T(bname[tool_hover - 100]));
+            gfx_print(6, BAR_H + 14, line);
+            gfx_print(6, BAR_H + 30, "                 ");
+        }
+    } else {   int t = tool_hover >= 0 ? tool_hover : editor.tool_state;              /* name and cost of the tool under the mouse, else of the chosen one */
         if (t >= 0 && t < NTOOLS) {
             gfx_target(fb, SCR_W);
             gfx_colors(tool_hover >= 0 ? PEN_V_YELLOW : PEN_TEXT, PEN_BAR);
@@ -630,7 +690,7 @@ struct panel {
 enum { P_NOTICE, P_BUDGET, P_EVAL, P_GRAPH, P_QUERY, P_MAP, P_SOUND, NPANELS };
 #define QUERY_X 0
 #define QUERY_Y 0
-#define QUERY_W 236
+#define QUERY_W 280
 #define QUERY_H 112
 #define MAPWIN_W (MV_W + 2)
 #define MAPWIN_H (MV_H + 2)
@@ -649,7 +709,9 @@ static void draw_query(void)
     gfx_target(scratch, SCRATCH_STRIDE);
     gfx_colors(PEN_TEXT, PEN_BAR);
     gfx_print(QUERY_X + 8, QUERY_Y + 18, T("Query zone status"));
-    for (int i = 0; i < 6; i++) { gfx_print(QUERY_X + 8, QUERY_Y + 36 + i * 13, T(label[i])); gfx_print(QUERY_X + 8 + 88, QUERY_Y + 36 + i * 13, T(query_f[i])); }
+    int lw = 0;                                         /* the value column starts after the longest label in this language (#49) */
+    for (int i = 0; i < 6; i++) { int l = (int)strlen(T(label[i])); if (l > lw) lw = l; }
+    for (int i = 0; i < 6; i++) { gfx_print(QUERY_X + 8, QUERY_Y + 36 + i * 13, T(label[i])); gfx_print(QUERY_X + 8 + lw * 8 + 12, QUERY_Y + 36 + i * 13, T(query_f[i])); }
 }
 static void close_query(void) { query_visible = 0; }
 static void close_notice(void) { notice_close(); }
@@ -877,6 +939,7 @@ static int dem_y(void)                        /* top of the demand display (fb c
     for (int i = 0; i < NTOOLS; i++) if (tool_y(i) + tool_h(i) > b) b = tool_y(i) + tool_h(i);
     return BAR_H + b + 14;
 }
+static int btn_y(void) { return dem_y() + DEM_H + 8; }
 static void draw_demand(void)
 {
     static const UBYTE pen[3] = { PEN_V_LGREEN, PEN_V_LBLUE, PEN_V_YELLOW };
@@ -2032,7 +2095,11 @@ static int real_main(int argc, char **argv)
                 if (cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) {
                     if (mx < TB_W && my >= BAR_H) {
                         int i = tool_at(mx, my);
-                        if (i >= 0) {
+                        if (i >= 100) {                               /* small buttons: undo, redo, speed */
+                            static const int cmd[NBTN] = { CMD_UNDO, CMD_REDO, CMD_PAUSE, CMD_SLOW, CMD_MEDIUM, CMD_FAST };
+                            if (i - 100 < NBTN) do_command(cmd[i - 100], win, NULL);
+                            dirty = 1;
+                        } else if (i >= 0) {
                             static const char *const tool_sound[18] = { "res", "com", "ind", "fire", "query", "police", "wire", "bulldozer", "rail",
                                                                          "road", "chalk", "eraser", "stadium", "park", "seaport", "coal", "nuclear", "airport" };
                             editor.tool_state = i; toolbar_dirty = 1; tb_label_only = 0;
@@ -2055,7 +2122,7 @@ static int real_main(int argc, char **argv)
             dirty = 1;
         }
         frame++;
-        if (SimSpeed != menu_speed) { menu_speed = SimSpeed; menu_sync(); }      /* keys, game events and the menu: the check mark follows the speed */
+        if (SimSpeed != menu_speed) { menu_speed = SimSpeed; menu_sync(); toolbar_dirty = 1; tb_label_only = 0; dirty = 1; }      /* keys, game events and the menu: the check mark follows the speed */
         if (dbg_hoverwalk) { int th = (frame % 36) / 2; if (th < NTOOLS && th != tool_hover) { tool_hover = th; if (!toolbar_dirty) tb_label_only = 1; toolbar_dirty = 1; dirty = 1; } }
         {   int ex = 0, ey = 0;                                           /* edge scrolling: which way does the mouse push? */
             int under = 0;                                    /* the pointer is really over the game window, not in the menu bar and not under a panel window (#42) */
@@ -2130,8 +2197,8 @@ static int real_main(int argc, char **argv)
         }
         if ((++title_tick & 7) == 0) {                                    /* the screen title bar shows the city's numbers */
             char t[120];
-            sprintf(t, "Micropolis %s   %s   %s   %s %ld   %s", VERSION, status_date, status_funds, T("Pop"), (long)CityPop,
-                    SimSpeed ? "" : T("(paused)"));
+            sprintf(t, "Micropolis %s   %s   %s   %s %ld   %s %d   %s", VERSION, status_date, status_funds, T("Pop"), (long)CityPop,
+                    T("Speed"), (int)SimSpeed, SimSpeed ? "" : T("(paused)"));
             set_screen_title(t);
         }
         sync_panels();

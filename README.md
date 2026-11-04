@@ -62,7 +62,7 @@ question on again. `SIZE=` (ToolType or argument) skips the question and uses th
 | Build | click or drag on the map; the white frame shows what will be built |
 | Scroll | W A S D, mouse wheel, or move the mouse to the screen edge. With the overview map open: click or drag in it |
 | Menus | right mouse button: Project, Speed, Options, Windows, Map, Disasters |
-| Speed | `0` pause, `1` slow, `2` medium, `3` fast (or the Speed menu) |
+| Speed | `0` pause, `1` slow, `2` medium, `3` fast (or the Speed menu, or the four small buttons in the tool palette; the current speed is highlighted) |
 | Budget | Windows > Budget (taxes, road/fire/police funding; Continue / Cancel) |
 | Evaluation | Windows > Evaluation (public opinion, worst problems, score) |
 | Graphs | Windows > Graphs (residential, commercial, industrial, money, crime, pollution; 10 or 120 years) |
@@ -75,7 +75,7 @@ question on again. `SIZE=` (ToolType or argument) skips the question and uses th
 | Ambient sounds | quiet loops that follow the visible part of the map: sea where it shows mostly water, traffic hum over a city, birds and wind over open land (Options > Sound options; CC0 recordings, see `tools/ambient/SOURCES.md`) |
 | Options | Auto Goto, City animation, World animation, Messages, Message windows can be switched off in the Options menu; Options > Sound options: sound on/off, ambient sounds, "Speak tool names" (off by default), volume sliders for effects and ambient sounds, and the output: the system sound (sound.datatype, Paula) or **AHI** (`ahi.device`, unit 0 to 3: sound cards, mixing without channel conflicts; falls back to the system sound when the unit cannot be opened) |
 | Animation | Options > City animation: cars on the roads, smoke. Options > World animation: the surf along the coasts (waves that roll in, break and run back) and gusts of wind that pass over woods; separate so that a slow machine can switch it off |
-| Undo / Redo | Project > Undo (Amiga+U) and Redo (Amiga+Z): the last 5 building actions (a road drawn with one drag is one step), with the money they cost; tiles the simulation changed in the meantime are left alone |
+| Undo / Redo | Project > Undo (Amiga+U) and Redo (Amiga+Z), or the two small buttons below the R C I bars: the last 5 building actions (a road drawn with one drag is one step), with the money they cost; tiles the simulation changed in the meantime are left alone |
 | Scrolling | W A S D, cursor keys, mouse wheel, or the mouse at an edge of the map: it scrolls after a short dwell and gets faster the longer the mouse stays (at the top edge the game status bar is the zone, not the first map row; nothing scrolls while the pointer is over a panel window or in the menu bar) |
 | Help | `Help` key or Project > Help (AmigaGuide document `Micropolis.guide`) |
 | Preferences | screen mode, options, speed, level and window positions are remembered (ENVARC:Micropolis.prefs) |

@@ -151,6 +151,24 @@ Flughafen
 S_73627527
 Geld:
 ; Funds:
+S_71FD4ACF
+Rückgängig
+; Undo
+S_7412E5E9
+Wiederholen
+; Redo
+S_44F9BF2D
+Pause
+; Pause
+S_6DC18ED8
+Langsam
+; Slow
+S_09BE5F96
+Mittel
+; Medium
+S_053AB7CF
+Schnell
+; Fast
 S_588F6213
 Kosten: $%d
 ; Cost: $%d
@@ -214,12 +232,6 @@ Stadt speichern
 S_4C833401
 Stadt speichern unter...
 ; Save City As...
-S_71FD4ACF
-Rückgängig
-; Undo
-S_7412E5E9
-Wiederholen
-; Redo
 S_47B3D356
 Beenden
 ; Quit
@@ -250,18 +262,6 @@ Boston 2010
 S_43862A0F
 Rio de Janeiro 2047
 ; Rio de Janeiro 2047
-S_44F9BF2D
-Pause
-; Pause
-S_6DC18ED8
-Langsam
-; Slow
-S_09BE5F96
-Mittel
-; Medium
-S_053AB7CF
-Schnell
-; Fast
 S_353E0D45
 Optionen
 ; Options

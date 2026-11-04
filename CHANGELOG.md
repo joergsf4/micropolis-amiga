@@ -2,6 +2,19 @@
 
 Older versions: see the release notes on GitHub (v0.1 to v0.8.1).
 
+## 0.8.13 (4 November 2026)
+
+### Added
+- **Six small buttons in the tool palette** (#49): below the R C I bars there are undo, redo, pause, slow, medium and fast. The
+  button of the current speed is highlighted, and the name of a button shows above the icons when the mouse is over it.
+
+### Changed
+- **Screen title bar** (#49): it shows the speed as well now (version, date, funds, population, speed). The dark status line stays for the messages.
+
+### Fixed
+- **Query window** (#49): the value column starts after the longest label of the language now; in German "Kriminalität" and
+  "Verschmutzung" no longer run into the values. The window is a little wider.
+
 ## 0.8.12 (1 November 2026)
 
 ### Changed

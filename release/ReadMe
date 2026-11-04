@@ -71,8 +71,8 @@ Tools          click a button on the left (Query, Doze, Road, Rail, Wire, Park, 
 Build          click or drag on the map; the white frame shows the area
 Scroll         W A S D, mouse wheel, mouse at the screen edge; in the overview map click or drag
 Menus          right mouse button
-Speed          0 pause, 1 slow, 2 medium, 3 fast (or menu Speed)
-Undo / Redo    Amiga+U / Amiga+Z (menu Project): the last 5 building actions, with the money they cost
+Speed          0 pause, 1 slow, 2 medium, 3 fast (or menu Speed, or the four small buttons below the R C I bars)
+Undo / Redo    Amiga+U / Amiga+Z (menu Project) or the two small buttons below the R C I bars: the last 5 building actions, with the money they cost
 Budget         menu Windows/Budget (Continue or Cancel)
 Evaluation     menu Windows/Evaluation (opinion, problems, score)
 Graphs         menu Windows/Graphs (6 histories, 10 or 120 years)
