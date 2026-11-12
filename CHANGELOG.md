@@ -2,6 +2,19 @@
 
 Older versions: see the release notes on GitHub (v0.1 to v0.8.1).
 
+## 0.8.14 (12 November 2026)
+
+### Changed
+- **Silent at Pause**: when the speed *Pause* is chosen (menu, key `0` or the button), the ambient sounds fade out and no sound
+  effects play (also not the tool names or the "boing" of the speed change). They come back with any other speed. A dialog that only
+  holds the simulation does not silence them.
+- **Status bar** (#49): the dark status line now spans the whole screen width, from the left edge (in line with the tool palette)
+  to the right end of the screen title bar.
+
+### Fixed
+- **Undo / redo buttons** (#49): the arrows have a proper pointed head now (it was drawn the wrong way round, and the shaft sat one
+  pixel off its centre).
+
 ## 0.8.13 (4 November 2026)
 
 ### Added
