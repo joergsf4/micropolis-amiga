@@ -12,6 +12,7 @@ Older versions: see the release notes on GitHub (v0.1 to v0.8.1).
   to the right end of the screen title bar.
 
 ### Fixed
+- **Screen title bar at Pause**: it shows the word "Pause" instead of "Speed 0 (paused)", so that the depth gadget no longer covers the end of the bar at 640 pixels.
 - **Undo / redo buttons** (#49): the arrows have a proper pointed head now (it was drawn the wrong way round, and the shaft sat one
   pixel off its centre).
 

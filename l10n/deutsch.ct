@@ -514,9 +514,6 @@ Der Nachrichten-Port kann nicht angelegt werden.
 S_0C38C5B7
 Das Spielfenster kann nicht geöffnet werden.
 ; Cannot open the game window.
-S_3D334790
-(Pause)
-; (paused)
 S_75AFE364
 Alle
 ; All

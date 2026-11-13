@@ -39,6 +39,8 @@
 
   Tempo: Tasten 0 (Pause) bis 3 (schnell), das Menü Tempo oder die vier
   kleinen Knöpfe unter den R-C-I-Balken (mit Zurück und Wiederholen).
+  Bei Pause ist das Spiel still: die Umgebungsgeräusche blenden aus,
+  Effekte werden nicht gespielt.
 @endnode
 
 @node TOOLS "Bauwerkzeuge"

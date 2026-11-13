@@ -514,9 +514,6 @@ Nie mozna utworzyc portu komunikatow.
 S_0C38C5B7
 Nie mozna otworzyc okna gry.
 ; Cannot open the game window.
-S_3D334790
-(pauza)
-; (paused)
 S_75AFE364
 Wszystko
 ; All

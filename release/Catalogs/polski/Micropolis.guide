@@ -36,7 +36,8 @@
   4. Otworz budzet (menu Okna/Budzet), aby ustawic podatki i fundusze.
 
   Tempo: klawisze 0 (pauza) do 3 (szybko), menu Tempo lub cztery male
-  przyciski pod paskami R C I (razem z cofnij i ponow).
+  przyciski pod paskami R C I (razem z cofnij i ponow). Przy pauzie gra
+  milczy: dzwieki otoczenia cichna, efekty nie graja.
 @endnode
 
 @node TOOLS "Narzedzia budowy"

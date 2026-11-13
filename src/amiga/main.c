@@ -2204,8 +2204,8 @@ static int real_main(int argc, char **argv)
         }
         if ((++title_tick & 7) == 0) {                                    /* the screen title bar shows the city's numbers */
             char t[120];
-            sprintf(t, "Micropolis %s   %s   %s   %s %ld   %s %d   %s", VERSION, status_date, status_funds, T("Pop"), (long)CityPop,
-                    T("Speed"), (int)SimSpeed, SimSpeed ? "" : T("(paused)"));
+            if (SimSpeed) sprintf(t, "Micropolis %s   %s   %s   %s %ld   %s %d", VERSION, status_date, status_funds, T("Pop"), (long)CityPop, T("Speed"), (int)SimSpeed);
+            else sprintf(t, "Micropolis %s   %s   %s   %s %ld   %s", VERSION, status_date, status_funds, T("Pop"), (long)CityPop, T("Pause"));   /* short: the depth gadget covers the end of the bar at 640 pixels */
             set_screen_title(t);
         }
         sync_panels();

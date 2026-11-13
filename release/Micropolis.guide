@@ -35,7 +35,8 @@
   4. Open the budget (menu Windows/Budget) to set taxes and funding.
 
   Speed: keys 0 (pause) to 3 (fast), the Speed menu, or the four small
-  buttons below the R C I bars (with undo and redo).
+  buttons below the R C I bars (with undo and redo). At Pause the game is
+  silent: the ambient sounds fade out and no effects play.
 @endnode
 
 @node TOOLS "Building tools"
