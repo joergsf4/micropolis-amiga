@@ -296,13 +296,13 @@ int ui_eval(const char *cmd)
         if (q) {
             const char *e = q, *b;
             for (b = e - 1; b > cmd && *b != '"'; b--) ;
-            if (*b == '"' && e > b + 1 && e - b - 1 < 40) { char id[44]; memcpy(id, b + 1, e - b - 1); id[e - b - 1] = 0; sound_play(id);
+            if (*b == '"' && e > b + 1 && e - b - 1 < 40) { char id[44]; memcpy(id, b + 1, e - b - 1); id[e - b - 1] = 0; if (SimMetaSpeed) sound_play(id);   /* silent at the speed "Pause" */
                 if (debug_log) { char lb[80]; sprintf(lb, "sound: %s", id); logmsg(lb); } }
         }
     }
     else if (!strncmp(cmd, "UIDidSaveCity", 13))   { save_state = 1; }
     else if (!strncmp(cmd, "UIDidntSaveCity ", 16)) { save_state = 2; copy_braced(save_msg, sizeof save_msg, cmd); }
-    else if (!strncmp(cmd, "UISetSpeed ", 11))      { if (sound_ui_ready && UserSoundOn) sound_play("boing"); }
+    else if (!strncmp(cmd, "UISetSpeed ", 11))      { if (sound_ui_ready && UserSoundOn && SimMetaSpeed) sound_play("boing"); }   /* no sound when switching to "Pause" */
     else if (!strncmp(cmd, "UISetMessage ", 13)) { if (DoMessages) { char m[200]; m[0] = 0; copy_braced(m, sizeof m, cmd); strncpy(status_msg, T(m), sizeof status_msg - 1); status_msg[sizeof status_msg - 1] = 0; } dirty = 1; }
     return 0;
 }
@@ -509,11 +509,13 @@ static void bpx(int x, int y, UBYTE pen) { if (x >= 0 && x < SCR_W && y >= 0 && 
 /* the symbols are drawn pixel by pixel into the frame buffer (every screen depth): kind 0 undo, 1 redo, 2 pause, 3..5 play x1..x3 */
 static void btn_glyph(int kind, int x, int y, UBYTE pen)
 {
-    if (kind < 2) {                                      /* arrow with a tail: undo points left, redo right */
-        int dir = kind == 0 ? 1 : -1, tip = kind == 0 ? x + 3 : x + 15;
-        for (int r = 0; r < 5; r++) for (int k = 0; k <= r; k++) { bpx(tip + dir * k, y + 5 - r, pen); bpx(tip + dir * k, y + 5 + r, pen); }
-        for (int k = 0; k < 9; k++) { bpx(tip + dir * (4 + k), y + 5, pen); bpx(tip + dir * (4 + k), y + 6, pen); }
-        for (int k = 0; k < 4; k++) { bpx(tip + dir * 12, y + 7 + k, pen); bpx(tip + dir * 11, y + 7 + k, pen); }
+    if (kind < 2) {                                      /* hooked arrow with a pointed head: undo points left, redo right (drawn for undo, mirrored for redo) */
+        #define UPX(cx, cy) bpx(kind == 0 ? x + (cx) : x + 17 - (cx), y + (cy), pen)
+        for (int c = 0; c < 4; c++)                       /* the head: the tip at column 2, it widens by one row up and down per column */
+            for (int r = 4 - c; r <= 5 + c; r++) UPX(2 + c, r);
+        for (int c = 5; c <= 16; c++) { UPX(c, 4); UPX(c, 5); }   /* the shaft, two pixels thick, centred on the head */
+        for (int r = 6; r <= 11; r++) { UPX(15, r); UPX(16, r); } /* the tail going down at the far end */
+        #undef UPX
     } else if (kind == 2) {                              /* two bars */
         for (int r = 0; r < 10; r++) for (int k = 0; k < 3; k++) { bpx(x + 4 + k, y + 1 + r, pen); bpx(x + 11 + k, y + 1 + r, pen); }
     } else {                                              /* one to three triangles pointing right */
@@ -1069,8 +1071,13 @@ static void render_frame(struct Window *win)
         gfx_colors(PEN_TEXT, PEN_BAR);
         sprintf(line, " %-9s %-18s %s %-6ld %s %d%s", status_date, status_funds, T("Pop"), (long)CityPop, T("Speed"), (int)SimSpeed,
                 SimSpeed ? "" : T(" (Pause)"));
-        { char pad[200]; sprintf(pad, "%s   %s", line, status_msg); sprintf(line, "%-78.78s", pad); }     /* padded: overwrites what an earlier, longer line left behind */
-        if (strcmp(line, last_line1)) { gfx_print(4, 12, line); strcpy(last_line1, line); status_dirty = 1; }
+        { int n = SCR_W / 8; char pad[300]; if (n > 199) n = 199;          /* the bar spans the whole screen width, like the title bar above it */
+          snprintf(pad, sizeof pad, "%s   %s", line, status_msg); sprintf(line, "%-*.*s", n, n, pad); }     /* padded: overwrites what an earlier, longer line left behind */
+        if (strcmp(line, last_line1)) {
+            gfx_print(0, 12, line);                                                  /* starts at x = 0 like the tool palette below (the leading space lines the text up with its labels) */
+            for (int y = 5; y <= 12; y++) { int x0 = 8 * (int)strlen(line); if (x0 < SCR_W) memset(fb + y * SCR_W + x0, PEN_BAR, SCR_W - x0); }   /* the rest of a width that is no multiple of 8 */
+            strcpy(last_line1, line); status_dirty = 1;
+        }
     }
     if (toolbar_dirty && !tb_label_only) demand_dirty = 1;      /* the palette was cleared: draw the demand display again */
     if (demand_dirty) {
@@ -1244,7 +1251,7 @@ static void ambient_update(void)
 {
     long water = 0, built = 0, infra = 0, total;
     int sea_dom, city_dom, nat;
-    if (!ambient_on || !UserSoundOn) { ambient_set(0, 0, 0); return; }          /* it keeps playing while the game is paused */
+    if (!ambient_on || !UserSoundOn || SimMetaSpeed == 0) { ambient_set(0, 0, 0); return; }   /* the speed "Pause" silences it (fades out); a dialog that only holds the simulation does not */
     for (int row = 0; row < VIEW_ROWS; row++) {
         for (int col = 0; col < VIEW_COLS; col++) {
             int mx = view_x + col, my = view_y + row, w, t;
@@ -2103,7 +2110,7 @@ static int real_main(int argc, char **argv)
                             static const char *const tool_sound[18] = { "res", "com", "ind", "fire", "query", "police", "wire", "bulldozer", "rail",
                                                                          "road", "chalk", "eraser", "stadium", "park", "seaport", "coal", "nuclear", "airport" };
                             editor.tool_state = i; toolbar_dirty = 1; tb_label_only = 0;
-                            if (UserSoundOn && speak_tools && editor.tool_state >= 0 && editor.tool_state < 18) sound_play(tool_sound[editor.tool_state]);   /* like the original palette */
+                            if (UserSoundOn && speak_tools && SimMetaSpeed && editor.tool_state >= 0 && editor.tool_state < 18) sound_play(tool_sound[editor.tool_state]);   /* like the original palette */
                         }
                     } else if (inview) {
                         if (editor.tool_state != queryState && editor.tool_state != chalkState && editor.tool_state != eraserState) undo_begin();   /* undo: remember the map before the stroke */
@@ -2159,7 +2166,7 @@ static int real_main(int argc, char **argv)
             st = coast_freeze >= 0 ? coast_freeze : (int)((((unsigned long)tn.tv_sec & 0xFFFF) * 1000UL + (unsigned long)(tn.tv_usec / 1000)) / (anim_slow ? 380 : 190));   /* small enough for 32 bit longs and never negative (the old product overflowed on the Amiga) */
             if (st != coast_tick) { coast_tick = st; dirty = 1; }
         }
-        { static int amb_frame; if ((++amb_frame & 31) == 0 || amb_frame == 1) ambient_update(); ambient_tick(); }
+        { static int amb_frame, amb_speed = -1; if ((++amb_frame & 31) == 0 || amb_frame == 1 || amb_speed != SimMetaSpeed) { amb_speed = SimMetaSpeed; ambient_update(); } ambient_tick(); }   /* a change of speed acts at once (Pause: fade out) */
         guide_poll();
         if (ShakeNow > 0 && shake_frames == 0) { shake_frames = 50; shake_bx = view_x; shake_by = view_y; }
         if (shake_frames > 0) {

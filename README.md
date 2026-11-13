@@ -62,7 +62,7 @@ question on again. `SIZE=` (ToolType or argument) skips the question and uses th
 | Build | click or drag on the map; the white frame shows what will be built |
 | Scroll | W A S D, mouse wheel, or move the mouse to the screen edge. With the overview map open: click or drag in it |
 | Menus | right mouse button: Project, Speed, Options, Windows, Map, Disasters |
-| Speed | `0` pause, `1` slow, `2` medium, `3` fast (or the Speed menu, or the four small buttons in the tool palette; the current speed is highlighted) |
+| Speed | `0` pause, `1` slow, `2` medium, `3` fast (or the Speed menu, or the four small buttons in the tool palette; the current speed is highlighted). At *Pause* the game is silent: the ambient sounds fade out and no effects play |
 | Budget | Windows > Budget (taxes, road/fire/police funding; Continue / Cancel) |
 | Evaluation | Windows > Evaluation (public opinion, worst problems, score) |
 | Graphs | Windows > Graphs (residential, commercial, industrial, money, crime, pollution; 10 or 120 years) |
