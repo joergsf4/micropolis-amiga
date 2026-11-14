@@ -38,7 +38,7 @@ ToolTypes (icon information; remove the parentheses to switch one on): `CITY=cit
 Command line: `Micropolis [city] [SIZE=WxH] [ASK] [DEBUG]`.
 
 **RTG drawing:** the tile set is kept in the graphics card's memory, and the card copies the tiles that changed itself; only
-tiles with something on top (cars, the cursor, surf) go over the bus. If the card has no room for it, the program falls back to
+tiles with something on top (cars, the cursor, surf) go over the bus (`BLIT=atlas`). If the card has no room for it, the program falls back to
 WritePixelArray. ToolTypes for testing on other cards (the `perf:` lines of `micropolis.log` show the time per frame):
 `BLIT=wpa` WritePixelArray for everything (as up to 0.8.14), `BLIT=p96` p96WritePixelArray and `BLIT=chunky` WriteChunkyPixels
 (8 bit screens only); `MERGE=n` lets a rectangle sent to the screen include up to n unchanged tiles to save a blit (default 0,
