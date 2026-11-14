@@ -37,6 +37,13 @@ ToolTypes (icon information; remove the parentheses to switch one on): `CITY=cit
 `DEBUG` write `micropolis.log`.
 Command line: `Micropolis [city] [SIZE=WxH] [ASK] [DEBUG]`.
 
+**RTG drawing:** the tile set is kept in the graphics card's memory, and the card copies the tiles that changed itself; only
+tiles with something on top (cars, the cursor, surf) go over the bus. If the card has no room for it, the program falls back to
+WritePixelArray. ToolTypes for testing on other cards (the `perf:` lines of `micropolis.log` show the time per frame):
+`BLIT=wpa` WritePixelArray for everything (as up to 0.8.14), `BLIT=p96` p96WritePixelArray and `BLIT=chunky` WriteChunkyPixels
+(8 bit screens only); `MERGE=n` lets a rectangle sent to the screen include up to n unchanged tiles to save a blit (default 0,
+`-1` = one blit per row run as up to 0.8.14). As arguments: `blit=wpa`, `merge=-1`.
+
 **Screen mode:** by default Micropolis asks for the screen mode (RTG or chipset) at every start (a screen mode requester, then
 "Always use this screen mode? - Always use it / Ask me next time"). With *Always use it* the mode is saved in
 `ENVARC:Micropolis.prefs` and used without asking; the menu *Options > Ask for screen mode at start* switches the
