@@ -38,6 +38,7 @@
 #include <proto/gadtools.h>
 #include <proto/asl.h>
 #include <proto/cybergraphics.h>
+#include <proto/Picasso96.h>
 #include <proto/icon.h>
 #include <proto/keymap.h>
 #include <libraries/amigaguide.h>
@@ -52,6 +53,7 @@
 static const char verstag[] __attribute__((used)) = "$VER: Micropolis " VERSION " (" VER_DATE ")";
 
 struct Library *CyberGfxBase;
+struct Library *P96Base;                       /* Picasso96API.library: only for BLIT=p96 and the atlas check */
 struct IntuitionBase *IntuitionBase;
 struct GfxBase *GfxBase;
 struct Library *GadToolsBase;
@@ -374,6 +376,7 @@ struct rect { short x0, y0, x1, y1; };          /* inclusive, frame buffer pixel
 
 static short shown[MAX_ROWS][MAX_COLS];       /* tile id last drawn in each cell, -1 = unknown */
 static UBYTE redraw[MAX_ROWS][MAX_COLS];
+static UBYTE deco[MAX_ROWS][MAX_COLS];          /* perf log: the cell shows more than its bare tile (surf, wind, sprite, cursor, ink) */
 static int full_redraw = 1;                     /* start, scroll, panel closed: redraw all cells */
 static int toolbar_dirty = 1, first_present = 1, status_dirty = 1;
 static int tb_label_only;                  /* only the name/cost label at the top of the palette changed (mouse over an icon): send just that part */
@@ -385,7 +388,7 @@ static struct rect prev_cursor;
 static int have_prev_cursor;
 static char last_line1[200];
 
-static struct { long frames, tiles, bytes, render_us, sim_us, sim_steps; } stats;   /* no doubles: the ieee double library is unreliable */
+static struct { long frames, tiles, bytes, render_us, sim_us, sim_steps, calls, bare, present_us, atlas; } stats;   /* calls: blits of the main picture; bare: changed cells that show only their tile; atlas: of those copied on the card */   /* no doubles: the ieee double library is unreliable */
 
 static int anim_hold, anim_slow;                  /* the animation stands still while the view scrolls (anim_hold frames); anim_slow: a slow machine, half the speed */
 static int coast_tick, coast_seen;                /* animation step of the surf (145 ms each); shore tiles seen in the last picture */
@@ -647,15 +650,15 @@ static void ink_prepare(void)             /* before the tiles are drawn: which c
         for (int row = 0; row < VIEW_ROWS; row++)
             for (int col = 0; col < VIEW_COLS; col++) {
                 int mx = view_x + col, my = view_y + row;
-                if (mx < WORLD_X && my < WORLD_Y && (ink_cur[my][mx] || ink_prev[my][mx])) redraw[row][col] = 1;
+                if (mx < WORLD_X && my < WORLD_Y && (ink_cur[my][mx] || ink_prev[my][mx])) { redraw[row][col] = 1; if (ink_cur[my][mx]) deco[row][col] = 1; }
             }
     }
     memcpy(ink_prev, ink_cur, sizeof ink_prev);
     ink_prev_any = any;
 }
 
-/* mark every cell touched by a pixel rectangle */
-static void mark_rect(const struct rect *r)
+/* mark every cell touched by a pixel rectangle; on_top: something is drawn there now (a sprite, the cursor), not just cleared away */
+static void mark_rect(const struct rect *r, int on_top)
 {
     int c0 = (r->x0 - TB_W) >> 4, c1 = (r->x1 - TB_W) >> 4;
     int r0 = (r->y0 - BAR_H) >> 4, r1 = (r->y1 - BAR_H) >> 4;
@@ -666,7 +669,7 @@ static void mark_rect(const struct rect *r)
     if (c1 >= VIEW_COLS) c1 = VIEW_COLS - 1;
     if (r1 >= VIEW_ROWS) r1 = VIEW_ROWS - 1;
     for (int y = r0; y <= r1; y++)
-        for (int x = c0; x <= c1; x++) redraw[y][x] = 1;
+        for (int x = c0; x <= c1; x++) { redraw[y][x] = 1; if (on_top) deco[y][x] = 1; }
 }
 
 /* ---------- panel windows ----------
@@ -741,6 +744,24 @@ static int panels_open(void)
     return n;
 }
 
+/* How the picture reaches an RTG screen (BLIT= tooltype, for measuring on real cards; chipset screens ignore it):
+ * atlas  the default: the tile set is kept in the graphics card's memory, a cell that shows only its tile is copied there by
+ *        the card (BltBitMapRastPort), everything else goes the wpa way. On a ZZ9000 in a Zorro II slot (68060, 8 bit) this
+ *        sends a frame in 8-10 ms instead of 13-15 ms. If the bitmap cannot be made, wpa is used.
+ * wpa    WritePixelArray (cybergraphics)
+ * p96    p96WritePixelArray (Picasso96API.library), 8 bit screens
+ * chunky WriteChunkyPixels (graphics.library), 8 bit screens
+ * Deeper screens always go through WriteLUTPixelArray (the frame buffer holds palette indices). */
+enum { BM_WPA, BM_P96, BM_CHUNKY, BM_ATLAS };
+static const char *const blit_name[] = { "wpa", "p96", "chunky", "atlas" };
+static int blit_mode = BM_ATLAS;
+/* MERGE= tooltype: changed cells are sent as rectangles; a rectangle may include this many unchanged cells (16x16) to save a
+ * blit. -1 = one blit per run of changed cells in a row, as up to 0.8.14. Measured on a ZZ9000 in a Zorro II slot (68060):
+ * a blit costs about 70 us, a pixel about 0.55 us (the bus), so one unchanged cell costs twice what a saved blit brings:
+ * 0 = only rectangles without unchanged cells (runs of the same columns one below the other). */
+static int merge_waste = 0;
+#define ATLAS_TALL 64                      /* the atlas: 15 columns of 64 tiles (16 x 1024 pixels each, the layout of tiles.bin) */
+static struct BitMap *atlas;
 static int true_color;                     /* screen deeper than 8 bit: blit through a colour table */
 static int planar;                         /* chipset screen (OCS/ECS/AGA): bitplanes, chunky data goes through WriteChunkyPixels */
 static int planar16;                       /* ... with only 16 colours (OCS/ECS hires): every pixel goes through lut16 first */
@@ -810,9 +831,49 @@ static void blit_buf(UBYTE *buf, int stride, int sx, int sy, struct RastPort *rp
         WriteChunkyPixels(rp, dx, dy, dx + w - 1, dy + h - 1, buf + sy * stride + sx, stride);
     else if (true_color)
         WriteLUTPixelArray(buf + sy * stride + sx, 0, 0, stride, rp, ctable, dx, dy, w, h, CTABFMT_XRGB8);
+    else if (blit_mode == BM_P96 && P96Base) {
+        struct RenderInfo ri;
+        ri.Memory = buf; ri.BytesPerRow = (WORD)stride; ri.pad = 0; ri.RGBFormat = RGBFB_CLUT;
+        p96WritePixelArray(&ri, sx, sy, rp, dx, dy, w, h);
+    } else if (blit_mode == BM_CHUNKY)
+        WriteChunkyPixels(rp, dx, dy, dx + w - 1, dy + h - 1, buf + sy * stride + sx, stride);
     else
         WritePixelArray(buf, sx, sy, stride, rp, dx, dy, w, h, RECTFMT_LUT8);
     stats.bytes += (long)w * h;
+}
+
+/* the tile set as a bitmap in the graphics card's memory (BLIT=atlas); 0 = not possible, the wpa way is used */
+static int atlas_make(struct Screen *scr)
+{
+    struct RastPort arp;
+    struct BitMap *sbm = scr->RastPort.BitMap;
+    int cols = TILE_COUNT / ATLAS_TALL;
+    char b[120];
+    atlas = AllocBitMap(cols * 16, ATLAS_TALL * 16, GetBitMapAttr(sbm, BMA_DEPTH), BMF_MINPLANES | BMF_DISPLAYABLE, sbm);
+    if (!atlas) { logmsg("atlas: AllocBitMap failed"); return 0; }
+    InitRastPort(&arp);
+    arp.BitMap = atlas;
+    for (int c = 0; c < cols; c++) {                    /* 64 tiles one below the other are 16 x 1024 pixels with a stride of 16 */
+        UBYTE *src = tiles + (long)c * ATLAS_TALL * 256;
+        if (true_color) WriteLUTPixelArray(src, 0, 0, 16, &arp, ctable, c * 16, 0, 16, ATLAS_TALL * 16, CTABFMT_XRGB8);
+        else WritePixelArray(src, 0, 0, 16, &arp, c * 16, 0, 16, ATLAS_TALL * 16, RECTFMT_LUT8);
+    }
+    WaitBlit();
+    sprintf(b, "atlas: %dx%d, depth %ld", cols * 16, ATLAS_TALL * 16, (long)GetBitMapAttr(atlas, BMA_DEPTH));
+    if (P96Base && p96GetBitMapAttr(atlas, P96BMA_ISP96)) {     /* where is it now? (P96 may move bitmaps between the card and fast RAM) */
+        struct RenderInfo ri;
+        LONG lock = p96LockBitMap(atlas, (UBYTE *)&ri, sizeof ri);
+        ULONG onb = p96GetBitMapAttr(atlas, P96BMA_ISONBOARD);
+        p96UnlockBitMap(atlas, lock);
+        sprintf(b + strlen(b), ", P96 bitmap %s", onb ? "in the card's memory" : "NOT in the card's memory");
+    }
+    logmsg(b);
+    return 1;
+}
+
+static void atlas_blit(struct RastPort *rp, int col, int row, int tile)
+{
+    BltBitMapRastPort(atlas, (tile / ATLAS_TALL) * 16, (tile % ATLAS_TALL) * 16, rp, TB_W + col * 16, BAR_H + row * 16, 16, 16, 0xC0);
 }
 
 static void blit(struct RastPort *rp, int x, int y, int w, int h)       /* main window: same coordinates */
@@ -967,6 +1028,9 @@ static void scroll_by(struct RastPort *rp, int dx, int dy)
     if (dx > 0) { sx += dx * 16; w -= dx * 16; } else if (dx < 0) { tx -= dx * 16; w += dx * 16; }
     if (dy > 0) { sy += dy * 16; h -= dy * 16; } else if (dy < 0) { ty -= dy * 16; h += dy * 16; }
     ClipBlit(rp, sx, sy, rp, tx, ty, w, h, 0xC0);
+    /* fb moves along: it must match the screen everywhere, a merged rectangle also sends cells that did not change */
+    if (ty <= sy) for (int y = 0; y < h; y++) memmove(fb + (ty + y) * SCR_W + tx, fb + (sy + y) * SCR_W + sx, w);
+    else for (int y = h - 1; y >= 0; y--) memmove(fb + (ty + y) * SCR_W + tx, fb + (sy + y) * SCR_W + sx, w);
     if (planar) WaitBlit();                               /* the blitter must be done before the CPU writes bitplanes (WriteChunkyPixels) into the same memory */
     memcpy(old, shown, sizeof old);                       /* what each tile cell showed before */
     for (int r = 0; r < VIEW_ROWS; r++)
@@ -976,6 +1040,60 @@ static void scroll_by(struct RastPort *rp, int dx, int dy)
         }
     for (int i = 0; i < n_prev_spr; i++) { prev_spr[i].x0 -= dx * 16; prev_spr[i].x1 -= dx * 16; prev_spr[i].y0 -= dy * 16; prev_spr[i].y1 -= dy * 16; }
     prev_cursor.x0 -= dx * 16; prev_cursor.x1 -= dx * 16; prev_cursor.y0 -= dy * 16; prev_cursor.y1 -= dy * 16;
+}
+
+/* Send the wanted cells of the tile view as few rectangles: runs of a row are joined across gaps of up to merge_waste cells,
+ * and a run joins the rectangle above it when that adds at most merge_waste unwanted cells (every blit has a fixed cost). */
+static void present_cells(struct RastPort *rp, UBYTE want[][MAX_COLS])
+{
+    struct mr { short c0, c1, r0, r1, area; };          /* cells, inclusive; area = cells already inside */
+    struct mr open[MAX_COLS * 2], next[MAX_COLS * 2];
+    int n_open = 0;
+    for (int row = 0; row <= VIEW_ROWS; row++) {
+        struct { short c0, c1; char used; } run[MAX_COLS];
+        int n_run = 0, n_next = 0;
+        if (row < VIEW_ROWS)
+            for (int col = 0; col < VIEW_COLS; ) {
+                int c0;
+                if (!want[row][col]) { col++; continue; }
+                c0 = col;
+                while (col < VIEW_COLS && want[row][col]) col++;
+                if (merge_waste >= 0 && n_run && c0 - run[n_run - 1].c1 - 1 <= merge_waste) run[n_run - 1].c1 = col - 1;
+                else { run[n_run].c0 = c0; run[n_run].c1 = col - 1; run[n_run].used = 0; n_run++; }
+            }
+        for (int i = 0; i < n_open; i++) {
+            struct mr *o = &open[i];
+            int k = -1;
+            if (merge_waste >= 0)
+                for (int j = 0; j < n_run && k < 0; j++) {
+                    int c0, c1, span = run[j].c1 - run[j].c0 + 1;
+                    if (run[j].used) continue;
+                    c0 = o->c0 < run[j].c0 ? o->c0 : run[j].c0;
+                    c1 = o->c1 > run[j].c1 ? o->c1 : run[j].c1;
+                    if ((c1 - c0 + 1) * (o->r1 - o->r0 + 2) - o->area - span <= merge_waste) k = j;
+                }
+            if (k < 0) {                                     /* the rectangle ends here */
+                blit(rp, TB_W + o->c0 * 16, BAR_H + o->r0 * 16, (o->c1 - o->c0 + 1) * 16, (o->r1 - o->r0 + 1) * 16);
+                stats.calls++;
+                continue;
+            }
+            run[k].used = 1;
+            next[n_next] = *o;
+            if (run[k].c0 < next[n_next].c0) next[n_next].c0 = run[k].c0;
+            if (run[k].c1 > next[n_next].c1) next[n_next].c1 = run[k].c1;
+            next[n_next].r1 = (short)row;
+            next[n_next].area = (short)((next[n_next].c1 - next[n_next].c0 + 1) * (row - next[n_next].r0 + 1));
+            n_next++;
+        }
+        for (int j = 0; j < n_run; j++) {                     /* runs that joined nothing start a rectangle */
+            if (run[j].used) continue;
+            next[n_next].c0 = run[j].c0; next[n_next].c1 = run[j].c1; next[n_next].r0 = next[n_next].r1 = (short)row;
+            next[n_next].area = (short)(run[j].c1 - run[j].c0 + 1);
+            n_next++;
+        }
+        memcpy(open, next, n_next * sizeof *open);
+        n_open = n_next;
+    }
 }
 
 static void render_frame(struct Window *win)
@@ -1010,6 +1128,7 @@ static void render_frame(struct Window *win)
     /* which cells changed? */
     static int coast_drawn = -1;
     int coast_now = 0, coast_moved = coast_drawn != coast_tick;
+    memset(deco, 0, sizeof deco);
 
     for (int row = 0; row < VIEW_ROWS; row++) {
         for (int col = 0; col < VIEW_COLS; col++) {
@@ -1020,10 +1139,10 @@ static void render_frame(struct Window *win)
                 if (blink && (tile & ZONEBIT) && !(tile & PWRBIT)) tile = LIGHTNINGBOLT;
                 else tile &= LOMASK;
             }
-            if (world_anim && coast_has(tile)) { coast_now++; if (coast_moved) redraw[row][col] = 1; }
+            if (world_anim && coast_has(tile)) { coast_now++; deco[row][col] = 1; if (coast_moved) redraw[row][col] = 1; }
             else if (world_anim && wind_has(tile)) {                /* only trees a gust touches now or touched one step ago */
                 int wx = mx << 4, wy = my << 4;
-                coast_now++;
+                coast_now++; deco[row][col] = 1;
                 if (coast_moved && (wind_active(wx, wy, coast_tick) || wind_active(wx, wy, coast_drawn))) redraw[row][col] = 1;
             }
             if (tile != shown[row][col]) { redraw[row][col] = 1; shown[row][col] = tile; }
@@ -1035,14 +1154,14 @@ static void render_frame(struct Window *win)
     /* moving things: redraw the cells under their old and new positions */
     for (SimSprite *sp = sim->sprite; sp && n_spr < MAX_SPR; sp = sp->next) {
         if (sprite_rect(sp, &cur_spr[n_spr], &spr_px[n_spr], &spr_w[n_spr], &spr_h[n_spr])) {
-            mark_rect(&cur_spr[n_spr]);
+            mark_rect(&cur_spr[n_spr], 1);
             n_spr++;
         }
     }
-    for (int i = 0; i < n_prev_spr; i++) mark_rect(&prev_spr[i]);
+    for (int i = 0; i < n_prev_spr; i++) mark_rect(&prev_spr[i], 0);
     have_cursor = cursor_rect(&cur);
-    if (have_cursor) mark_rect(&cur);
-    if (have_prev_cursor) mark_rect(&prev_cursor);
+    if (have_cursor) mark_rect(&cur, 1);
+    if (have_prev_cursor) mark_rect(&prev_cursor, 0);
 
     ink_prepare();
 
@@ -1093,32 +1212,39 @@ static void render_frame(struct Window *win)
     }
 
     /* send the changes to the screen */
+    gettimeofday(&t_a, NULL);
     if (first_present) {
         blit(rp, 0, 0, SCR_W, SCR_H);
         first_present = 0;
     } else {
-        for (int row = 0; row < VIEW_ROWS; row++) {
-            int col = 0;
-            while (col < VIEW_COLS) {
-                int c0;
-                if (!redraw[row][col]) { col++; continue; }
-                c0 = col;
-                while (col < VIEW_COLS && redraw[row][col]) col++;
-                blit(rp, TB_W + c0 * 16, BAR_H + row * 16, (col - c0) * 16, 16);
+        static UBYTE want[MAX_ROWS][MAX_COLS];               /* cells that go from fb to the screen */
+        for (int row = 0; row < VIEW_ROWS; row++)
+            for (int col = 0; col < VIEW_COLS; col++) {
+                int bare = redraw[row][col] && !deco[row][col];
+                stats.bare += bare;
+                if (bare && atlas) { atlas_blit(rp, col, row, shown[row][col]); stats.calls++; stats.atlas++; want[row][col] = 0; }
+                else want[row][col] = redraw[row][col];
             }
-        }
-        if (toolbar_dirty) blit(rp, 0, BAR_H, TB_W, tb_label_only ? TB_LABEL_H : SCR_H - BAR_H);
-        if (demand_dirty) blit(rp, DEM_X, dem_y(), DEM_W, DEM_H);
-        if (status_dirty) blit(rp, 0, 0, SCR_W, BAR_H);
+        present_cells(rp, want);
+        if (toolbar_dirty) { blit(rp, 0, BAR_H, TB_W, tb_label_only ? TB_LABEL_H : SCR_H - BAR_H); stats.calls++; }
+        if (demand_dirty) { blit(rp, DEM_X, dem_y(), DEM_W, DEM_H); stats.calls++; }
+        if (status_dirty) { blit(rp, 0, 0, SCR_W, BAR_H); stats.calls++; }
     }
+    stats.present_us += elapsed_us();
 
     toolbar_dirty = 0; tb_label_only = 0; status_dirty = 0; demand_dirty = 0;
 
     if (++stats.frames >= 200) {                     /* performance log for tuning on slow machines */
-        char b[160];
+        char b[200];
         sprintf(b, "perf: %ld frames, render %ld us/frame, %ld tiles/frame, %ld KB blit/frame; %ld sim steps, %ld us/step",
                 stats.frames, stats.render_us / stats.frames, stats.tiles / stats.frames,
                 stats.bytes / stats.frames / 1024, stats.sim_steps, stats.sim_steps ? stats.sim_us / stats.sim_steps : 0L);
+        logmsg(b);
+        /* present: time to send the changes to the screen (bus); bare: blitted cells that show only their tile, the part a tile
+         * set kept in the graphics card's memory could copy on the card instead (pixels: times bytes per pixel on deep screens) */
+        sprintf(b, "perf: blit=%s merge=%d: present %ld us/frame, %ld blits/frame (%ld atlas), %ld bare tiles/frame (%ld of %ld pixels)",
+                atlas ? "atlas" : blit_name[blit_mode], merge_waste, stats.present_us / stats.frames, stats.calls / stats.frames,
+                stats.atlas / stats.frames, stats.bare / stats.frames, stats.bare * 256 / stats.frames, stats.bytes / stats.frames);
         logmsg(b);
         memset(&stats, 0, sizeof stats);
     }
@@ -1597,6 +1723,13 @@ static int size_forced;                   /* SIZE= given: use exactly that size,
 static char tt_city[200];
 static int  tt_debug;
 static int  force_depth;                 /* depth=NN argument for testing other screen depths */
+static int  blit_arg(const char *v)      /* BLIT= tooltype / blit= argument: how the picture reaches an RTG screen */
+{
+    if (!strcasecmp(v, "wpa")) return BM_WPA;
+    if (!strcasecmp(v, "p96")) return BM_P96;
+    if (!strcasecmp(v, "chunky")) return BM_CHUNKY;
+    return BM_ATLAS;
+}
 
 static void read_tooltypes(int argc, char **argv)
 {
@@ -1611,6 +1744,8 @@ static void read_tooltypes(int argc, char **argv)
                 if ((v = FindToolType((CONST_STRPTR *)dobj->do_ToolTypes, (CONST_STRPTR)"SIZE"))) { sscanf((char *)v, "%dx%d", &req_w, &req_h); size_forced = 1; }
                 if ((v = FindToolType((CONST_STRPTR *)dobj->do_ToolTypes, (CONST_STRPTR)"LANGUAGE"))) { strncpy(arg_lang, (char *)v, sizeof arg_lang - 1); }
                 if ((v = FindToolType((CONST_STRPTR *)dobj->do_ToolTypes, (CONST_STRPTR)"MODE")) && !strcasecmp((char *)v, "ASK")) ask_mode_flag = 1;
+                if ((v = FindToolType((CONST_STRPTR *)dobj->do_ToolTypes, (CONST_STRPTR)"BLIT"))) blit_mode = blit_arg((char *)v);
+                if ((v = FindToolType((CONST_STRPTR *)dobj->do_ToolTypes, (CONST_STRPTR)"MERGE"))) merge_waste = atoi((char *)v);
             }
             FreeDiskObject(dobj);
         }
@@ -1621,6 +1756,8 @@ static void read_tooltypes(int argc, char **argv)
         else if (!strncasecmp(argv[i], "size=", 5)) { sscanf(argv[i] + 5, "%dx%d", &req_w, &req_h); size_forced = 1; }
         else if (!strcasecmp(argv[i], "ask")) ask_mode_flag = 1;
         else if (!strncasecmp(argv[i], "lang=", 5)) strncpy(arg_lang, argv[i] + 5, sizeof arg_lang - 1);
+        else if (!strncasecmp(argv[i], "blit=", 5)) blit_mode = blit_arg(argv[i] + 5);
+        else if (!strncasecmp(argv[i], "merge=", 6)) merge_waste = atoi(argv[i] + 6);
     }
 }
 
@@ -1761,7 +1898,8 @@ static int real_main(int argc, char **argv)
     read_tooltypes(argc, argv);
     prefs_load();
     debug_log = tt_debug;
-    if (argc > 1 && strcasecmp(argv[1], "debug") && strncasecmp(argv[1], "depth=", 6) && strncasecmp(argv[1], "size=", 5) && strcasecmp(argv[1], "ask") && strncasecmp(argv[1], "lang=", 5)) {
+    if (argc > 1 && strcasecmp(argv[1], "debug") && strncasecmp(argv[1], "depth=", 6) && strncasecmp(argv[1], "size=", 5) && strcasecmp(argv[1], "ask") && strncasecmp(argv[1], "lang=", 5)
+        && strncasecmp(argv[1], "blit=", 5) && strncasecmp(argv[1], "merge=", 6)) {
         city = argv[1];                                  /* given on the command line: relative to the current directory */
     } else {                                             /* default / CITY tooltype: relative to the program's drawer */
         const char *c = tt_city[0] ? tt_city : "cities/haight.cty";
@@ -1924,6 +2062,13 @@ static int real_main(int argc, char **argv)
     }
 
     logmsg("window open");
+    if (!planar) {
+        if (blit_mode == BM_P96 || blit_mode == BM_ATLAS) P96Base = OpenLibrary((CONST_STRPTR)"Picasso96API.library", 2);
+        if (blit_mode == BM_P96 && (!P96Base || true_color)) { logmsg(P96Base ? "blit=p96: only on 8 bit screens" : "blit=p96: no Picasso96API.library"); blit_mode = BM_WPA; }
+        if (blit_mode == BM_CHUNKY && true_color) { logmsg("blit=chunky: only on 8 bit screens"); blit_mode = BM_WPA; }
+        if (blit_mode == BM_ATLAS && !atlas_make(scr)) blit_mode = BM_WPA;
+    }
+    { char b[80]; sprintf(b, "blit: %s, merge %d", planar ? "chipset" : blit_name[blit_mode], merge_waste); logmsg(b); }
     sound_init();
     if (pref_sndout) sound_set_output(pref_sndout);               /* AHI from the preferences (falls back to the system sound when the unit cannot be opened) */
     if (GadToolsBase) {
@@ -2247,8 +2392,10 @@ out:
     if (vi) FreeVisualInfo(vi);
     if (idcmp_port) DeleteMsgPort(idcmp_port);
     logmsg("window closed");
+    if (atlas) { WaitBlit(); FreeBitMap(atlas); atlas = NULL; }
     if (scr) CloseScreen(scr);
     logmsg("screen closed");
+    if (P96Base) { CloseLibrary(P96Base); P96Base = NULL; }
     if (fb) FreeVec(fb);
     if (scratch) FreeVec(scratch);
     if (CyberGfxBase) CloseLibrary(CyberGfxBase);

@@ -2,6 +2,22 @@
 
 Older versions: see the release notes on GitHub (v0.1 to v0.8.1).
 
+## 0.8.15 (14 November 2026)
+
+### Changed
+- **Faster drawing on RTG cards**: the tile set is kept as a bitmap in the graphics card's memory, and the card copies every
+  changed tile that shows nothing else (no car, cursor, surf) itself, so its pixels no longer go over the bus. On an A2000 with a
+  68060 and a ZZ9000 in a Zorro II slot (8 bit) a frame reaches the screen in 8-10 ms instead of 13-15 ms. If the card has no
+  room for the bitmap, WritePixelArray is used as before (the log says so).
+- **Fewer blits per frame**: runs of changed tiles with the same columns in rows one below the other go to the screen as one
+  rectangle. Unchanged tiles are not sent along by default: on that machine a pixel costs about 0.55 µs on the bus and a blit
+  about 70 µs, so an extra tile costs more than the saved blit.
+
+### Added
+- **ToolTypes for testing** on other cards: `BLIT=wpa|p96|chunky` (WritePixelArray for everything as before, p96WritePixelArray,
+  WriteChunkyPixels) and `MERGE=n` (a rectangle may include n unchanged tiles; `-1` = as before). With `DEBUG` the log shows the
+  time to send each frame to the screen, the number of blits and how many tiles the card copied itself.
+
 ## 0.8.14 (12 November 2026)
 
 ### Changed
