@@ -20,8 +20,7 @@ C code; Tcl/Tk and X11 were replaced by an Amiga user interface.
 | **Sound** | via the system `sound.datatype` (datatypes.library, OS 3.0+): the original sound effects as 8SVX samples; they are loaded when first played. AHI is supported (tested with AHI 4.18). |
 | **CPU libraries** | the right `680x0.library` for your CPU (68030/68040/68060), as AmigaOS 3.2 asks for |
 
-On an emulator: FS-UAE with `graphics_card = uaegfx-z3` (Zorro III) and Picasso96 installed.
-There is no AGA/OCS version.
+On an emulator: FS-UAE with `graphics_card = uaegfx-z3` (Zorro III) and Picasso96 installed, or WinUAE with a virtual Picasso II+ graphics card and a current version of P96.
 
 ## Install
 
