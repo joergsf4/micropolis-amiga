@@ -17,7 +17,7 @@ C code; Tcl/Tk and X11 were replaced by an Amiga user interface.
 | **RAM** | 2 MB Chip + 2 MB Fast or more (the program itself takes about 1.5 MB) |
 | **Graphics** | RTG card with Picasso96 or CyberGraphX (`cybergraphics.library` 40+) and a screen mode between 640x480 and 800x600 (4:3 / 5:4 shape; 8, 15, 16, 24 or 32 bit; 8 bit is used when available). **Or the Amiga chipset** (Kickstart 3.1, no card needed): AGA with 256 colours, OCS/ECS with 16 colours, in a hires interlaced mode of at least 640x400 (PAL 640x512, NTSC 640x400) |
 | **System files** | `mathieeedoubbas.library`, `mathieeedoubtrans.library` (in `LIBS:` of any Workbench), `gadtools.library`, `asl.library` |
-| **Sound** | via the system `sound.datatype` (datatypes.library, OS 3.0+): the original sound effects as 8SVX samples; they are loaded when first played |
+| **Sound** | via the system `sound.datatype` (datatypes.library, OS 3.0+): the original sound effects as 8SVX samples; they are loaded when first played. AHI is supported (tested with AHI 4.18). |
 | **CPU libraries** | the right `680x0.library` for your CPU (68030/68040/68060), as AmigaOS 3.2 asks for |
 
 On an emulator: FS-UAE with `graphics_card = uaegfx-z3` (Zorro III) and Picasso96 installed.
