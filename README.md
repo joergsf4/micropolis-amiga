@@ -22,6 +22,9 @@ C code; Tcl/Tk and X11 were replaced by an Amiga user interface.
 
 On an emulator: FS-UAE with `graphics_card = uaegfx-z3` (Zorro III) and Picasso96 installed, or WinUAE with a virtual Picasso II+ graphics card and a current version of P96.
 
+## [Micropolis Public Name License](https://github.com/suessthomas/micropolis-amiga/blob/main/MicropolisPublicNameLicense.md)
+The name/term "MICROPOLIS" is a registered trademark owned by and exclusively licensed to Micropolis GmbH (Micropolis Corporation, the "licensor"). It is here (upstream) licensed to the authors/publishers of the "Micropolis" city simulation game and its source code (the project or "licensee(s)").
+
 ## Install
 
 Unpack the archive anywhere, e.g. `lha x Micropolis-0.2.lha Work:`, then double-click the `Micropolis`
