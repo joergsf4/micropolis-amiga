@@ -744,17 +744,28 @@ static int panels_open(void)
     return n;
 }
 
-/* How the picture reaches an RTG screen (BLIT= tooltype, for measuring on real cards; chipset screens ignore it):
- * atlas  the default: the tile set is kept in the graphics card's memory, a cell that shows only its tile is copied there by
- *        the card (BltBitMapRastPort), everything else goes the wpa way. On a ZZ9000 in a Zorro II slot (68060, 8 bit) this
- *        sends a frame in 8-10 ms instead of 13-15 ms. If the bitmap cannot be made, wpa is used.
+/* How the picture reaches an RTG screen (BLIT= tooltype; chipset screens ignore it):
+ * auto   the default: measures atlas and wpa for a few seconds after the start and keeps the faster one (see auto_step)
+ * atlas  the tile set is kept in the graphics card's memory, a cell that shows only its tile is copied there by the card
+ *        (BltBitMapRastPort), everything else goes the wpa way. Wins where the bus is slow and the CPU fast: on a ZZ9000 in a
+ *        Zorro II slot (68060, 8 bit) a frame goes out in 8-10 ms instead of 13-15 ms. Loses on a slow CPU, where every blit
+ *        costs ~0.5 ms in graphics.library and the driver: A3000 68030 (FS-UAE, real speed, Picasso IV) 36-69 ms against 15-18 ms.
+ *        If the bitmap cannot be made, wpa is used.
  * wpa    WritePixelArray (cybergraphics)
  * p96    p96WritePixelArray (Picasso96API.library), 8 bit screens
  * chunky WriteChunkyPixels (graphics.library), 8 bit screens
  * Deeper screens always go through WriteLUTPixelArray (the frame buffer holds palette indices). */
-enum { BM_WPA, BM_P96, BM_CHUNKY, BM_ATLAS };
-static const char *const blit_name[] = { "wpa", "p96", "chunky", "atlas" };
-static int blit_mode = BM_ATLAS;
+enum { BM_WPA, BM_P96, BM_CHUNKY, BM_ATLAS, BM_AUTO };
+static const char *const blit_name[] = { "wpa", "p96", "chunky", "atlas", "auto" };
+static int blit_mode = BM_AUTO;
+/* BLIT=auto: phase 0 sends with the atlas, phase 1 without it; each phase lasts until AUTO_FRAMES frames with together at least
+ * AUTO_CELLS changed cells were sent (frames with more than AUTO_MAX_CELLS, full redraws, do not count). The time per changed
+ * cell decides; the atlas is freed when wpa wins. */
+#define AUTO_FRAMES 100
+#define AUTO_CELLS 3000
+#define AUTO_MAX_CELLS 200
+static int auto_phase;
+static long auto_us[2], auto_cells[2], auto_frames[2];
 /* MERGE= tooltype: changed cells are sent as rectangles; a rectangle may include this many unchanged cells (16x16) to save a
  * blit. -1 = one blit per run of changed cells in a row, as up to 0.8.14. Measured on a ZZ9000 in a Zorro II slot (68060):
  * a blit costs about 70 us, a pixel about 0.55 us (the bus), so one unchanged cell costs twice what a saved blit brings:
@@ -874,6 +885,24 @@ static int atlas_make(struct Screen *scr)
 static void atlas_blit(struct RastPort *rp, int col, int row, int tile)
 {
     BltBitMapRastPort(atlas, (tile / ATLAS_TALL) * 16, (tile % ATLAS_TALL) * 16, rp, TB_W + col * 16, BAR_H + row * 16, 16, 16, 0xC0);
+}
+
+/* BLIT=auto: one frame of the tile view was sent (cells changed cells in us microseconds) */
+static void auto_step(int cells, long us)
+{
+    char b[200];
+    if (cells <= 0 || cells > AUTO_MAX_CELLS) return;
+    auto_us[auto_phase] += us; auto_cells[auto_phase] += cells; auto_frames[auto_phase]++;
+    if (auto_frames[auto_phase] < AUTO_FRAMES || auto_cells[auto_phase] < AUTO_CELLS) return;
+    if (auto_phase == 0) { auto_phase = 1; return; }      /* now the same without the atlas */
+    {   long a = auto_us[0] * 10 / auto_cells[0], w = auto_us[1] * 10 / auto_cells[1];       /* tenths of a microsecond per cell */
+        int keep = a < w;
+        sprintf(b, "blit auto: atlas %ld.%ld us/cell (%ld cells, %ld frames), wpa %ld.%ld us/cell (%ld cells, %ld frames): using %s",
+                a / 10, a % 10, auto_cells[0], auto_frames[0], w / 10, w % 10, auto_cells[1], auto_frames[1], keep ? "atlas" : "wpa");
+        logmsg(b);
+        if (keep) blit_mode = BM_ATLAS;
+        else { blit_mode = BM_WPA; WaitBlit(); FreeBitMap(atlas); atlas = NULL; }
+    }
 }
 
 static void blit(struct RastPort *rp, int x, int y, int w, int h)       /* main window: same coordinates */
@@ -1234,14 +1263,22 @@ static void render_frame(struct Window *win)
         first_present = 0;
     } else {
         static UBYTE want[MAX_ROWS][MAX_COLS];               /* cells that go from fb to the screen */
+        int use_atlas = atlas && !(blit_mode == BM_AUTO && auto_phase == 1), cells = 0;
+        struct timeval tv0, tv1;
+        gettimeofday(&tv0, NULL);
         for (int row = 0; row < VIEW_ROWS; row++)
             for (int col = 0; col < VIEW_COLS; col++) {
                 int bare = redraw[row][col] && !deco[row][col];
                 stats.bare += bare;
-                if (bare && atlas) { atlas_blit(rp, col, row, shown[row][col]); stats.calls++; stats.atlas++; want[row][col] = 0; }
+                cells += redraw[row][col];
+                if (bare && use_atlas) { atlas_blit(rp, col, row, shown[row][col]); stats.calls++; stats.atlas++; want[row][col] = 0; }
                 else want[row][col] = redraw[row][col];
             }
         present_cells(rp, want);
+        if (blit_mode == BM_AUTO) {
+            gettimeofday(&tv1, NULL);
+            auto_step(cells, (long)(tv1.tv_sec - tv0.tv_sec) * 1000000L + (long)(tv1.tv_usec - tv0.tv_usec));
+        }
         if (toolbar_dirty) { blit(rp, 0, BAR_H, TB_W, tb_label_only ? TB_LABEL_H : SCR_H - BAR_H); stats.calls++; }
         if (demand_dirty) { blit(rp, DEM_X, dem_y(), DEM_W, DEM_H); stats.calls++; }
         if (status_dirty) { blit(rp, 0, 0, SCR_W, BAR_H); stats.calls++; }
@@ -1259,7 +1296,7 @@ static void render_frame(struct Window *win)
         /* present: time to send the changes to the screen (bus); bare: blitted cells that show only their tile, the part a tile
          * set kept in the graphics card's memory could copy on the card instead (pixels: times bytes per pixel on deep screens) */
         sprintf(b, "perf: blit=%s merge=%d: present %ld us/frame, %ld blits/frame (%ld atlas), %ld bare tiles/frame (%ld of %ld pixels)",
-                atlas ? "atlas" : blit_name[blit_mode], merge_waste, stats.present_us / stats.frames, stats.calls / stats.frames,
+                blit_mode == BM_AUTO ? (auto_phase ? "auto(wpa)" : "auto(atlas)") : blit_name[blit_mode], merge_waste, stats.present_us / stats.frames, stats.calls / stats.frames,
                 stats.atlas / stats.frames, stats.bare / stats.frames, stats.bare * 256 / stats.frames, stats.bytes / stats.frames);
         logmsg(b);
         memset(&stats, 0, sizeof stats);
@@ -1744,7 +1781,8 @@ static int  blit_arg(const char *v)      /* BLIT= tooltype / blit= argument: how
     if (!strcasecmp(v, "wpa")) return BM_WPA;
     if (!strcasecmp(v, "p96")) return BM_P96;
     if (!strcasecmp(v, "chunky")) return BM_CHUNKY;
-    return BM_ATLAS;
+    if (!strcasecmp(v, "atlas")) return BM_ATLAS;
+    return BM_AUTO;
 }
 
 static void read_tooltypes(int argc, char **argv)
@@ -2079,11 +2117,11 @@ static int real_main(int argc, char **argv)
 
     logmsg("window open");
     if (!planar) {
-        if (blit_mode == BM_P96 || blit_mode == BM_ATLAS) P96Base = OpenLibrary((CONST_STRPTR)"Picasso96API.library", 2);
+        if (blit_mode == BM_P96 || blit_mode == BM_ATLAS || blit_mode == BM_AUTO) P96Base = OpenLibrary((CONST_STRPTR)"Picasso96API.library", 2);
         if (blit_mode == BM_P96 && (!P96Base || true_color)) { logmsg(P96Base ? "blit=p96: only on 8 bit screens" : "blit=p96: no Picasso96API.library"); blit_mode = BM_WPA; }
         if (blit_mode == BM_CHUNKY && true_color) { logmsg("blit=chunky: only on 8 bit screens"); blit_mode = BM_WPA; }
-        if (blit_mode == BM_ATLAS && !atlas_make(scr)) blit_mode = BM_WPA;
-    }
+        if ((blit_mode == BM_ATLAS || blit_mode == BM_AUTO) && !atlas_make(scr)) blit_mode = BM_WPA;
+    } else blit_mode = BM_WPA;                                    /* chipset: WriteChunkyPixels, nothing to choose */
     { char b[80]; sprintf(b, "blit: %s, merge %d", planar ? "chipset" : blit_name[blit_mode], merge_waste); logmsg(b); }
     sound_init();
     if (pref_sndout) sound_set_output(pref_sndout);               /* AHI from the preferences (falls back to the system sound when the unit cannot be opened) */

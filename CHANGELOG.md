@@ -2,6 +2,16 @@
 
 Older versions: see the release notes on GitHub (v0.1 to v0.8.1).
 
+## Unreleased
+
+### Changed
+- **RTG drawing chooses itself** (`BLIT=auto`, the new default): for the first seconds after the start Micropolis sends the
+  picture once with the tile set in the graphics card's memory (0.8.15) and once with WritePixelArray, and keeps the faster
+  way. The tile set wins with a fast CPU and a slow bus (68060 with a ZZ9000 in a Zorro II slot: 8-10 ms per frame instead of
+  13-15 ms), but on a 68030 every single blit costs about 0.5 ms of CPU time, and there WritePixelArray is two to four times
+  faster (A3000 with a Picasso IV in FS-UAE at real speed: 15-18 ms instead of 36-69 ms). `BLIT=atlas` and `BLIT=wpa` still
+  choose by hand.
+
 ## 0.8.15 (14 November 2026)
 
 ### Changed
