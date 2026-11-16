@@ -1,5 +1,7 @@
 # Micropolis for AmigaOS 3
 
+<img width="1139" height="1111" alt="2026-11-15_Micropolis" src="https://github.com/user-attachments/assets/cbd4db64-3e17-4dd5-a1f7-da38cf63c2f6" />
+
 Micropolis (the open-source version of the original SimCity) for the Amiga with a native
 Intuition front end and **RTG** graphics (Picasso96 / CyberGraphX) or the **AGA / ECS chipset** (no graphics card needed). The simulation is the original
 C code; Tcl/Tk and X11 were replaced by an Amiga user interface.
@@ -15,11 +17,10 @@ C code; Tcl/Tk and X11 were replaced by an Amiga user interface.
 | **RAM** | 2 MB Chip + 2 MB Fast or more (the program itself takes about 1.5 MB) |
 | **Graphics** | RTG card with Picasso96 or CyberGraphX (`cybergraphics.library` 40+) and a screen mode between 640x480 and 800x600 (4:3 / 5:4 shape; 8, 15, 16, 24 or 32 bit; 8 bit is used when available). **Or the Amiga chipset** (Kickstart 3.1, no card needed): AGA with 256 colours, OCS/ECS with 16 colours, in a hires interlaced mode of at least 640x400 (PAL 640x512, NTSC 640x400) |
 | **System files** | `mathieeedoubbas.library`, `mathieeedoubtrans.library` (in `LIBS:` of any Workbench), `gadtools.library`, `asl.library` |
-| **Sound** | via the system `sound.datatype` (datatypes.library, OS 3.0+): the original sound effects as 8SVX samples; they are loaded when first played |
+| **Sound** | via the system `sound.datatype` (datatypes.library, OS 3.0+): the original sound effects as 8SVX samples; they are loaded when first played. AHI is supported (tested with AHI 4.18). |
 | **CPU libraries** | the right `680x0.library` for your CPU (68030/68040/68060), as AmigaOS 3.2 asks for |
 
-On an emulator: FS-UAE with `graphics_card = uaegfx-z3` (Zorro III) and Picasso96 installed.
-There is no AGA/OCS version.
+On an emulator: FS-UAE with `graphics_card = uaegfx-z3` (Zorro III) and Picasso96 installed, or WinUAE with a virtual Picasso II+ graphics card and a current version of P96.
 
 ## Install
 
@@ -36,6 +37,13 @@ ToolTypes (icon information; remove the parentheses to switch one on): `CITY=cit
 `SIZE=800x600` screen size (640x480 up to 800x600; the tile view fills the screen, so more of the city is visible),
 `DEBUG` write `micropolis.log`.
 Command line: `Micropolis [city] [SIZE=WxH] [ASK] [DEBUG]`.
+
+**RTG drawing:** the tile set is kept in the graphics card's memory, and the card copies the tiles that changed itself; only
+tiles with something on top (cars, the cursor, surf) go over the bus (`BLIT=atlas`). If the card has no room for it, the program falls back to
+WritePixelArray. ToolTypes for testing on other cards (the `perf:` lines of `micropolis.log` show the time per frame):
+`BLIT=wpa` WritePixelArray for everything (as up to 0.8.14), `BLIT=p96` p96WritePixelArray and `BLIT=chunky` WriteChunkyPixels
+(8 bit screens only); `MERGE=n` lets a rectangle sent to the screen include up to n unchanged tiles to save a blit (default 0,
+`-1` = one blit per row run as up to 0.8.14). As arguments: `blit=wpa`, `merge=-1`.
 
 **Screen mode:** by default Micropolis asks for the screen mode (RTG or chipset) at every start (a screen mode requester, then
 "Always use this screen mode? - Always use it / Ask me next time"). With *Always use it* the mode is saved in
