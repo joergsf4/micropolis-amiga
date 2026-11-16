@@ -80,8 +80,8 @@ def run_case(args, timeout=60, env=None):
 
 # (name, game arguments, [(plane, text, must_be_present)])    plane: fb = the picture, scr = the panel window, log = the log file
 CASES = [
-    ('start-en', 'show=none', [('fb', 'Speed 2', True), ('fb', '(Pause)', False), ('fb', 'Funds:', True), ('fb', 'Query', True)]),
-    ('pause', 'show=none speed=0', [('fb', 'Speed 0', True), ('fb', '(Pause)', True)]),
+    ('start-en', 'show=none', [('log', 'Speed 2', True), ('log', 'Pop 0   Pause', False), ('log', 'Funds:', True), ('fb', 'Query', True), ('fb', 'haight', True)]),
+    ('pause', 'show=none speed=0', [('log', 'Pop 0   Pause', True), ('log', 'Speed 0', False)]),
     ('hover', 'show=none hover=7', [('fb', 'Bulldozer', True), ('fb', 'Cost: $1', True)]),
     ('budget-en', 'show=budget', [('scr', 'Taxes collected', True), ('scr', '$1,000,000', True), ('scr', 'Continue', True)]),
     ('budget-de', 'show=budget lang=deutsch', [('scr', 'Steuereinnahmen', True), ('scr', '$1,000,000', True), ('scr', 'Weiter', True)]),
@@ -90,7 +90,7 @@ CASES = [
     ('sound-en', 'show=sound', [('scr', 'Effects volume', True), ('scr', 'Ambient sounds', True), ('scr', 'Speak tool names', True), ('scr', 'Output: system', True), ('scr', 'Close', True)]),
     ('sound-de', 'show=sound lang=deutsch', [('scr', 'Lautst\xe4rke Effekte', True), ('scr', 'Ausgabe: System', True), ('scr', 'Hintergrundger\xe4usche', True), ('scr', 'Schlie\xdfen', True)]),
     ('graph-pl', 'show=graph lang=polski', [('scr', 'Wykresy', True), ('scr', 'Zamknij', True)]),
-    ('status-de', 'show=none lang=deutsch', [('fb', 'Tempo 2', True), ('fb', 'Geld:', True), ('fb', 'Abfrage', True)]),
+    ('status-de', 'show=none lang=deutsch', [('log', 'Tempo 2', True), ('log', 'Geld:', True), ('fb', 'Abfrage', True)]),
     ('save', 'show=none savetest', [('log', 'Saved PROGDIR:cities/savetest.cty', True)]),
     ('tax-new', 'newcity show=budget', [('scr', '  7%', True)]),
 ]
@@ -98,8 +98,8 @@ CASES = [
 AGA = {'MODEL': 'A1200', 'ROMFILE': 'kicka1200.rom', 'GFX': 'none', 'EXTRA': '--fast_memory=8192'}
 ECS = {'MODEL': 'A3000', 'ROMFILE': 'kicka3000.rom', 'GFX': 'none'}
 CHIPSET_CASES = [
-    ('aga', 'size=640x512 show=none', [('log', 'screen mode 0x00029004, depth 8', True), ('fb', 'Funds:', True), ('fb', 'Query', True)], AGA),
-    ('ecs', 'size=640x512 show=none', [('log', 'screen mode 0x00029004, depth 4', True), ('fb', 'Funds:', True), ('fb', 'Query', True)], ECS),
+    ('aga', 'size=640x512 show=none', [('log', 'screen mode 0x00029004, depth 8', True), ('log', 'Funds:', True), ('fb', 'Query', True), ('fb', 'haight', True)], AGA),
+    ('ecs', 'size=640x512 show=none', [('log', 'screen mode 0x00029004, depth 4', True), ('log', 'Funds:', True), ('fb', 'Query', True), ('fb', 'haight', True)], ECS),
 ]
 # the menu bar must fit into the screen in every language (a title beyond the right edge cannot be opened)
 MENU_CASES = [('menu-en', 'show=none'), ('menu-de', 'show=none lang=deutsch'), ('menu-pl', 'show=none lang=polski')]

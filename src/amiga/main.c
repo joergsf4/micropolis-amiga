@@ -976,6 +976,7 @@ static void sync_panels(void)
 static void set_screen_title(const char *t)
 {
     if (!strcmp(t, screen_title)) return;
+    if (debug_log) { char lb[160]; sprintf(lb, "title: %.140s", t); logmsg(lb); }
     strncpy(screen_title, t, sizeof screen_title - 1);
     screen_title[sizeof screen_title - 1] = 0;
     if (g_scr) {
@@ -1096,6 +1097,16 @@ static void present_cells(struct RastPort *rp, UBYTE want[][MAX_COLS])
     }
 }
 
+/* time of day as "HH:MM" from the system clock (DateStamp: minutes since midnight, local time) */
+static void clock_hhmm(char *out)
+{
+    struct DateStamp ds;
+    long m;
+    DateStamp(&ds);
+    m = ds.ds_Minute;
+    sprintf(out, "%02ld:%02ld", (m / 60) % 24, m % 60);
+}
+
 static void render_frame(struct Window *win)
 {
     struct RastPort *rp = win->RPort;
@@ -1185,17 +1196,22 @@ static void render_frame(struct Window *win)
     if (toolbar_dirty) {
         draw_toolbar();
     }
-    {   /* status line: date, funds, population, speed, then the last message in the rest of the line */
-        char line[200];
+    {   /* status line (#49): the name of the city on the left, the time of day on the right, the last message in between
+         * (date, funds, population and speed are in the screen title bar above) */
+        char line[200], pad[200], clk[8];
+        int n = SCR_W / 8, nl;
+        if (n > 199) n = 199;                                              /* the bar spans the whole screen width, like the title bar above it */
         gfx_colors(PEN_TEXT, PEN_BAR);
-        sprintf(line, " %-9s %-18s %s %-6ld %s %d%s", status_date, status_funds, T("Pop"), (long)CityPop, T("Speed"), (int)SimSpeed,
-                SimSpeed ? "" : T(" (Pause)"));
-        { int n = SCR_W / 8; char pad[300]; if (n > 199) n = 199;          /* the bar spans the whole screen width, like the title bar above it */
-          snprintf(pad, sizeof pad, "%s   %s", line, status_msg); sprintf(line, "%-*.*s", n, n, pad); }     /* padded: overwrites what an earlier, longer line left behind */
-        if (strcmp(line, last_line1)) {
-            gfx_print(0, 12, line);                                                  /* starts at x = 0 like the tool palette below (the leading space lines the text up with its labels) */
-            for (int y = 5; y <= 12; y++) { int x0 = 8 * (int)strlen(line); if (x0 < SCR_W) memset(fb + y * SCR_W + x0, PEN_BAR, SCR_W - x0); }   /* the rest of a width that is no multiple of 8 */
-            strcpy(last_line1, line); status_dirty = 1;
+        clock_hhmm(clk);
+        memset(pad, ' ', (size_t)n); pad[n] = 0;
+        snprintf(line, sizeof line, " %.16s", CityName ? CityName : "");
+        nl = (int)strlen(line); memcpy(pad, line, (size_t)nl);
+        { int mstart = 20 < n ? 20 : n, mlen = n - 7 - mstart; if (mlen > 0) { snprintf(line, sizeof line, "%.*s", mlen, status_msg); memcpy(pad + mstart, line, strlen(line)); } }
+        if (n >= 8) memcpy(pad + n - 6, clk, 5);
+        if (strcmp(pad, last_line1)) {
+            gfx_print(0, 12, pad);                                                   /* starts at x = 0 like the tool palette below (the leading space lines the text up with its labels) */
+            for (int y = 5; y <= 12; y++) { int x0 = 8 * n; if (x0 < SCR_W) memset(fb + y * SCR_W + x0, PEN_BAR, SCR_W - x0); }   /* the rest of a width that is no multiple of 8 */
+            strcpy(last_line1, pad); status_dirty = 1;
         }
     }
     if (toolbar_dirty && !tb_label_only) demand_dirty = 1;      /* the palette was cleared: draw the demand display again */
@@ -2347,6 +2363,7 @@ static int real_main(int argc, char **argv)
             render_frame(win);
             dirty = 0;
         }
+        if ((title_tick & 7) == 0) { static char last_clk[8]; char clk[8]; clock_hhmm(clk); if (strcmp(clk, last_clk)) { strcpy(last_clk, clk); dirty = 1; } }   /* the status line shows the time: redraw when the minute changes */
         if ((++title_tick & 7) == 0) {                                    /* the screen title bar shows the city's numbers */
             char t[120];
             if (SimSpeed) sprintf(t, "Micropolis %s   %s   %s   %s %ld   %s %d", VERSION, status_date, status_funds, T("Pop"), (long)CityPop, T("Speed"), (int)SimSpeed);

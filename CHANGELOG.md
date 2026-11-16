@@ -13,6 +13,10 @@ Older versions: see the release notes on GitHub (v0.1 to v0.8.1).
   rectangle. Unchanged tiles are not sent along by default: on that machine a pixel costs about 0.55 µs on the bus and a blit
   about 70 µs, so an extra tile costs more than the saved blit.
 
+- **Dark status line** (#49): it no longer repeats the screen title bar. The name of the city (from the file name) is on the left,
+  the time of day (HH:MM, from the system clock, redrawn when the minute changes) on the right, and the last message in between.
+  Date, funds, population and speed stay in the grey screen title bar.
+
 ### Added
 - **ToolTypes for testing** on other cards: `BLIT=wpa|p96|chunky` (WritePixelArray for everything as before, p96WritePixelArray,
   WriteChunkyPixels) and `MERGE=n` (a rectangle may include n unchanged tiles; `-1` = as before). With `DEBUG` the log shows the

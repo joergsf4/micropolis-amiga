@@ -202,15 +202,6 @@ S_27CDC1E8
 S_4086C042
 Toneinstellungen
 ; Sound options
-S_36386070
-Einw.
-; Pop
-S_0A6B8020
-Tempo
-; Speed
-S_47F7351C
- (Pause)
-;  (Pause)
 S_7B5FEA5E
 Projekt
 ; Project
@@ -262,6 +253,9 @@ Boston 2010
 S_43862A0F
 Rio de Janeiro 2047
 ; Rio de Janeiro 2047
+S_0A6B8020
+Tempo
+; Speed
 S_353E0D45
 Optionen
 ; Options
@@ -514,6 +508,9 @@ Der Nachrichten-Port kann nicht angelegt werden.
 S_0C38C5B7
 Das Spielfenster kann nicht geöffnet werden.
 ; Cannot open the game window.
+S_36386070
+Einw.
+; Pop
 S_75AFE364
 Alle
 ; All

@@ -202,15 +202,6 @@ Mapa przegladowa
 S_4086C042
 Ustawienia dzwieku
 ; Sound options
-S_36386070
-Ludn.
-; Pop
-S_0A6B8020
-Tempo
-; Speed
-S_47F7351C
- (Pauza)
-;  (Pause)
 S_7B5FEA5E
 Projekt
 ; Project
@@ -262,6 +253,9 @@ Boston 2010
 S_43862A0F
 Rio de Janeiro 2047
 ; Rio de Janeiro 2047
+S_0A6B8020
+Tempo
+; Speed
 S_353E0D45
 Opcje
 ; Options
@@ -514,6 +508,9 @@ Nie mozna utworzyc portu komunikatow.
 S_0C38C5B7
 Nie mozna otworzyc okna gry.
 ; Cannot open the game window.
+S_36386070
+Ludn.
+; Pop
 S_75AFE364
 Wszystko
 ; All

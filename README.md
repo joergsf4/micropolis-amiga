@@ -55,7 +55,7 @@ question on again. `SIZE=` (ToolType or argument) skips the question and uses th
 ## Looks and feels like an Amiga program
 
 - The game runs on its own **screen with a title bar**: drag the title bar down to see the Workbench behind it, use the depth gadget
-  (top right) to send the screen back. The title bar shows version, date, funds, population and speed.
+  (top right) to send the screen back. The title bar shows version, date, funds, population and speed; the dark line below it shows the name of the city, the last message and the time of day.
 - Messages, budget, city evaluation, history graphs, the query box and the overview map are **ordinary Amiga windows** on the game
   screen: drag them by their title bar, close them with the close gadget (the budget window's close gadget means *Continue*), bring
   them to the front with the depth gadget. They cannot be resized. Several can be open at once.
