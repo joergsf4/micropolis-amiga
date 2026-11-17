@@ -2,15 +2,27 @@
 
 Older versions: see the release notes on GitHub (v0.1 to v0.8.1).
 
-## Unreleased
+## 0.8.16 (17 November 2026)
+
+Why a new release: 0.8.15 made drawing faster on fast Amigas with a slow bus, but slower on a 68020/68030; 0.8.16 measures
+which way is faster on each machine. It also brings the new status line.
 
 ### Changed
+- **Dark status line** (#49): it no longer repeats the screen title bar. The name of the city (from the file name) is on the left,
+  the time of day (HH:MM, from the system clock, redrawn when the minute changes) on the right, and the last message in between.
+  Date, funds, population and speed stay in the grey screen title bar.
 - **RTG drawing chooses itself** (`BLIT=auto`, the new default): for the first seconds after the start Micropolis sends the
   picture once with the tile set in the graphics card's memory (0.8.15) and once with WritePixelArray, and keeps the faster
   way. The tile set wins with a fast CPU and a slow bus (68060 with a ZZ9000 in a Zorro II slot: 8-10 ms per frame instead of
   13-15 ms), but on a 68030 every single blit costs about 0.5 ms of CPU time, and there WritePixelArray is two to four times
   faster (A3000 with a Picasso IV in FS-UAE at real speed: 15-18 ms instead of 36-69 ms). `BLIT=atlas` and `BLIT=wpa` still
   choose by hand.
+
+### Added
+- **"Micropolis" public name license** (`MicropolisPublicNameLicense.md`) in the repository.
+- **Reproducible test runs** (for developers): `headless <city> <steps> hash [seed]` and `headless_native` give the same state
+  hashes every time, and the Amiga build and the native build give identical hashes; `tools/test/core_parity.py` compares
+  them exactly (see PORTING.md). Before, the clock-seeded random numbers made every run different.
 
 ## 0.8.15 (14 November 2026)
 
@@ -22,10 +34,6 @@ Older versions: see the release notes on GitHub (v0.1 to v0.8.1).
 - **Fewer blits per frame**: runs of changed tiles with the same columns in rows one below the other go to the screen as one
   rectangle. Unchanged tiles are not sent along by default: on that machine a pixel costs about 0.55 µs on the bus and a blit
   about 70 µs, so an extra tile costs more than the saved blit.
-
-- **Dark status line** (#49): it no longer repeats the screen title bar. The name of the city (from the file name) is on the left,
-  the time of day (HH:MM, from the system clock, redrawn when the minute changes) on the right, and the last message in between.
-  Date, funds, population and speed stay in the grey screen title bar.
 
 ### Added
 - **ToolTypes for testing** on other cards: `BLIT=wpa|p96|chunky` (WritePixelArray for everything as before, p96WritePixelArray,
