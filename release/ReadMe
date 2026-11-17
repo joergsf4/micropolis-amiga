@@ -43,9 +43,11 @@ ToolTypes of the icon (Information; remove the parentheses to switch one on):
   SIZE=800x600            screen size, 640x480 up to 800x600 (the view fills the screen: more city visible)
   DEBUG                   writes micropolis.log
 Command line: Micropolis [city] [SIZE=WxH] [ASK] [DEBUG]
-For testing on RTG cards (perf lines of micropolis.log). By default the tile set stays in the
-graphics card's memory and the card copies changed tiles itself (less traffic on the bus).
-  BLIT=wpa                WritePixelArray for everything instead (as up to 0.8.14);
+RTG drawing: for the first seconds Micropolis measures two ways and keeps the faster one: the
+tile set in the graphics card's memory (faster with a fast CPU and a slow bus) or WritePixelArray
+(faster on a 68020/68030). To choose by hand (perf lines of micropolis.log show the times):
+  BLIT=atlas              tile set in the card's memory
+  BLIT=wpa                WritePixelArray for everything (as up to 0.8.14);
                           BLIT=p96 and BLIT=chunky: other functions, 8 bit screens only
   MERGE=0                 a rectangle may include this many unchanged tiles to save a blit (-1 = off)
 
