@@ -1,5 +1,6 @@
 /* Milestone 1: run the simulation core without any UI.
- * usage: headless <city.cty> [months]   (default 24 months) */
+ * usage: headless <city.cty> [months]   (default 24 months)
+ *        headless <city.cty> <steps> hash [seed]   reproducible run, state hashes (see tools/native/statehash.h) */
 #include "sim.h"
 #include "ui.h"
 extern int SeedRand();
@@ -64,12 +65,14 @@ static int real_main(int argc, char **argv)
     printf("sizeof: short=%d int=%d long=%d QUAD=%d  map=%dx%d\n", (int)sizeof(short), (int)sizeof(int),
            (int)sizeof(long), (int)sizeof(QUAD), WORLD_X, WORLD_Y);
     if (argc < 2) { printf("usage: headless city.cty [months]\n"); return 5; }
-    if (argc > 3 && !strcmp(argv[3], "hash")) {            /* deterministic run: state hashes after every month */
+    if (argc > 3 && !strcmp(argv[3], "hash")) {            /* reproducible run: state hashes after every 16 sim_loop calls (one CityTime step) */
+        hash_seed = argc > 4 ? atol(argv[4]) : 777;          /* from here on the core sees a fixed clock (statehash.h) */
         sim = MakeNewSim();
         HomeDir = ""; ResourceDir = "res"; HostName = "amiga";
         sim_init();
         if (!LoadCity(argv[1])) { printf("LoadCity failed\n"); return 10; }
-        SimSpeed = 3; SeedRand(777);
+        SimSpeed = 3; SeedRand((int)hash_seed);
+        state_report(0);
         for (i = 0; i < months * 16; i++) { sim_loop(1); if ((i + 1) % 16 == 0) state_report((i + 1) / 16); }
         return 0;
     }

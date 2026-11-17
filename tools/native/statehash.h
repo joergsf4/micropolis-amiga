@@ -1,6 +1,20 @@
 /* State hashes of the simulation, to compare the Amiga build with the native build step by step.
  * Included by tools/native/headless_native.c and src/amiga/headless.c (same output format; values are hashed, not bytes, so
  * the byte order of the machine does not matter). */
+/* Reproducible hash runs ("hash" argument): the core seeds its random numbers from the clock while a city loads
+ * (RandomlySeedRand in s_init.c), so two runs of the same city used to start from different states. Both test programs are
+ * linked with -Wl,--wrap=gettimeofday: while hash_seed is set, the core sees a fixed time (hash_seed seconds), otherwise the
+ * real clock. Together with SeedRand(hash_seed) after loading, a run is the same every time, and the Amiga build and the
+ * native build give identical hashes. */
+static long hash_seed;
+int __real_gettimeofday();
+int __wrap_gettimeofday(struct timeval *tv, void *tz)
+{
+    if (!hash_seed) return __real_gettimeofday(tv, tz);
+    tv->tv_sec = hash_seed; tv->tv_usec = 0;
+    return 0;
+}
+
 static unsigned long sh_h;
 static void sh_add(long v) { sh_h = (sh_h ^ (unsigned long)(v & 0xffffffffUL)) * 16777619UL & 0xffffffffUL; }
 #define SH_BEGIN() (sh_h = 2166136261UL)

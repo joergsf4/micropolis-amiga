@@ -57,6 +57,13 @@ These are functions that lived in the removed upstream files. They are small on 
 
 - **`-O1`, not `-O2`:** with `-O2` the cross compiler (Bebbo amiga-gcc) miscompiled parts of the core (almost no traffic,
   residents counted too low, demand valves stuck at their limits). `tools/native_test.sh` builds the core natively and compares.
+- **Reproducible test runs:** `headless <city> <steps> hash [seed]` (Amiga) and `headless_native` with the same arguments print
+  state hashes of all simulation tables after every step (one step = 16 `sim_loop` calls = one `CityTime` tick, about a week).
+  The core seeds its random numbers from the clock while a city loads (`RandomlySeedRand`), so both test programs are linked
+  with `-Wl,--wrap=gettimeofday` and give the core a fixed time in hash runs (`tools/native/statehash.h`); the game itself is
+  not affected. With the same seed the Amiga build and the native build give identical hashes (checked over 96 steps with
+  Kobe and Senri on an emulated A3000); `tools/test/core_parity.py` compares them and names the first step and table that
+  differ. Single runs of a city are chaotic: to judge a change of the game rules, compare several seeds.
 - **Floats:** the core uses `float` and no FPU code is generated (`-m68030`/`-m68020`, software float).
 - **Byte order:** the Amiga is big endian like the `.cty` files, so nothing is swapped. Only the native test build
   (`tools/native_test.sh`, defines `IS_INTEL`) byte-swaps when it reads a city.
