@@ -853,6 +853,23 @@ static void blit_buf(UBYTE *buf, int stride, int sx, int sy, struct RastPort *rp
     stats.bytes += (long)w * h;
 }
 
+/* debug log: how much memory the screen's graphics card has free (P96 only). Other screens (Workbench, Directory Opus ...)
+ * share it; when it is short P96 keeps the atlas in fast RAM, and the atlas then has no advantage. */
+static void card_mem_log(struct Screen *scr, const char *when)
+{
+    ULONG board, total = 0, free_ = 0, largest = 0;
+    STRPTR name = NULL;
+    char b[160];
+    if (!P96Base || !debug_log) return;
+    board = p96GetModeIDAttr(GetVPModeID(&scr->ViewPort), P96IDA_BOARDNUMBER);
+    if (board == (ULONG)-1) return;
+    if (p96GetBoardDataTags(board, P96BD_BoardName, (ULONG)&name, P96BD_TotalMemory, (ULONG)&total, P96BD_FreeMemory, (ULONG)&free_,
+                            P96BD_LargestFreeMemory, (ULONG)&largest, TAG_DONE) < 0) return;
+    sprintf(b, "card memory %s: %s, total %lu KB, free %lu KB, largest free block %lu KB", when, name ? (char *)name : "?",
+            (unsigned long)(total >> 10), (unsigned long)(free_ >> 10), (unsigned long)(largest >> 10));
+    logmsg(b);
+}
+
 /* the tile set as a bitmap in the graphics card's memory (BLIT=atlas); 0 = not possible, the wpa way is used */
 static int atlas_make(struct Screen *scr)
 {
@@ -860,6 +877,10 @@ static int atlas_make(struct Screen *scr)
     struct BitMap *sbm = scr->RastPort.BitMap;
     int cols = TILE_COUNT / ATLAS_TALL;
     char b[120];
+    if (P96Base && p96GetBitMapAttr(sbm, P96BMA_ISP96)) {
+        sprintf(b, "before the atlas (needs %lu KB)", (unsigned long)((ULONG)cols * 16 * ATLAS_TALL * 16 * p96GetBitMapAttr(sbm, P96BMA_BYTESPERPIXEL) >> 10));
+        card_mem_log(scr, b);
+    }
     atlas = AllocBitMap(cols * 16, ATLAS_TALL * 16, GetBitMapAttr(sbm, BMA_DEPTH), BMF_MINPLANES | BMF_DISPLAYABLE, sbm);
     if (!atlas) { logmsg("atlas: AllocBitMap failed"); return 0; }
     InitRastPort(&arp);
@@ -879,6 +900,7 @@ static int atlas_make(struct Screen *scr)
         sprintf(b + strlen(b), ", P96 bitmap %s", onb ? "in the card's memory" : "NOT in the card's memory");
     }
     logmsg(b);
+    card_mem_log(scr, "after the atlas");
     return 1;
 }
 
