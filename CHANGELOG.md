@@ -2,7 +2,10 @@
 
 Older versions: see the release notes on GitHub (v0.1 to v0.8.1).
 
-## Unreleased
+## 0.8.17 (19 November 2026)
+
+Why a new release: Micropolis now opens the cities of the original SimCity (Amiga and Atari ST), and a loaded city shows its
+name and numbers at once.
 
 ### Added
 - **Import of cities from the original SimCity** for the Amiga and the Atari ST: *Load City* (also in the start question and with `CITY=` or a
