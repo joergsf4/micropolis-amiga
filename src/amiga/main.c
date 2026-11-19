@@ -14,6 +14,7 @@
 #include "sound.h"
 #include "sound_ui.h"
 #include "undo.h"
+#include "simcity_import.h"
 #include "coast.h"
 #include "wind.h"
 #include "l10n.h"
@@ -85,6 +86,14 @@ static int view_cols = 35, view_rows = 28;
 void app_log(const char *msg);
 static int debug_log;                  /* DEBUG tooltype / argument: write micropolis.log */
 static void logmsg(const char *msg) { app_log(msg); }
+static void logmsg_t(const char *msg)   /* with the time since the first such line, in seconds */
+{
+    static struct timeval t0; struct timeval t; char b[200];
+    if (!debug_log) return;
+    gettimeofday(&t, NULL); if (!t0.tv_sec) t0 = t;
+    sprintf(b, "%4ld.%02ld %.180s", (long)(t.tv_sec - t0.tv_sec - (t.tv_usec < t0.tv_usec)), (long)(((t.tv_usec - t0.tv_usec + 1000000L) % 1000000L) / 10000), msg);
+    app_log(b);
+}
 void app_log(const char *msg)   /* progress log: when started from the Workbench there is no console */
 {
     if (!debug_log) return;
@@ -218,6 +227,7 @@ static int shake_frames, shake_bx, shake_by;   /* earthquake: the view jitters b
 static int dbg_hoverwalk;               /* test option hoverwalk: the tool under the mouse changes every frame */
 static int dbg_about, dbg_det;                 /* test options: keep the About box open / deterministic picture (no blinking, no animation, no ambient sound) */
 static char dbg_dump[120];                  /* test option dump=PATH: write the frame buffer and the panel scratch buffer at exit */
+static int dbg_load_loops; static char dbg_load_path[128];   /* test option load=SECONDS,FILE: load a city as "Load City" does */
 static int dbg_quit_loops;                 /* test option quit=N: leave the game after N seconds (checks the clean shutdown) */
 static int dbg_scroll;                  /* test option scroll=N: scroll N tiles (x and y), then stop */
 static int debug_show;                  /* test option show=eval|graph: keep messages away so the panel can be photographed */
@@ -1027,7 +1037,7 @@ static void sync_panels(void)
 static void set_screen_title(const char *t)
 {
     if (!strcmp(t, screen_title)) return;
-    if (debug_log) { char lb[160]; sprintf(lb, "title: %.140s", t); logmsg(lb); }
+    if (debug_log) { char lb[160]; sprintf(lb, "title: %.140s", t); logmsg_t(lb); }
     strncpy(screen_title, t, sizeof screen_title - 1);
     screen_title[sizeof screen_title - 1] = 0;
     if (g_scr) {
@@ -1263,6 +1273,7 @@ static void render_frame(struct Window *win)
             gfx_print(0, 12, pad);                                                   /* starts at x = 0 like the tool palette below (the leading space lines the text up with its labels) */
             for (int y = 5; y <= 12; y++) { int x0 = 8 * n; if (x0 < SCR_W) memset(fb + y * SCR_W + x0, PEN_BAR, SCR_W - x0); }   /* the rest of a width that is no multiple of 8 */
             strcpy(last_line1, pad); status_dirty = 1;
+            if (debug_log) { char lb[120]; sprintf(lb, "status: %.100s", pad); logmsg_t(lb); }
         }
     }
     if (toolbar_dirty && !tb_label_only) demand_dirty = 1;      /* the palette was cleared: draw the demand display again */
@@ -1425,13 +1436,20 @@ static struct Menu *make_menus(struct Screen *scr, APTR *vi_out)
 }
 
 /* file requester (asl.library); returns 1 and a full path in out, 0 if cancelled */
+static int city_imported;                   /* the city came from an original SimCity file and has no .cty name yet */
+static char import_file[72];                /* the .cty name the save requester suggests for it */
+
 static int ask_file(struct Window *win, int save, char *out, size_t n)
 {
     int ok = 0;
     if (!AslBase) return 0;
+    if (save && city_imported && !CityFileName && CityName) snprintf(import_file, sizeof import_file, "%.60s.cty", CityName);
+    else import_file[0] = 0;
+    /* loading also shows files without a name extension: the cities of the original SimCity ("San Francisco") */
     struct FileRequester *fr = AllocAslRequestTags(ASL_FileRequest,
         ASLFR_Window, (ULONG)win, ASLFR_TitleText, (ULONG)(save ? T("Save City") : T("Load City")),
-        ASLFR_InitialDrawer, (ULONG)"PROGDIR:cities", ASLFR_InitialPattern, (ULONG)"#?.cty",
+        ASLFR_InitialDrawer, (ULONG)"PROGDIR:cities", ASLFR_InitialPattern, (ULONG)(save ? "#?.cty" : "(#?.cty|~(#?.#?))"),
+        import_file[0] ? ASLFR_InitialFile : TAG_IGNORE, (ULONG)import_file,
         ASLFR_DoPatterns, TRUE, ASLFR_DoSaveMode, save, ASLFR_RejectIcons, TRUE, TAG_DONE);
     if (fr) {
         if (AslRequest(fr, NULL)) {
@@ -1492,6 +1510,32 @@ static void recenter(void)
 {
     view_x = WORLD_X / 2 - VIEW_COLS / 2;
     view_y = WORLD_Y / 2 - VIEW_ROWS / 2;
+}
+
+void UpdateHeads();                         /* w_update.c: the core sends date, funds and demand again */
+static int title_now;                       /* the screen title bar is due in this pass, not only every 8th */
+static long load_pop = -1;                  /* population right after loading, shown until the first evaluation */
+
+/* a city was loaded, generated or imported: show its name, date, funds and population at once. The core would send date
+ * and funds only with the next simulation step (never while the game is paused) and the population only with the first
+ * evaluation (on "slow" about 16 seconds later). */
+static void after_load(void);
+static void load_city_file(char *path)                  /* "Load City" after the file requester (and the test option load=) */
+{
+    int r = city_load_any(path);
+    if (r != CITY_FAILED) {
+        undo_clear(); EraseOverlay(); recenter(); after_load(); clean_time = (long)CityTime; tool_used = 0; city_imported = r == CITY_IMPORTED;
+        if (city_imported) snprintf(status_msg, sizeof status_msg, T("Imported %s from the original SimCity"), CityName ? CityName : path);
+        else snprintf(status_msg, sizeof status_msg, T("Loaded %s"), path);
+    }
+    else snprintf(status_msg, sizeof status_msg, T("Could not load %s"), path);
+}
+
+static void after_load(void)
+{
+    UpdateHeads();
+    load_pop = ((long)ResPop + ComPop * 8L + IndPop * 8L) * 20L;   /* the census is complete now; the first simulation steps count again from 0 */
+    title_now = 1; dirty = 1;
 }
 
 /* ---------- About box: version, build, machine - to tell which variant is running ---------- */
@@ -1623,8 +1667,8 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
         return 1;
     }
     if (id > CMD_SCEN && id <= CMD_SCEN + 8) {            /* scenario: load it and show its story, as the original does */
-        undo_clear(); EraseOverlay(); LoadScenario((short)(id - CMD_SCEN)); clean_time = (long)CityTime; tool_used = 0;
-        recenter();
+        undo_clear(); EraseOverlay(); LoadScenario((short)(id - CMD_SCEN)); clean_time = (long)CityTime; tool_used = 0; city_imported = 0;
+        recenter(); after_load();
         notice_show(id - CMD_SCEN); notice_dirty = 1;
         return 1;
     }
@@ -1652,13 +1696,11 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
         break;
     }
     case CMD_NEW:
-        undo_clear(); EraseOverlay(); GenerateNewCity(); CityTax = 7; SetGameLevelFunds((short)pref_level); setSpeed(2); clean_time = (long)CityTime; tool_used = 0; recenter();
+        city_imported = 0;
+        undo_clear(); EraseOverlay(); GenerateNewCity(); CityTax = 7; SetGameLevelFunds((short)pref_level); setSpeed(2); clean_time = (long)CityTime; tool_used = 0; recenter(); after_load();
         sprintf(status_msg, T("New city generated.")); break;
     case CMD_LOAD:
-        if (ask_file(win, 0, path, sizeof path)) {
-            if (LoadCity(path)) { undo_clear(); EraseOverlay(); recenter(); clean_time = (long)CityTime; tool_used = 0; sprintf(status_msg, T("Loaded %s"), path); }
-            else sprintf(status_msg, T("Could not load %s"), path);
-        }
+        if (ask_file(win, 0, path, sizeof path)) load_city_file(path);
         break;
     case CMD_SAVE:
         if (CityFileName) { strncpy(path, CityFileName, sizeof path - 1); path[sizeof path - 1] = 0; save_city(win, path); break; }
@@ -1755,7 +1797,15 @@ static void start_choice(struct Window *win)             /* what to start with *
     for (;;) {
         int r = easy(win, T("Welcome to Micropolis!\nWhat do you want to start with?"), T("New city|Load city...|Scenario...|Current city"));
         if (r == 1) { do_command(CMD_NEW, win, NULL); return; }
-        if (r == 2) { if (ask_file(win, 0, path, sizeof path) && LoadCity(path)) { undo_clear(); EraseOverlay(); recenter(); sprintf(status_msg, T("Loaded %s"), path); return; } }
+        if (r == 2 && ask_file(win, 0, path, sizeof path)) {
+            int lr = city_load_any(path);
+            if (lr != CITY_FAILED) {
+                undo_clear(); EraseOverlay(); recenter(); after_load(); city_imported = lr == CITY_IMPORTED;
+                if (city_imported) snprintf(status_msg, sizeof status_msg, T("Imported %s from the original SimCity"), CityName ? CityName : path);
+                else snprintf(status_msg, sizeof status_msg, T("Loaded %s"), path);
+                return;
+            }
+        }
         else if (r == 3) { int sc = pick_scenario(win); if (sc) { do_command(CMD_SCEN + sc, win, NULL); return; } }
         else return;                                       /* Current city (the default one) */
     }
@@ -2006,7 +2056,10 @@ static int real_main(int argc, char **argv)
     logmsg("sim made");
     sim_init();
     logmsg("sim_init done");
-    if (!LoadCity((char *)city)) { fail(T("Cannot load the city file '%s'."), city); goto out; }
+    {   int lr = city_load_any(city);                     /* a .cty file, or a city of the original SimCity */
+        if (lr == CITY_FAILED) { fail(T("Cannot load the city file '%s'."), city); goto out; }
+        city_imported = lr == CITY_IMPORTED;
+    }
     logmsg("city loaded");
     clean_time = (long)CityTime; tool_used = 0;
     if (CityTax == 0) CityTax = 7;                        /* the default city (haight.cty) was saved with 0 %; the original starts with 7 % */
@@ -2156,6 +2209,8 @@ static int real_main(int argc, char **argv)
     SetGameLevel((short)pref_level);
     setSpeed(2);                                          /* medium: the fast speed was too quick for most cities */
     for (int ai = 1; ai < argc; ai++) if (!strncmp(argv[ai], "quit=", 5)) dbg_quit_loops = atoi(argv[ai] + 5) * 50;
+    for (int ai = 1; ai < argc; ai++) if (!strncmp(argv[ai], "load=", 5) && strchr(argv[ai], ',')) {
+        dbg_load_loops = atoi(argv[ai] + 5) * 50; strncpy(dbg_load_path, strchr(argv[ai], ',') + 1, sizeof dbg_load_path - 1); }
     for (int di = 3; di < argc; di++) {                          /* debug options, any number, any order (arguments 3 and up) */
         const char *a = argv[di];
         if (!strncmp(a, "scroll=", 7)) { dbg_scroll = atoi(a + 7); setSpeed(0); }   /* debug: scroll test */
@@ -2216,6 +2271,7 @@ static int real_main(int argc, char **argv)
     }
     int running = 1, tick = 0, frame = 0, title_tick = 0;
     sound_ui_ready = 1;
+    after_load();                                      /* the city of the start: screen and window are open now */
     static const int delay[4] = { 0, 12, 4, 1 };      /* video frames per simulation step */
     while (running) {
         struct IntuiMessage *m;
@@ -2251,6 +2307,7 @@ static int real_main(int argc, char **argv)
                 else { full_redraw = 1; first_present = 1; toolbar_dirty = status_dirty = demand_dirty = 1; tb_label_only = 0; last_line1[0] = 0; render_frame(win); }
                 EndRefresh(mw, TRUE);
                 if (refresh_full && pi < 0) { refresh_full = 0; full_redraw = 1; dirty = 1; }
+                if (pi < 0) { last_line1[0] = 0; toolbar_dirty = demand_dirty = 1; tb_label_only = 0; dirty = 1; }   /* drawing between Begin/EndRefresh only reaches the uncovered part: status line (city name after "Load City"), palette and demand once more in full */
                 continue;
             }
             if (cls == IDCMP_RAWKEY) {
@@ -2424,10 +2481,12 @@ static int real_main(int argc, char **argv)
             dirty = 0;
         }
         if ((title_tick & 7) == 0) { static char last_clk[8]; char clk[8]; clock_hhmm(clk); if (strcmp(clk, last_clk)) { strcpy(last_clk, clk); dirty = 1; } }   /* the status line shows the time: redraw when the minute changes */
-        if ((++title_tick & 7) == 0) {                                    /* the screen title bar shows the city's numbers */
+        if ((++title_tick & 7) == 0 || title_now) {                       /* the screen title bar shows the city's numbers */
             char t[120];
-            if (SimSpeed) sprintf(t, "Micropolis %s   %s   %s   %s %ld   %s %d", VERSION, status_date, status_funds, T("Pop"), (long)CityPop, T("Speed"), (int)SimSpeed);
-            else sprintf(t, "Micropolis %s   %s   %s   %s %ld   %s", VERSION, status_date, status_funds, T("Pop"), (long)CityPop, T("Pause"));   /* short: the depth gadget covers the end of the bar at 640 pixels */
+            long pop = DoInitialEval && load_pop >= 0 ? load_pop : (long)CityPop;   /* just loaded: the evaluation is still to come */
+            title_now = 0;
+            if (SimSpeed) sprintf(t, "Micropolis %s   %s   %s   %s %ld   %s %d", VERSION, status_date, status_funds, T("Pop"), pop, T("Speed"), (int)SimSpeed);
+            else sprintf(t, "Micropolis %s   %s   %s   %s %ld   %s", VERSION, status_date, status_funds, T("Pop"), pop, T("Pause"));   /* short: the depth gadget covers the end of the bar at 640 pixels */
             set_screen_title(t);
         }
         sync_panels();
@@ -2438,6 +2497,7 @@ static int real_main(int argc, char **argv)
             full_redraw = 1; dirty = 1; refresh_full = 1;
         }
         if (dbg_quit_loops && title_tick > dbg_quit_loops) running = 0;
+        if (dbg_load_loops && title_tick > dbg_load_loops) { dbg_load_loops = 0; logmsg_t("test: load"); load_city_file(dbg_load_path); }
         WaitTOF();
         gettimeofday(&now_time, NULL);
         flagBlink = dbg_det ? -1 : (now_time.tv_usec < 500000) ? 1 : -1;

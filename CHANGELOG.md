@@ -2,6 +2,28 @@
 
 Older versions: see the release notes on GitHub (v0.1 to v0.8.1).
 
+## Unreleased
+
+### Added
+- **Import of cities from the original SimCity** for the Amiga and the Atari ST: *Load City* (also in the start question and with `CITY=` or a
+  file name on the command line) now also loads the city files of the original SimCity, such as the scenarios on its disk
+  ("San Francisco", "Tokyo" ...). They are the Mac format of SimCity: a 128 byte MacBinary header (city name, type `CITY`,
+  creator `MCRP`) and then exactly the data of a Micropolis `.cty` file. Micropolis takes the data part and the city name from
+  the header. The load requester also shows files without a name extension. An imported city has no `.cty` name yet: *Save City*
+  asks for one (it suggests `<city name>.cty`) and never overwrites the original file. The simulation core is not changed.
+- **Test option `load=SECONDS,FILE`** (for developers): loads a city after that many seconds, as *Load City* does but without
+  the file requester. With `DEBUG` the log now also shows each change of the status line and the screen title bar, with the
+  time.
+
+### Fixed
+- **The name of a newly loaded city appeared late in the status line**, up to a minute after *Load City* (about 13 s on an
+  A3000): the window was drawn again while the file requester closed, and that drawing only reaches the part the requester had
+  covered, so the new status line was not shown until its text changed again (the clock). After such a refresh the status
+  line, the tool palette and the demand display are now drawn once more in full.
+- **The screen title bar shows a loaded city at once:** date and funds came only with the next simulation step (never while
+  paused) and the population only with the first evaluation (about 16 s later on "slow"). Until that evaluation the title bar
+  shows the population counted at loading.
+
 ## 0.8.16 (17 November 2026)
 
 Why a new release: 0.8.15 made drawing faster on fast Amigas with a slow bus, but slower on a 68020/68030; 0.8.16 measures

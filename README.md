@@ -99,7 +99,10 @@ question on again. `SIZE=` (ToolType or argument) skips the question and uses th
 The bars below the tool icons show what the city needs: **R**esidential, **C**ommercial, **I**ndustrial
 (up from the white line = demand, down = too many). Events and warnings open a message window (Continue / Return / Space).
 
-You can load and save cities (`.cty`, the original Micropolis format; `cities/` has the classic scenarios).
+You can load and save cities (`.cty`, the original Micropolis format; `cities/` has the classic scenarios). *Load City* also
+imports cities of the original SimCity for the Amiga and the Atari ST (files without a name extension, e.g. `San Francisco`
+from the SimCity disk): they are the same data in a MacBinary wrapper. An imported city is saved as a new `.cty` file; the original file is not
+overwritten.
 
 ## Status
 
@@ -144,5 +147,5 @@ Amiga port by this repository's authors. No Kickstart or Workbench files are inc
 `tools/test/run_tests.sh [--quick]` (Docker must be running):
 
 - **Notifications:** every `UI...` notification the simulation core sends must have a handler in `src/amiga/main.c` or a reason in `tools/test/ui_ignored.txt` (this would have caught the lost budget handler).
-- **Screens:** the game is started in the emulator with debug arguments (`show=budget`, `lang=deutsch`, `speed=0`, `hover=N`, ...; `det` makes the picture deterministic) and writes its exact frame buffer (`dump=`); the test finds texts in it by rendering them with the game's own font. 10 cases, about 40 s each.
+- **Screens:** the game is started in the emulator with debug arguments (`show=budget`, `lang=deutsch`, `speed=0`, `hover=N`, `load=SECONDS,FILE`, ...; `det` makes the picture deterministic) and writes its exact frame buffer (`dump=`); the test finds texts in it by rendering them with the game's own font. 10 cases, about 40 s each.
 - **Core parity:** the simulation core is run for 12 months in the Amiga build and in a native build of the same code and the results are compared with tolerances (the original Micropolis code is only reliable with `-O1`, see the Makefile).

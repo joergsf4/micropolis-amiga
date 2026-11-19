@@ -89,6 +89,9 @@
 @toc MAIN
 
   Project    new city, load, save, undo / redo, About, Help, quit
+             (Load also imports cities of the original SimCity for the Amiga
+             and the Atari ST, files without an extension; they are saved as a
+             new .cty file)
   Speed      pause / slow / medium / fast
   Options    auto bulldoze, auto budget, disasters, auto goto, city animation,
              world animation, messages, message windows, sound options (window with the

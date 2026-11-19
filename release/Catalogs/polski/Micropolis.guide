@@ -93,6 +93,9 @@
 @toc MAIN
 
   Projekt      nowe miasto, wczytaj, zapisz, cofnij / ponow, O programie, Pomoc, zakoncz
+               (Wczytaj importuje tez miasta z oryginalnego SimCity na Amige
+               i Atari ST, pliki bez rozszerzenia; zapisuje sie je jako nowy
+               plik .cty)
   Scenariusze  historyczne miasta z opowiescia i celem
   Tempo        pauza / wolno / srednio / szybko
   Opcje        auto-burzenie, auto-budzet, katastrofy, auto-skok, animacja miasta, animacja swiata,

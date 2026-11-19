@@ -108,6 +108,9 @@ STATUS
 ------
 Works: simulation, building tools, animated map, overview map with overlays, budget, evaluation, graphs, sound effects, scenarios, zone query box, earthquake shake,
 load/save/new random city, menus, disasters, event messages.
+Load City also imports cities of the original SimCity for the Amiga and the Atari ST (files without an extension,
+e.g. "San Francisco");
+they are saved as a new .cty file, the original file is not overwritten.
 Missing: looping sounds (bulldozer), terrain options for new cities.
 An early crash on quitting seems fixed in 0.2 - if you still see it, please report the error number.
 
