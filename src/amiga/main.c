@@ -14,6 +14,7 @@
 #include "sound.h"
 #include "sound_ui.h"
 #include "undo.h"
+#include "simcity_import.h"
 #include "coast.h"
 #include "wind.h"
 #include "l10n.h"
@@ -85,6 +86,14 @@ static int view_cols = 35, view_rows = 28;
 void app_log(const char *msg);
 static int debug_log;                  /* DEBUG tooltype / argument: write micropolis.log */
 static void logmsg(const char *msg) { app_log(msg); }
+static void logmsg_t(const char *msg)   /* with the time since the first such line, in seconds */
+{
+    static struct timeval t0; struct timeval t; char b[200];
+    if (!debug_log) return;
+    gettimeofday(&t, NULL); if (!t0.tv_sec) t0 = t;
+    sprintf(b, "%4ld.%02ld %.180s", (long)(t.tv_sec - t0.tv_sec - (t.tv_usec < t0.tv_usec)), (long)(((t.tv_usec - t0.tv_usec + 1000000L) % 1000000L) / 10000), msg);
+    app_log(b);
+}
 void app_log(const char *msg)   /* progress log: when started from the Workbench there is no console */
 {
     if (!debug_log) return;
@@ -218,6 +227,7 @@ static int shake_frames, shake_bx, shake_by;   /* earthquake: the view jitters b
 static int dbg_hoverwalk;               /* test option hoverwalk: the tool under the mouse changes every frame */
 static int dbg_about, dbg_det;                 /* test options: keep the About box open / deterministic picture (no blinking, no animation, no ambient sound) */
 static char dbg_dump[120];                  /* test option dump=PATH: write the frame buffer and the panel scratch buffer at exit */
+static int dbg_load_loops; static char dbg_load_path[128];   /* test option load=SECONDS,FILE: load a city as "Load City" does */
 static int dbg_quit_loops;                 /* test option quit=N: leave the game after N seconds (checks the clean shutdown) */
 static int dbg_scroll;                  /* test option scroll=N: scroll N tiles (x and y), then stop */
 static int debug_show;                  /* test option show=eval|graph: keep messages away so the panel can be photographed */
@@ -744,17 +754,28 @@ static int panels_open(void)
     return n;
 }
 
-/* How the picture reaches an RTG screen (BLIT= tooltype, for measuring on real cards; chipset screens ignore it):
- * atlas  the default: the tile set is kept in the graphics card's memory, a cell that shows only its tile is copied there by
- *        the card (BltBitMapRastPort), everything else goes the wpa way. On a ZZ9000 in a Zorro II slot (68060, 8 bit) this
- *        sends a frame in 8-10 ms instead of 13-15 ms. If the bitmap cannot be made, wpa is used.
+/* How the picture reaches an RTG screen (BLIT= tooltype; chipset screens ignore it):
+ * auto   the default: measures atlas and wpa for a few seconds after the start and keeps the faster one (see auto_step)
+ * atlas  the tile set is kept in the graphics card's memory, a cell that shows only its tile is copied there by the card
+ *        (BltBitMapRastPort), everything else goes the wpa way. Wins where the bus is slow and the CPU fast: on a ZZ9000 in a
+ *        Zorro II slot (68060, 8 bit) a frame goes out in 8-10 ms instead of 13-15 ms. Loses on a slow CPU, where every blit
+ *        costs ~0.5 ms in graphics.library and the driver: A3000 68030 (FS-UAE, real speed, Picasso IV) 36-69 ms against 15-18 ms.
+ *        If the bitmap cannot be made, wpa is used.
  * wpa    WritePixelArray (cybergraphics)
  * p96    p96WritePixelArray (Picasso96API.library), 8 bit screens
  * chunky WriteChunkyPixels (graphics.library), 8 bit screens
  * Deeper screens always go through WriteLUTPixelArray (the frame buffer holds palette indices). */
-enum { BM_WPA, BM_P96, BM_CHUNKY, BM_ATLAS };
-static const char *const blit_name[] = { "wpa", "p96", "chunky", "atlas" };
-static int blit_mode = BM_ATLAS;
+enum { BM_WPA, BM_P96, BM_CHUNKY, BM_ATLAS, BM_AUTO };
+static const char *const blit_name[] = { "wpa", "p96", "chunky", "atlas", "auto" };
+static int blit_mode = BM_AUTO;
+/* BLIT=auto: phase 0 sends with the atlas, phase 1 without it; each phase lasts until AUTO_FRAMES frames with together at least
+ * AUTO_CELLS changed cells were sent (frames with more than AUTO_MAX_CELLS, full redraws, do not count). The time per changed
+ * cell decides; the atlas is freed when wpa wins. */
+#define AUTO_FRAMES 100
+#define AUTO_CELLS 3000
+#define AUTO_MAX_CELLS 200
+static int auto_phase;
+static long auto_us[2], auto_cells[2], auto_frames[2];
 /* MERGE= tooltype: changed cells are sent as rectangles; a rectangle may include this many unchanged cells (16x16) to save a
  * blit. -1 = one blit per run of changed cells in a row, as up to 0.8.14. Measured on a ZZ9000 in a Zorro II slot (68060):
  * a blit costs about 70 us, a pixel about 0.55 us (the bus), so one unchanged cell costs twice what a saved blit brings:
@@ -842,6 +863,23 @@ static void blit_buf(UBYTE *buf, int stride, int sx, int sy, struct RastPort *rp
     stats.bytes += (long)w * h;
 }
 
+/* debug log: how much memory the screen's graphics card has free (P96 only). Other screens (Workbench, Directory Opus ...)
+ * share it; when it is short P96 keeps the atlas in fast RAM, and the atlas then has no advantage. */
+static void card_mem_log(struct Screen *scr, const char *when)
+{
+    ULONG board, total = 0, free_ = 0, largest = 0;
+    STRPTR name = NULL;
+    char b[160];
+    if (!P96Base || !debug_log) return;
+    board = p96GetModeIDAttr(GetVPModeID(&scr->ViewPort), P96IDA_BOARDNUMBER);
+    if (board == (ULONG)-1) return;
+    if (p96GetBoardDataTags(board, P96BD_BoardName, (ULONG)&name, P96BD_TotalMemory, (ULONG)&total, P96BD_FreeMemory, (ULONG)&free_,
+                            P96BD_LargestFreeMemory, (ULONG)&largest, TAG_DONE) < 0) return;
+    sprintf(b, "card memory %s: %s, total %lu KB, free %lu KB, largest free block %lu KB", when, name ? (char *)name : "?",
+            (unsigned long)(total >> 10), (unsigned long)(free_ >> 10), (unsigned long)(largest >> 10));
+    logmsg(b);
+}
+
 /* the tile set as a bitmap in the graphics card's memory (BLIT=atlas); 0 = not possible, the wpa way is used */
 static int atlas_make(struct Screen *scr)
 {
@@ -849,6 +887,10 @@ static int atlas_make(struct Screen *scr)
     struct BitMap *sbm = scr->RastPort.BitMap;
     int cols = TILE_COUNT / ATLAS_TALL;
     char b[120];
+    if (P96Base && p96GetBitMapAttr(sbm, P96BMA_ISP96)) {
+        sprintf(b, "before the atlas (needs %lu KB)", (unsigned long)((ULONG)cols * 16 * ATLAS_TALL * 16 * p96GetBitMapAttr(sbm, P96BMA_BYTESPERPIXEL) >> 10));
+        card_mem_log(scr, b);
+    }
     atlas = AllocBitMap(cols * 16, ATLAS_TALL * 16, GetBitMapAttr(sbm, BMA_DEPTH), BMF_MINPLANES | BMF_DISPLAYABLE, sbm);
     if (!atlas) { logmsg("atlas: AllocBitMap failed"); return 0; }
     InitRastPort(&arp);
@@ -868,12 +910,31 @@ static int atlas_make(struct Screen *scr)
         sprintf(b + strlen(b), ", P96 bitmap %s", onb ? "in the card's memory" : "NOT in the card's memory");
     }
     logmsg(b);
+    card_mem_log(scr, "after the atlas");
     return 1;
 }
 
 static void atlas_blit(struct RastPort *rp, int col, int row, int tile)
 {
     BltBitMapRastPort(atlas, (tile / ATLAS_TALL) * 16, (tile % ATLAS_TALL) * 16, rp, TB_W + col * 16, BAR_H + row * 16, 16, 16, 0xC0);
+}
+
+/* BLIT=auto: one frame of the tile view was sent (cells changed cells in us microseconds) */
+static void auto_step(int cells, long us)
+{
+    char b[200];
+    if (cells <= 0 || cells > AUTO_MAX_CELLS) return;
+    auto_us[auto_phase] += us; auto_cells[auto_phase] += cells; auto_frames[auto_phase]++;
+    if (auto_frames[auto_phase] < AUTO_FRAMES || auto_cells[auto_phase] < AUTO_CELLS) return;
+    if (auto_phase == 0) { auto_phase = 1; return; }      /* now the same without the atlas */
+    {   long a = auto_us[0] * 10 / auto_cells[0], w = auto_us[1] * 10 / auto_cells[1];       /* tenths of a microsecond per cell */
+        int keep = a < w;
+        sprintf(b, "blit auto: atlas %ld.%ld us/cell (%ld cells, %ld frames), wpa %ld.%ld us/cell (%ld cells, %ld frames): using %s",
+                a / 10, a % 10, auto_cells[0], auto_frames[0], w / 10, w % 10, auto_cells[1], auto_frames[1], keep ? "atlas" : "wpa");
+        logmsg(b);
+        if (keep) blit_mode = BM_ATLAS;
+        else { blit_mode = BM_WPA; WaitBlit(); FreeBitMap(atlas); atlas = NULL; }
+    }
 }
 
 static void blit(struct RastPort *rp, int x, int y, int w, int h)       /* main window: same coordinates */
@@ -976,7 +1037,7 @@ static void sync_panels(void)
 static void set_screen_title(const char *t)
 {
     if (!strcmp(t, screen_title)) return;
-    if (debug_log) { char lb[160]; sprintf(lb, "title: %.140s", t); logmsg(lb); }
+    if (debug_log) { char lb[160]; sprintf(lb, "title: %.140s", t); logmsg_t(lb); }
     strncpy(screen_title, t, sizeof screen_title - 1);
     screen_title[sizeof screen_title - 1] = 0;
     if (g_scr) {
@@ -1212,6 +1273,7 @@ static void render_frame(struct Window *win)
             gfx_print(0, 12, pad);                                                   /* starts at x = 0 like the tool palette below (the leading space lines the text up with its labels) */
             for (int y = 5; y <= 12; y++) { int x0 = 8 * n; if (x0 < SCR_W) memset(fb + y * SCR_W + x0, PEN_BAR, SCR_W - x0); }   /* the rest of a width that is no multiple of 8 */
             strcpy(last_line1, pad); status_dirty = 1;
+            if (debug_log) { char lb[120]; sprintf(lb, "status: %.100s", pad); logmsg_t(lb); }
         }
     }
     if (toolbar_dirty && !tb_label_only) demand_dirty = 1;      /* the palette was cleared: draw the demand display again */
@@ -1234,14 +1296,22 @@ static void render_frame(struct Window *win)
         first_present = 0;
     } else {
         static UBYTE want[MAX_ROWS][MAX_COLS];               /* cells that go from fb to the screen */
+        int use_atlas = atlas && !(blit_mode == BM_AUTO && auto_phase == 1), cells = 0;
+        struct timeval tv0, tv1;
+        gettimeofday(&tv0, NULL);
         for (int row = 0; row < VIEW_ROWS; row++)
             for (int col = 0; col < VIEW_COLS; col++) {
                 int bare = redraw[row][col] && !deco[row][col];
                 stats.bare += bare;
-                if (bare && atlas) { atlas_blit(rp, col, row, shown[row][col]); stats.calls++; stats.atlas++; want[row][col] = 0; }
+                cells += redraw[row][col];
+                if (bare && use_atlas) { atlas_blit(rp, col, row, shown[row][col]); stats.calls++; stats.atlas++; want[row][col] = 0; }
                 else want[row][col] = redraw[row][col];
             }
         present_cells(rp, want);
+        if (blit_mode == BM_AUTO) {
+            gettimeofday(&tv1, NULL);
+            auto_step(cells, (long)(tv1.tv_sec - tv0.tv_sec) * 1000000L + (long)(tv1.tv_usec - tv0.tv_usec));
+        }
         if (toolbar_dirty) { blit(rp, 0, BAR_H, TB_W, tb_label_only ? TB_LABEL_H : SCR_H - BAR_H); stats.calls++; }
         if (demand_dirty) { blit(rp, DEM_X, dem_y(), DEM_W, DEM_H); stats.calls++; }
         if (status_dirty) { blit(rp, 0, 0, SCR_W, BAR_H); stats.calls++; }
@@ -1259,7 +1329,7 @@ static void render_frame(struct Window *win)
         /* present: time to send the changes to the screen (bus); bare: blitted cells that show only their tile, the part a tile
          * set kept in the graphics card's memory could copy on the card instead (pixels: times bytes per pixel on deep screens) */
         sprintf(b, "perf: blit=%s merge=%d: present %ld us/frame, %ld blits/frame (%ld atlas), %ld bare tiles/frame (%ld of %ld pixels)",
-                atlas ? "atlas" : blit_name[blit_mode], merge_waste, stats.present_us / stats.frames, stats.calls / stats.frames,
+                blit_mode == BM_AUTO ? (auto_phase ? "auto(wpa)" : "auto(atlas)") : blit_name[blit_mode], merge_waste, stats.present_us / stats.frames, stats.calls / stats.frames,
                 stats.atlas / stats.frames, stats.bare / stats.frames, stats.bare * 256 / stats.frames, stats.bytes / stats.frames);
         logmsg(b);
         memset(&stats, 0, sizeof stats);
@@ -1366,13 +1436,20 @@ static struct Menu *make_menus(struct Screen *scr, APTR *vi_out)
 }
 
 /* file requester (asl.library); returns 1 and a full path in out, 0 if cancelled */
+static int city_imported;                   /* the city came from an original SimCity file and has no .cty name yet */
+static char import_file[72];                /* the .cty name the save requester suggests for it */
+
 static int ask_file(struct Window *win, int save, char *out, size_t n)
 {
     int ok = 0;
     if (!AslBase) return 0;
+    if (save && city_imported && !CityFileName && CityName) snprintf(import_file, sizeof import_file, "%.60s.cty", CityName);
+    else import_file[0] = 0;
+    /* loading also shows files without a name extension: the cities of the original SimCity ("San Francisco") */
     struct FileRequester *fr = AllocAslRequestTags(ASL_FileRequest,
         ASLFR_Window, (ULONG)win, ASLFR_TitleText, (ULONG)(save ? T("Save City") : T("Load City")),
-        ASLFR_InitialDrawer, (ULONG)"PROGDIR:cities", ASLFR_InitialPattern, (ULONG)"#?.cty",
+        ASLFR_InitialDrawer, (ULONG)"PROGDIR:cities", ASLFR_InitialPattern, (ULONG)(save ? "#?.cty" : "(#?.cty|~(#?.#?))"),
+        import_file[0] ? ASLFR_InitialFile : TAG_IGNORE, (ULONG)import_file,
         ASLFR_DoPatterns, TRUE, ASLFR_DoSaveMode, save, ASLFR_RejectIcons, TRUE, TAG_DONE);
     if (fr) {
         if (AslRequest(fr, NULL)) {
@@ -1433,6 +1510,32 @@ static void recenter(void)
 {
     view_x = WORLD_X / 2 - VIEW_COLS / 2;
     view_y = WORLD_Y / 2 - VIEW_ROWS / 2;
+}
+
+void UpdateHeads();                         /* w_update.c: the core sends date, funds and demand again */
+static int title_now;                       /* the screen title bar is due in this pass, not only every 8th */
+static long load_pop = -1;                  /* population right after loading, shown until the first evaluation */
+
+/* a city was loaded, generated or imported: show its name, date, funds and population at once. The core would send date
+ * and funds only with the next simulation step (never while the game is paused) and the population only with the first
+ * evaluation (on "slow" about 16 seconds later). */
+static void after_load(void);
+static void load_city_file(char *path)                  /* "Load City" after the file requester (and the test option load=) */
+{
+    int r = city_load_any(path);
+    if (r != CITY_FAILED) {
+        undo_clear(); EraseOverlay(); recenter(); after_load(); clean_time = (long)CityTime; tool_used = 0; city_imported = r == CITY_IMPORTED;
+        if (city_imported) snprintf(status_msg, sizeof status_msg, T("Imported %s from the original SimCity"), CityName ? CityName : path);
+        else snprintf(status_msg, sizeof status_msg, T("Loaded %s"), path);
+    }
+    else snprintf(status_msg, sizeof status_msg, T("Could not load %s"), path);
+}
+
+static void after_load(void)
+{
+    UpdateHeads();
+    load_pop = ((long)ResPop + ComPop * 8L + IndPop * 8L) * 20L;   /* the census is complete now; the first simulation steps count again from 0 */
+    title_now = 1; dirty = 1;
 }
 
 /* ---------- About box: version, build, machine - to tell which variant is running ---------- */
@@ -1564,8 +1667,8 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
         return 1;
     }
     if (id > CMD_SCEN && id <= CMD_SCEN + 8) {            /* scenario: load it and show its story, as the original does */
-        undo_clear(); EraseOverlay(); LoadScenario((short)(id - CMD_SCEN)); clean_time = (long)CityTime; tool_used = 0;
-        recenter();
+        undo_clear(); EraseOverlay(); LoadScenario((short)(id - CMD_SCEN)); clean_time = (long)CityTime; tool_used = 0; city_imported = 0;
+        recenter(); after_load();
         notice_show(id - CMD_SCEN); notice_dirty = 1;
         return 1;
     }
@@ -1593,13 +1696,11 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
         break;
     }
     case CMD_NEW:
-        undo_clear(); EraseOverlay(); GenerateNewCity(); CityTax = 7; SetGameLevelFunds((short)pref_level); setSpeed(2); clean_time = (long)CityTime; tool_used = 0; recenter();
+        city_imported = 0;
+        undo_clear(); EraseOverlay(); GenerateNewCity(); CityTax = 7; SetGameLevelFunds((short)pref_level); setSpeed(2); clean_time = (long)CityTime; tool_used = 0; recenter(); after_load();
         sprintf(status_msg, T("New city generated.")); break;
     case CMD_LOAD:
-        if (ask_file(win, 0, path, sizeof path)) {
-            if (LoadCity(path)) { undo_clear(); EraseOverlay(); recenter(); clean_time = (long)CityTime; tool_used = 0; sprintf(status_msg, T("Loaded %s"), path); }
-            else sprintf(status_msg, T("Could not load %s"), path);
-        }
+        if (ask_file(win, 0, path, sizeof path)) load_city_file(path);
         break;
     case CMD_SAVE:
         if (CityFileName) { strncpy(path, CityFileName, sizeof path - 1); path[sizeof path - 1] = 0; save_city(win, path); break; }
@@ -1696,7 +1797,15 @@ static void start_choice(struct Window *win)             /* what to start with *
     for (;;) {
         int r = easy(win, T("Welcome to Micropolis!\nWhat do you want to start with?"), T("New city|Load city...|Scenario...|Current city"));
         if (r == 1) { do_command(CMD_NEW, win, NULL); return; }
-        if (r == 2) { if (ask_file(win, 0, path, sizeof path) && LoadCity(path)) { undo_clear(); EraseOverlay(); recenter(); sprintf(status_msg, T("Loaded %s"), path); return; } }
+        if (r == 2 && ask_file(win, 0, path, sizeof path)) {
+            int lr = city_load_any(path);
+            if (lr != CITY_FAILED) {
+                undo_clear(); EraseOverlay(); recenter(); after_load(); city_imported = lr == CITY_IMPORTED;
+                if (city_imported) snprintf(status_msg, sizeof status_msg, T("Imported %s from the original SimCity"), CityName ? CityName : path);
+                else snprintf(status_msg, sizeof status_msg, T("Loaded %s"), path);
+                return;
+            }
+        }
         else if (r == 3) { int sc = pick_scenario(win); if (sc) { do_command(CMD_SCEN + sc, win, NULL); return; } }
         else return;                                       /* Current city (the default one) */
     }
@@ -1744,7 +1853,8 @@ static int  blit_arg(const char *v)      /* BLIT= tooltype / blit= argument: how
     if (!strcasecmp(v, "wpa")) return BM_WPA;
     if (!strcasecmp(v, "p96")) return BM_P96;
     if (!strcasecmp(v, "chunky")) return BM_CHUNKY;
-    return BM_ATLAS;
+    if (!strcasecmp(v, "atlas")) return BM_ATLAS;
+    return BM_AUTO;
 }
 
 static void read_tooltypes(int argc, char **argv)
@@ -1946,7 +2056,10 @@ static int real_main(int argc, char **argv)
     logmsg("sim made");
     sim_init();
     logmsg("sim_init done");
-    if (!LoadCity((char *)city)) { fail(T("Cannot load the city file '%s'."), city); goto out; }
+    {   int lr = city_load_any(city);                     /* a .cty file, or a city of the original SimCity */
+        if (lr == CITY_FAILED) { fail(T("Cannot load the city file '%s'."), city); goto out; }
+        city_imported = lr == CITY_IMPORTED;
+    }
     logmsg("city loaded");
     clean_time = (long)CityTime; tool_used = 0;
     if (CityTax == 0) CityTax = 7;                        /* the default city (haight.cty) was saved with 0 %; the original starts with 7 % */
@@ -2079,11 +2192,11 @@ static int real_main(int argc, char **argv)
 
     logmsg("window open");
     if (!planar) {
-        if (blit_mode == BM_P96 || blit_mode == BM_ATLAS) P96Base = OpenLibrary((CONST_STRPTR)"Picasso96API.library", 2);
+        if (blit_mode == BM_P96 || blit_mode == BM_ATLAS || blit_mode == BM_AUTO) P96Base = OpenLibrary((CONST_STRPTR)"Picasso96API.library", 2);
         if (blit_mode == BM_P96 && (!P96Base || true_color)) { logmsg(P96Base ? "blit=p96: only on 8 bit screens" : "blit=p96: no Picasso96API.library"); blit_mode = BM_WPA; }
         if (blit_mode == BM_CHUNKY && true_color) { logmsg("blit=chunky: only on 8 bit screens"); blit_mode = BM_WPA; }
-        if (blit_mode == BM_ATLAS && !atlas_make(scr)) blit_mode = BM_WPA;
-    }
+        if ((blit_mode == BM_ATLAS || blit_mode == BM_AUTO) && !atlas_make(scr)) blit_mode = BM_WPA;
+    } else blit_mode = BM_WPA;                                    /* chipset: WriteChunkyPixels, nothing to choose */
     { char b[80]; sprintf(b, "blit: %s, merge %d", planar ? "chipset" : blit_name[blit_mode], merge_waste); logmsg(b); }
     sound_init();
     if (pref_sndout) sound_set_output(pref_sndout);               /* AHI from the preferences (falls back to the system sound when the unit cannot be opened) */
@@ -2096,6 +2209,8 @@ static int real_main(int argc, char **argv)
     SetGameLevel((short)pref_level);
     setSpeed(2);                                          /* medium: the fast speed was too quick for most cities */
     for (int ai = 1; ai < argc; ai++) if (!strncmp(argv[ai], "quit=", 5)) dbg_quit_loops = atoi(argv[ai] + 5) * 50;
+    for (int ai = 1; ai < argc; ai++) if (!strncmp(argv[ai], "load=", 5) && strchr(argv[ai], ',')) {
+        dbg_load_loops = atoi(argv[ai] + 5) * 50; strncpy(dbg_load_path, strchr(argv[ai], ',') + 1, sizeof dbg_load_path - 1); }
     for (int di = 3; di < argc; di++) {                          /* debug options, any number, any order (arguments 3 and up) */
         const char *a = argv[di];
         if (!strncmp(a, "scroll=", 7)) { dbg_scroll = atoi(a + 7); setSpeed(0); }   /* debug: scroll test */
@@ -2156,6 +2271,7 @@ static int real_main(int argc, char **argv)
     }
     int running = 1, tick = 0, frame = 0, title_tick = 0;
     sound_ui_ready = 1;
+    after_load();                                      /* the city of the start: screen and window are open now */
     static const int delay[4] = { 0, 12, 4, 1 };      /* video frames per simulation step */
     while (running) {
         struct IntuiMessage *m;
@@ -2191,6 +2307,7 @@ static int real_main(int argc, char **argv)
                 else { full_redraw = 1; first_present = 1; toolbar_dirty = status_dirty = demand_dirty = 1; tb_label_only = 0; last_line1[0] = 0; render_frame(win); }
                 EndRefresh(mw, TRUE);
                 if (refresh_full && pi < 0) { refresh_full = 0; full_redraw = 1; dirty = 1; }
+                if (pi < 0) { last_line1[0] = 0; toolbar_dirty = demand_dirty = 1; tb_label_only = 0; dirty = 1; }   /* drawing between Begin/EndRefresh only reaches the uncovered part: status line (city name after "Load City"), palette and demand once more in full */
                 continue;
             }
             if (cls == IDCMP_RAWKEY) {
@@ -2364,10 +2481,12 @@ static int real_main(int argc, char **argv)
             dirty = 0;
         }
         if ((title_tick & 7) == 0) { static char last_clk[8]; char clk[8]; clock_hhmm(clk); if (strcmp(clk, last_clk)) { strcpy(last_clk, clk); dirty = 1; } }   /* the status line shows the time: redraw when the minute changes */
-        if ((++title_tick & 7) == 0) {                                    /* the screen title bar shows the city's numbers */
+        if ((++title_tick & 7) == 0 || title_now) {                       /* the screen title bar shows the city's numbers */
             char t[120];
-            if (SimSpeed) sprintf(t, "Micropolis %s   %s   %s   %s %ld   %s %d", VERSION, status_date, status_funds, T("Pop"), (long)CityPop, T("Speed"), (int)SimSpeed);
-            else sprintf(t, "Micropolis %s   %s   %s   %s %ld   %s", VERSION, status_date, status_funds, T("Pop"), (long)CityPop, T("Pause"));   /* short: the depth gadget covers the end of the bar at 640 pixels */
+            long pop = DoInitialEval && load_pop >= 0 ? load_pop : (long)CityPop;   /* just loaded: the evaluation is still to come */
+            title_now = 0;
+            if (SimSpeed) sprintf(t, "Micropolis %s   %s   %s   %s %ld   %s %d", VERSION, status_date, status_funds, T("Pop"), pop, T("Speed"), (int)SimSpeed);
+            else sprintf(t, "Micropolis %s   %s   %s   %s %ld   %s", VERSION, status_date, status_funds, T("Pop"), pop, T("Pause"));   /* short: the depth gadget covers the end of the bar at 640 pixels */
             set_screen_title(t);
         }
         sync_panels();
@@ -2378,6 +2497,7 @@ static int real_main(int argc, char **argv)
             full_redraw = 1; dirty = 1; refresh_full = 1;
         }
         if (dbg_quit_loops && title_tick > dbg_quit_loops) running = 0;
+        if (dbg_load_loops && title_tick > dbg_load_loops) { dbg_load_loops = 0; logmsg_t("test: load"); load_city_file(dbg_load_path); }
         WaitTOF();
         gettimeofday(&now_time, NULL);
         flagBlink = dbg_det ? -1 : (now_time.tv_usec < 500000) ? 1 : -1;

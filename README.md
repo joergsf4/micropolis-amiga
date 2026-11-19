@@ -22,6 +22,9 @@ C code; Tcl/Tk and X11 were replaced by an Amiga user interface.
 
 On an emulator: FS-UAE with `graphics_card = uaegfx-z3` (Zorro III) and Picasso96 installed, or WinUAE with a virtual Picasso II+ graphics card and a current version of P96.
 
+## [Micropolis Public Name License](https://github.com/suessthomas/micropolis-amiga/blob/main/MicropolisPublicNameLicense.md)
+The name/term "MICROPOLIS" is a registered trademark owned by and exclusively licensed to Micropolis GmbH (Micropolis Corporation, the "licensor"). It is here (upstream) licensed to the authors/publishers of the "Micropolis" city simulation game and its source code (the project or "licensee(s)").
+
 ## Install
 
 Unpack the archive anywhere, e.g. `lha x Micropolis-0.2.lha Work:`, then double-click the `Micropolis`
@@ -38,12 +41,14 @@ ToolTypes (icon information; remove the parentheses to switch one on): `CITY=cit
 `DEBUG` write `micropolis.log`.
 Command line: `Micropolis [city] [SIZE=WxH] [ASK] [DEBUG]`.
 
-**RTG drawing:** the tile set is kept in the graphics card's memory, and the card copies the tiles that changed itself; only
-tiles with something on top (cars, the cursor, surf) go over the bus (`BLIT=atlas`). If the card has no room for it, the program falls back to
-WritePixelArray. ToolTypes for testing on other cards (the `perf:` lines of `micropolis.log` show the time per frame):
-`BLIT=wpa` WritePixelArray for everything (as up to 0.8.14), `BLIT=p96` p96WritePixelArray and `BLIT=chunky` WriteChunkyPixels
-(8 bit screens only); `MERGE=n` lets a rectangle sent to the screen include up to n unchanged tiles to save a blit (default 0,
-`-1` = one blit per row run as up to 0.8.14). As arguments: `blit=wpa`, `merge=-1`.
+**RTG drawing:** the tile set can be kept in the graphics card's memory, so that the card copies the changed tiles itself and
+only tiles with something on top (cars, the cursor, surf) go over the bus. That is faster where the bus is slow and the CPU fast
+(68040/68060 with a Zorro II card), but slower on a 68020/68030, where every single blit costs a lot of CPU time. So for the
+first seconds after the start Micropolis measures both ways and keeps the faster one (`micropolis.log` with `DEBUG` shows the
+result). ToolTypes to choose by hand: `BLIT=atlas` (tile set in the card's memory), `BLIT=wpa` (WritePixelArray for everything,
+as up to 0.8.14), `BLIT=p96` p96WritePixelArray and `BLIT=chunky` WriteChunkyPixels (8 bit screens only), `BLIT=auto` (default);
+`MERGE=n` lets a rectangle sent to the screen include up to n unchanged tiles to save a blit (default 0, `-1` = one blit per row
+run as up to 0.8.14). As arguments: `blit=wpa`, `merge=-1`.
 
 **Screen mode:** by default Micropolis asks for the screen mode (RTG or chipset) at every start (a screen mode requester, then
 "Always use this screen mode? - Always use it / Ask me next time"). With *Always use it* the mode is saved in
@@ -94,7 +99,10 @@ question on again. `SIZE=` (ToolType or argument) skips the question and uses th
 The bars below the tool icons show what the city needs: **R**esidential, **C**ommercial, **I**ndustrial
 (up from the white line = demand, down = too many). Events and warnings open a message window (Continue / Return / Space).
 
-You can load and save cities (`.cty`, the original Micropolis format; `cities/` has the classic scenarios).
+You can load and save cities (`.cty`, the original Micropolis format; `cities/` has the classic scenarios). *Load City* also
+imports cities of the original SimCity for the Amiga and the Atari ST (files without a name extension, e.g. `San Francisco`
+from the SimCity disk): they are the same data in a MacBinary wrapper. An imported city is saved as a new `.cty` file; the original file is not
+overwritten.
 
 ## Status
 
@@ -139,5 +147,5 @@ Amiga port by this repository's authors. No Kickstart or Workbench files are inc
 `tools/test/run_tests.sh [--quick]` (Docker must be running):
 
 - **Notifications:** every `UI...` notification the simulation core sends must have a handler in `src/amiga/main.c` or a reason in `tools/test/ui_ignored.txt` (this would have caught the lost budget handler).
-- **Screens:** the game is started in the emulator with debug arguments (`show=budget`, `lang=deutsch`, `speed=0`, `hover=N`, ...; `det` makes the picture deterministic) and writes its exact frame buffer (`dump=`); the test finds texts in it by rendering them with the game's own font. 10 cases, about 40 s each.
+- **Screens:** the game is started in the emulator with debug arguments (`show=budget`, `lang=deutsch`, `speed=0`, `hover=N`, `load=SECONDS,FILE`, ...; `det` makes the picture deterministic) and writes its exact frame buffer (`dump=`); the test finds texts in it by rendering them with the game's own font. 10 cases, about 40 s each.
 - **Core parity:** the simulation core is run for 12 months in the Amiga build and in a native build of the same code and the results are compared with tolerances (the original Micropolis code is only reliable with `-O1`, see the Makefile).

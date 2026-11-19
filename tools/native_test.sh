@@ -10,6 +10,6 @@ CFLAGS="-DOSF1 -DIS_INTEL -std=gnu89 -w -Wno-return-mismatch -Wno-implicit-funct
 for f in src/core/*.c src/amiga/ui_core.c tools/native/headless_native.c; do
     cc $CFLAGS -c "$f" -o "$OUT/$(basename "$f" .c).o"
 done
-cc -o $OUT/headless_native $OUT/*.o -lm
+cc -Wl,--wrap=gettimeofday -o $OUT/headless_native $OUT/*.o -lm      # fixed clock in hash runs (tools/native/statehash.h)
 mkdir -p $OUT/run; ln -sfn "$PWD/upstream/res" $OUT/run/res
 ( cd $OUT/run && ../headless_native "$PWD/../../../upstream/cities/$CITY" "$MONTHS" "$EVERY" )

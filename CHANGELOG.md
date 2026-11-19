@@ -2,6 +2,50 @@
 
 Older versions: see the release notes on GitHub (v0.1 to v0.8.1).
 
+## 0.8.17 (19 November 2026)
+
+Why a new release: Micropolis now opens the cities of the original SimCity (Amiga and Atari ST), and a loaded city shows its
+name and numbers at once.
+
+### Added
+- **Import of cities from the original SimCity** for the Amiga and the Atari ST: *Load City* (also in the start question and with `CITY=` or a
+  file name on the command line) now also loads the city files of the original SimCity, such as the scenarios on its disk
+  ("San Francisco", "Tokyo" ...). They are the Mac format of SimCity: a 128 byte MacBinary header (city name, type `CITY`,
+  creator `MCRP`) and then exactly the data of a Micropolis `.cty` file. Micropolis takes the data part and the city name from
+  the header. The load requester also shows files without a name extension. An imported city has no `.cty` name yet: *Save City*
+  asks for one (it suggests `<city name>.cty`) and never overwrites the original file. The simulation core is not changed.
+- **Test option `load=SECONDS,FILE`** (for developers): loads a city after that many seconds, as *Load City* does but without
+  the file requester. With `DEBUG` the log now also shows each change of the status line and the screen title bar, with the
+  time.
+
+### Fixed
+- **The name of a newly loaded city appeared late in the status line**, up to a minute after *Load City* (about 13 s on an
+  A3000): the window was drawn again while the file requester closed, and that drawing only reaches the part the requester had
+  covered, so the new status line was not shown until its text changed again (the clock). After such a refresh the status
+  line, the tool palette and the demand display are now drawn once more in full.
+- **The screen title bar shows a loaded city at once:** date and funds came only with the next simulation step (never while
+  paused) and the population only with the first evaluation (about 16 s later on "slow"). Until that evaluation the title bar
+  shows the population counted at loading.
+
+## 0.8.16 (17 November 2026)
+
+Why a new release: 0.8.15 made drawing faster on fast Amigas with a slow bus, but slower on a 68020/68030; 0.8.16 measures
+which way is faster on each machine.
+
+### Changed
+- **RTG drawing chooses itself** (`BLIT=auto`, the new default): for the first seconds after the start Micropolis sends the
+  picture once with the tile set in the graphics card's memory (0.8.15) and once with WritePixelArray, and keeps the faster
+  way. The tile set wins with a fast CPU and a slow bus (68060 with a ZZ9000 in a Zorro II slot: 8-10 ms per frame instead of
+  13-15 ms), but on a 68030 every single blit costs about 0.5 ms of CPU time, and there WritePixelArray is two to four times
+  faster (A3000 with a Picasso IV in FS-UAE at real speed: 15-18 ms instead of 36-69 ms). `BLIT=atlas` and `BLIT=wpa` still
+  choose by hand.
+
+### Added
+- **"Micropolis" public name license** (`MicropolisPublicNameLicense.md`) in the repository.
+- **Reproducible test runs** (for developers): `headless <city> <steps> hash [seed]` and `headless_native` give the same state
+  hashes every time, and the Amiga build and the native build give identical hashes; `tools/test/core_parity.py` compares
+  them exactly (see PORTING.md). Before, the clock-seeded random numbers made every run different.
+
 ## 0.8.15 (14 November 2026)
 
 ### Changed
@@ -12,7 +56,6 @@ Older versions: see the release notes on GitHub (v0.1 to v0.8.1).
 - **Fewer blits per frame**: runs of changed tiles with the same columns in rows one below the other go to the screen as one
   rectangle. Unchanged tiles are not sent along by default: on that machine a pixel costs about 0.55 µs on the bus and a blit
   about 70 µs, so an extra tile costs more than the saved blit.
-
 - **Dark status line** (#49): it no longer repeats the screen title bar. The name of the city (from the file name) is on the left,
   the time of day (HH:MM, from the system clock, redrawn when the minute changes) on the right, and the last message in between.
   Date, funds, population and speed stay in the grey screen title bar.

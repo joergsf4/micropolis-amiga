@@ -1,5 +1,6 @@
 /* Native (macOS/Linux) build of the simulation core without any UI, to compare its results with the Amiga build.
  * usage: headless_native city.cty [months] [per-month-line]
+ *        headless_native city.cty <steps> hash [seed]   reproducible run, state hashes (see statehash.h)
  * Build: tools/native_test.sh */
 #include "sim.h"
 #include "ui.h"
@@ -56,6 +57,7 @@ int main(int argc, char **argv)
     int months = argc > 2 ? atoi(argv[2]) : 24, every = argc > 3 ? atoi(argv[3]) : 1, i;
     printf("native: short=%d int=%d long=%d QUAD=%d map=%dx%d\n", (int)sizeof(short), (int)sizeof(int), (int)sizeof(long),
            (int)sizeof(QUAD), WORLD_X, WORLD_Y);
+    if (argc > 3 && !strcmp(argv[3], "hash")) hash_seed = argc > 4 ? atol(argv[4]) : 777;   /* the core sees a fixed clock (statehash.h) */
     sim = MakeNewSim();
     HomeDir = ""; ResourceDir = "res"; HostName = "native";
     sim_init();
@@ -63,8 +65,8 @@ int main(int argc, char **argv)
     printf("loaded: year %d funds %ld pop %ld\n", (int)CurrentYear(), (long)TotalFunds, (long)CityPop);
     SimSpeed = 3;
     printf("at load: "); stats();
-    if (argc > 3 && !strcmp(argv[3], "hash")) {        /* deterministic run: state hashes after every month */
-        SeedRand(777);
+    if (hash_seed) {                                   /* reproducible run: state hashes after every 16 sim_loop calls (one CityTime step) */
+        SeedRand((int)hash_seed);
         state_report(0);
         for (i = 0; i < months * 16; i++) { sim_loop(1); if ((i + 1) % 16 == 0) state_report((i + 1) / 16); }
         return 0;

@@ -2,10 +2,11 @@
 # Builds a release archive in LHA format (out/release/Micropolis-<version>.lha):
 #   Micropolis.info          drawer icon
 #   Micropolis/              Micropolis (program) + icon, ReadMe, COPYING, res/, cities/, Tools/
-# usage: tools/release.sh [version]     (default: read from src/amiga/main.c $VER)
+# usage: tools/release.sh [version]     (default: VERSION from src/amiga/version.h)
 set -euo pipefail
 cd "$(dirname "$0")/.."
-VER="${1:-$(sed -n 's/#define VERSION  "\(.*\)"/\1/p' src/amiga/version.h)}"
+VER="${1:-$(sed -n 's/^#define VERSION  *"\(.*\)"/\1/p' src/amiga/version.h)}"     # one or more spaces after VERSION
+[ -n "$VER" ] || { echo "release.sh: no version found in src/amiga/version.h (give it as argument)" >&2; exit 1; }
 SHARE="$HOME/dev/AmigaProjekt/workbench/share/Micropolis"
 OUT=out/release; D=$OUT/stage
 ./build.sh >/dev/null                              # fresh build + data
