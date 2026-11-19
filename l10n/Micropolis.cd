@@ -237,6 +237,12 @@ S_3F5A82CB (1062896331//)
 Meltdown
 S_4766D2E4 (1197920996//)
 Load City
+S_260DD269 (638440041//)
+Imported %s from the original SimCity
+S_6EB4B2A4 (1857335972//)
+Loaded %s
+S_2CF5B95B (754301275//)
+Could not load %s
 S_2DC0A276 (767599222//)
 Sound: switched off (Options menu)
 S_30300A1A (808454682//)
@@ -293,10 +299,6 @@ S_4C1563FA (1276470266//)
 Redone: %d tiles
 S_7E6206A1 (2120353441//)
 New city generated.
-S_6EB4B2A4 (1857335972//)
-Loaded %s
-S_2CF5B95B (754301275//)
-Could not load %s
 S_2BCF1D35 (734993717//)
 The screen mode will be asked at the next start.
 S_7BC0ABC0 (2076224448//)

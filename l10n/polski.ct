@@ -355,6 +355,15 @@ Awaria reaktora
 S_4766D2E4
 Wczytaj miasto
 ; Load City
+S_260DD269
+Zaimportowano %s z oryginalnego SimCity
+; Imported %s from the original SimCity
+S_6EB4B2A4
+Wczytano %s
+; Loaded %s
+S_2CF5B95B
+Nie mozna wczytac %s
+; Could not load %s
 S_2DC0A276
 Dzwiek: wylaczony (menu Opcje)
 ; Sound: switched off (Options menu)
@@ -439,12 +448,6 @@ Ponowiono: %d pol
 S_7E6206A1
 Utworzono nowe miasto.
 ; New city generated.
-S_6EB4B2A4
-Wczytano %s
-; Loaded %s
-S_2CF5B95B
-Nie mozna wczytac %s
-; Could not load %s
 S_2BCF1D35
 O tryb ekranu zapytamy przy nastepnym starcie.
 ; The screen mode will be asked at the next start.
