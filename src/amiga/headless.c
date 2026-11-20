@@ -72,8 +72,23 @@ static int real_main(int argc, char **argv)
         sim_init();
         if (!LoadCity(argv[1])) { printf("LoadCity failed\n"); return 10; }
         SimSpeed = 3; SeedRand((int)hash_seed);
-        state_report(0);
-        for (i = 0; i < months * 16; i++) { sim_loop(1); if ((i + 1) % 16 == 0) state_report((i + 1) / 16); }
+        {   int quiet = argc > 5 && !strcmp(argv[5], "quiet");    /* timing run: only the last state, so hashing does not count */
+            struct timeval t0, t1;
+            if (!quiet) state_report(0);
+            __real_gettimeofday(&t0, NULL);
+            for (i = 0; i < months * 16; i++) {
+                sim_loop(1);
+                if (!quiet && (i + 1) % 16 == 0) {
+                    state_report((i + 1) / 16);
+                    printf("     probs %d %d %d %d %d %d %d | order %d %d %d %d | yes %d class %d\n", ProblemVotes[0], ProblemVotes[1], ProblemVotes[2],
+                           ProblemVotes[3], ProblemVotes[4], ProblemVotes[5], ProblemVotes[6], ProblemOrder[0], ProblemOrder[1], ProblemOrder[2],
+                           ProblemOrder[3], CityYes, CityClass);   /* the evaluation: votes per problem (of 100), the four worst, approval */
+                }
+            }
+            __real_gettimeofday(&t1, NULL);
+            if (quiet) state_report(months);
+            printf("time: %ld ms for %d steps\n", (long)(t1.tv_sec - t0.tv_sec) * 1000L + (long)(t1.tv_usec - t0.tv_usec) / 1000L, months);
+        }
         return 0;
     }
     if (argc > 3 && !strcmp(argv[3], "floattest")) {

@@ -17,7 +17,8 @@ the core is either handled in `src/amiga` or listed in `tools/test/ui_ignored.tx
 
 | Upstream file | Here | Note |
 |---|---|---|
-| `s_*.c` (simulation), `g_ani.c`, `rand.c`, `random.c`, `w_budget.c`, `w_con.c`, `w_eval.c`, `w_keys.c`, `w_resrc.c`, `w_sound.c`, `w_stubs.c` | `src/core`, unchanged | the game itself |
+| `s_eval.c` | `src/core/s_eval.c` | one line: `VoteProblems()` wrapped around at `> PROBNUM`, so it read `ProblemTable[10]` and wrote `ProblemVotes[10]`, one past the end of both arrays; now `>= PROBNUM`. The result depended on what the linker placed behind the arrays. Simulation usually unchanged (the vote loop mostly ends after 600 tries either way), the problem votes are about 7 % higher |
+| other `s_*.c` (simulation), `g_ani.c`, `rand.c`, `random.c`, `w_budget.c`, `w_con.c`, `w_eval.c`, `w_keys.c`, `w_resrc.c`, `w_sound.c`, `w_stubs.c` | `src/core`, unchanged | the game itself |
 | `sim.c` | `src/core/sim.c` | `main()` and the X11/Tk option parsing removed (no `getopt`); the simulation loop stays |
 | `w_graph.c` | `src/core/w_graph.c` | only the history data logic; the Tk graph widget is gone, `graph_ui.c` draws the graphs |
 | `w_sprite.c` | `src/core/w_sprite.c` | the Tcl `sprite` command interface removed; movement code unchanged |
@@ -55,8 +56,15 @@ These are functions that lived in the removed upstream files. They are small on 
 
 ## Other deviations of the build
 
-- **`-O1`, not `-O2`:** with `-O2` the cross compiler (Bebbo amiga-gcc) miscompiled parts of the core (almost no traffic,
-  residents counted too low, demand valves stuck at their limits). `tools/native_test.sh` builds the core natively and compares.
+- **`-O2 -fno-strict-aliasing -fno-peephole2` for the core:** with plain `-O2` the cross compiler (Bebbo amiga-gcc) miscompiled
+  parts of the core (almost no traffic, residents counted too low, demand valves stuck at their limits), so it was built with
+  `-O1` up to 0.8.17. Built file by file and compared in hash runs, two causes showed up: the m68k `peephole2` pass changes
+  `s_traf.c` and `s_zone.c` (switched off), and `s_eval.c` read past an array (fixed, see above), so its result depended on the
+  link order. These were found with GCC 6.5; with GCC 16 (the Docker image since November 2026) even plain `-O2` computes
+  correctly, `peephole2` stays off for older images. The core is bit-identical to `-O1` and to the native build (4 cities,
+  2 seeds, 5 game years); on a cycle-exact emulated 68030 the simulation is only 2-4 % faster. `-O3` was about 7 % faster
+  there, but makes the core code 75 % bigger, so it is not used until it is measured on real 68030 and 68060 hardware.
+  `tools/native_test.sh` builds the core natively and compares.
 - **Reproducible test runs:** `headless <city> <steps> hash [seed]` (Amiga) and `headless_native` with the same arguments print
   state hashes of all simulation tables after every step (one step = 16 `sim_loop` calls = one `CityTime` tick, about a week).
   The core seeds its random numbers from the clock while a city loads (`RandomlySeedRand`), so both test programs are linked

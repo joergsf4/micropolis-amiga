@@ -153,7 +153,7 @@ static void prefs_load(void)
             else if (sscanf(line, "MODE=%lx", &m) == 1) pref_mode = (ULONG)m;
             else if (!strncmp(line, "SIZE=", 5)) sscanf(line + 5, "%dx%d", &pref_w, &pref_h);
             else if (!strncmp(line, "DEPTH=", 6)) pref_depth = atoi(line + 6);
-            else if (!strncmp(line, "LANGUAGE=", 9)) { strncpy(pref_lang, line + 9, sizeof pref_lang - 1); pref_lang[strcspn(pref_lang, "\r\n")] = 0; }
+            else if (!strncmp(line, "LANGUAGE=", 9)) { snprintf(pref_lang, sizeof pref_lang, "%.*s", (int)strcspn(line + 9, "\r\n"), line + 9); }
             else if (!strncmp(line, "SPEED=", 6)) { pref_speed = atoi(line + 6); if (pref_speed < 0 || pref_speed > 3) pref_speed = -1; }
             else if (!strncmp(line, "SOUNDOUT=", 9)) { pref_sndout = atoi(line + 9); if (pref_sndout < 0 || pref_sndout > 4) pref_sndout = 0; }
             else if (!strncmp(line, "SFXVOL=", 7)) { pref_fxvol = atoi(line + 7); if (pref_fxvol < 0 || pref_fxvol > 100) pref_fxvol = -1; }
@@ -270,7 +270,7 @@ int ui_eval(const char *cmd)
             char mon[4], rest[32];
             memcpy(mon, status_date, 3); mon[3] = 0;
             strcpy(rest, status_date + 3);
-            sprintf(status_date, "%.5s%s", T(mon), rest);
+            snprintf(status_date, sizeof status_date, "%.5s%.26s", T(mon), rest);   /* "Jan 2003" fits easily */
         }
     }
     else if (!strncmp(cmd, "UISetFunds ", 11))   {

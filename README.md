@@ -120,7 +120,8 @@ See the [issues](../../issues).
 
 ## Building from source
 
-Needs Docker (uses the `sacredbanana/amiga-compiler` image: Bebbo's amiga-gcc).
+Needs Docker (uses the `sacredbanana/amiga-compiler` image: Bebbo's amiga-gcc). Since 0.8.18 the releases are built with
+GCC 16 (the image as of November 2026, before that GCC 6.5); older images still build correct code.
 
 ```
 tools/fetch_upstream.sh      # clones the original sources (needed for graphics and message texts)

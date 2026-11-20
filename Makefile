@@ -1,8 +1,11 @@
 CC       = m68k-amigaos-gcc
 ARCH     = -noixemul -m68020 -fsingle-precision-constant -O2 -fomit-frame-pointer
-# the upstream simulation core is old K&R-ish C: no warnings from it. It is built with -O1: -O2 miscompiles parts of it
-# (traffic stayed away, the census counted too few residents, the valves ran into their limits); -O1 gives the same results as the native build
-COREFLAGS = $(subst -O2,-O1,$(ARCH)) -std=gnu89 -w -Isrc/core -Isrc/amiga
+# the upstream simulation core is old K&R-ish C: no warnings from it. -O2 used to miscompile it (traffic stayed away, the census
+# counted too few residents, the valves ran into their limits). Two causes: the m68k peephole2 pass of GCC 6.5 (the compiler of the
+# Docker image up to November 2026) changes s_traf.c and s_zone.c, so it stays switched off; and VoteProblems() in s_eval.c read one
+# entry past its array (fixed). Old code with loose pointer casts: no strict aliasing. With GCC 16 the core is bit-identical to -O1
+# and to the native build in hash runs; on a cycle-exact 68030 the simulation is 2-4 % faster (-O3: about 7 %, but 75 % more code).
+COREFLAGS = $(ARCH) -fno-strict-aliasing -fno-peephole2 -std=gnu89 -w -Isrc/core -Isrc/amiga
 AMIFLAGS  = $(ARCH) -std=gnu99 -Wall -Wno-unused-parameter -Isrc/core -Isrc/amiga -Itools/native -Iout
 DEST     = /share/Micropolis
 UP       = upstream

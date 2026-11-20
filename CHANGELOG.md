@@ -2,6 +2,28 @@
 
 Older versions: see the release notes on GitHub (v0.1 to v0.8.1).
 
+## 0.8.18 (20 November 2026)
+
+Why a new release: a fault of the original code in the citizens' vote is fixed, and Micropolis is now built with a new
+compiler version, GCC 16 instead of GCC 6.5.
+
+### Fixed
+- **The citizens' vote on the city's problems read past the end of its table** (`VoteProblems()` in `s_eval.c`, a fault of
+  the original code that is also in MicropolisCore). Every eleventh try of the vote looked at the memory behind the table, so
+  the result depended on what the linker placed there. Now all tries go to the seven real problems: the problem percentages
+  in the evaluation are about 7 % higher, their order stays the same. The simulation itself is almost always unchanged (11 of
+  12 test runs over 5 game years were bit-identical; one differed after about 3 years by under 1 % population).
+
+### Changed
+- **New compiler version: built with GCC 16** (new Docker image of the cross compiler `sacredbanana/amiga-compiler`, up to
+  0.8.17 it was GCC 6.5). Apart from the vote fix above, the simulation computes bit-identically to 0.8.17, and it matches
+  the PC build exactly (4 cities, 2 seeds, 5 game years). Four new compiler warnings in the front end are fixed (`sound.c`, `eval_ui.c`, `main.c`: string lengths, no effect
+  in practice).
+- **The core is built with `-O2` instead of `-O1`** (without the `peephole2` pass, which miscompiled two of its files in GCC
+  6.5). The simulation is 2-4 % faster on a cycle-exact emulated 68030.
+- For developers: `headless <city> <steps> hash <seed> quiet` measures the time of a run; hash runs also print the problem
+  votes of the evaluation.
+
 ## 0.8.17 (19 November 2026)
 
 Why a new release: Micropolis now opens the cities of the original SimCity (Amiga and Atari ST), and a loaded city shows its
