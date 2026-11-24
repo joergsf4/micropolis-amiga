@@ -131,6 +131,9 @@ SetTrafMem(void)
 	    sprite->dest_y = TrafMaxY;
 	  }
 	}
+	/* Amiga port: TrfDensity is a Byte, so above 255 the value wrapped round (240 + 50 = 290 -> 34) and the
+	 * busiest roads kept dropping to almost no traffic. Clamp it always (MicropolisCore does the same). */
+	if (z > 240) z = 240;
 	TrfDensity[SMapX >>1][SMapY >>1] = z;
       }
     }
