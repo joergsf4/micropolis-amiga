@@ -2,6 +2,41 @@
 
 Older versions: see the release notes on GitHub (v0.1 to v0.8.1).
 
+## 0.8.19 (24 November 2026)
+
+Why a new release: two more faults of the original simulation are fixed (a loaded city was counted twice, traffic on busy
+roads ran over), the start menu works again, and Micropolis no longer leaves memory behind after quitting.
+
+### Fixed
+- **A loaded city was counted twice** (`DoSimInit()` in `s_sim.c`, a fault of the original code; MicropolisCore does not have it).
+  Right after *Load City* the title bar showed the right population, a few seconds later twice as much, until the next yearly
+  evaluation. The census was not the only thing counted twice: police and fire stations worked double, and crime, fire and
+  pollution were all recalculated at once with these doubled values, so crime was far too low for the first months and the
+  city grew artificially. At the next evaluation the population seemed to halve, and the score dropped sharply (Kobe 700 to
+  480). Now the first evaluation sees the city as loaded. In test runs (14 cities, 64 seeds, 10 years) the score after the
+  first year is about 150 points higher, residents are about 5 % fewer in the first 2 years (the artificial growth is gone)
+  and the same after 10 years, funds are unchanged.
+- **Traffic on busy roads**: the traffic density of a road is a byte and ran over when it passed 255 (240 + 50 = 290 was
+  stored as 34), so the busiest roads kept dropping back to almost no traffic, the heavy traffic animation flickered and the
+  city saw less traffic than there was. It is now always limited to 240, as in MicropolisCore.
+  **This makes the game harder:** busy roads now really count. Pollution is up to 4 points higher, and cities with much traffic
+  grow less: in test runs (14 cities, 64 seeds) residents are about 7 % fewer after 5 years and 6 % after 10 years (Wetcity
+  -19 %, Haight -13 %), funds a few percent lower. Better road networks and rail help.
+- Both fixes change how the simulation runs on, so the test hashes differ from 0.8.18. Saved cities stay valid.
+- **The start menu never appeared** (Options > *Start menu at launch* had no effect since October 2026): the line that
+  switches it on had slipped into the loop over the test arguments, which only runs in test runs. Now the menu (*New city,
+  Load city, Scenario, Current city*) comes again at launch, but only when no city is given: a `CITY=` tooltype or a city on
+  the command line opens that city directly. The program icon therefore has `(CITY=cities/haight.cty)` in brackets now, like
+  the other examples; whoever keeps an old icon with `CITY=` switched on gets no start menu. The menu opens centred just
+  below the status bar, and the game picture behind it is drawn again at once when it moves or closes (before, a black
+  box stayed where it had been while the file requester was open).
+- **About 475 KB of memory stayed allocated after quitting**, every time (at least since 0.8.17): the tile and sprite
+  graphics, the tool icons, the small map tiles and the notice texts were loaded at start and never freed. Starting and
+  quitting Micropolis several times made the free fast RAM shrink further each time. Now all of it is freed; in the emulator
+  five runs in a row leave the free memory unchanged after the first one (the first start leaves system libraries and
+  devices in memory, as every program does).
+- German: the traffic report says "Helikopter Eins meldet starken Verkehr!" instead of "Himmelsbeobachter Eins".
+
 ## 0.8.18 (20 November 2026)
 
 Why a new release: a fault of the original code in the citizens' vote is fixed, and Micropolis is now built with a new
