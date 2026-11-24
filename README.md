@@ -6,7 +6,7 @@ Micropolis (the open-source version of the original SimCity) for the Amiga with 
 Intuition front end and **RTG** graphics (Picasso96 / CyberGraphX) or the **AGA / ECS chipset** (no graphics card needed). The simulation is the original
 C code; Tcl/Tk and X11 were replaced by an Amiga user interface.
 
-![status](https://img.shields.io/badge/status-early%20alpha-orange)
+![status](https://img.shields.io/badge/status-beta-brightgreen?style=plastic)
 
 ## What you need
 
