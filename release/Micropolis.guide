@@ -140,8 +140,9 @@
   at start turns the question on again.
 
   Settings are stored in ENVARC:Micropolis.prefs. ToolTypes of the icon:
-  SIZE=800x600 (fixed size, no question), CITY=<file>, LANGUAGE=deutsch (or
-  english, polski; also lang=deutsch on the command line).
+  SIZE=800x600 (fixed size, no question), CITY=<file> (opens it directly,
+  without the start menu), LANGUAGE=deutsch (or english, polski; also
+  lang=deutsch on the command line).
 @endnode
 
 @node CHEATS "Cheat words"

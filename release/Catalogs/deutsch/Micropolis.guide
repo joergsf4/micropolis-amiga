@@ -153,8 +153,8 @@
   beim Start fragen schaltet die Frage wieder ein.
 
   Die Einstellungen stehen in ENVARC:Micropolis.prefs. ToolTypes des Icons:
-  SIZE=800x600 (feste Größe, keine Frage), CITY=<Datei>,
-  LANGUAGE=deutsch (oder english, polski; auf der Kommandozeile lang=deutsch).
+  SIZE=800x600 (feste Größe, keine Frage), CITY=<Datei> (öffnet sie direkt,
+  ohne Startmenü), LANGUAGE=deutsch (oder english, polski; auf der Kommandozeile lang=deutsch).
 @endnode
 
 @node CHEATS "Cheat-Wörter"

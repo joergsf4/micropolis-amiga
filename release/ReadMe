@@ -39,7 +39,7 @@ started from anywhere, also from a shell:
     Work:Micropolis/Micropolis my.cty          ; a city file (relative to the current directory)
 
 ToolTypes of the icon (Information; remove the parentheses to switch one on):
-  CITY=cities/bruce.cty   opens that city at start
+  CITY=cities/bruce.cty   opens that city at start (directly, without the start menu)
   SIZE=800x600            screen size, 640x480 up to 800x600 (the view fills the screen: more city visible)
   DEBUG                   writes micropolis.log
 Command line: Micropolis [city] [SIZE=WxH] [ASK] [DEBUG]
@@ -85,7 +85,8 @@ Evaluation     menu Windows/Evaluation (opinion, problems, score)
 Graphs         menu Windows/Graphs (6 histories, 10 or 120 years)
 Overview map   menu Windows/Map opens the map window, Map/Next overlay cycles (14 overlays); click/drag in it to scroll
 Tool keys      b bulldozer, r road, p park, t wire, x rail, z query (as in the original); cheat words work too
-Start          at launch you choose: New city, Load city, Scenario or the default city (Options/Start menu at launch)
+Start          at launch you choose: New city, Load city, Scenario or the default city (Options/Start menu at launch;
+               not when a city is given with CITY= or on the command line)
 Tool icons     uniform 32x32 set by default; Options/Classic tool icons switches to the original pictures
 Level          menu Level: Easy/Medium/Hard (start funds of a new city, saved in the preferences)
 Ambient sounds quiet sea / city / nature loops that follow the visible part of the map (Options > Sound options)

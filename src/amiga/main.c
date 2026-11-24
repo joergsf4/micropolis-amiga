@@ -112,6 +112,7 @@ static int pref_level;                          /* difficulty 0 easy, 1 medium, 
 enum { O_BULLDOZE, O_BUDGET, O_DISASTERS, O_SOUND, O_AUTOGO, O_ANIM, O_MSGS, O_NOTICES, O_SPEAK, O_STARTMENU, O_CLASSIC, O_AMBIENT, O_WORLD, N_OPT };
 static int classic_icons;                        /* 1 = the original tool palette pictures, 0 = the uniform 32x32 set */
 static int start_pending;
+static int city_given;                          /* a city was named on the command line or with the CITY tooltype */
 static int refresh_full;                   /* the next window refresh must be followed by a complete redraw (the picture changed while a requester covered it) */
 static int start_menu = 1;                       /* ask what to start with: new city, load, scenario */
 static const char *const opt_key[N_OPT] = { "AUTOBULLDOZE", "AUTOBUDGET", "DISASTERS", "SOUND", "AUTOGOTO", "ANIMATION", "MESSAGES", "MESSAGEWINDOWS", "SPEAKTOOLS", "STARTMENU", "CLASSICICONS", "AMBIENT", "WORLDANIM" };
@@ -334,6 +335,16 @@ static UBYTE *load_file(const char *name, ULONG *size)
     Close(f);
     if (size) *size = len;
     return buf;
+}
+
+static void free_assets(void)
+{
+    if (tiles) { FreeVec(tiles); tiles = NULL; }
+    if (objects) { FreeVec(objects); objects = NULL; }
+    if (toolicons) { FreeVec(toolicons); toolicons = NULL; }
+    if (toolicons2) { FreeVec(toolicons2); toolicons2 = NULL; }
+    map_free();
+    notice_free();
 }
 
 static int load_assets(void)
@@ -1753,12 +1764,40 @@ static int do_command(int id, struct Window *win, struct MenuItem *item)
 }
 
 
+static int easy_centered;                                  /* the start menu: centred, just below the status bar */
+
+static void repaint_now(struct Window *win)                /* draw the damaged parts of the game window at once, while the main loop waits for a requester */
+{
+    BeginRefresh(win);
+    full_redraw = 1; first_present = 1; toolbar_dirty = status_dirty = demand_dirty = 1; tb_label_only = 0; last_line1[0] = 0;
+    render_frame(win);
+    EndRefresh(win, TRUE);
+    full_redraw = 1; first_present = 1; toolbar_dirty = status_dirty = demand_dirty = 1; last_line1[0] = 0;   /* and once more in full afterwards */
+}
+
 static int easy(struct Window *win, const char *text, const char *gadgets)   /* 1..n for the buttons left to right, the last = 0 */
 {
     struct EasyStruct es;
+    struct Window *rw;
+    LONG r;
     es.es_StructSize = sizeof(struct EasyStruct); es.es_Flags = 0;
     es.es_Title = (CONST_STRPTR)"Micropolis"; es.es_TextFormat = (CONST_STRPTR)text; es.es_GadgetFormat = (CONST_STRPTR)gadgets;
-    return (int)EasyRequestArgs(win, &es, NULL, NULL);
+    if (!easy_centered || !win) return (int)EasyRequestArgs(win, &es, NULL, NULL);
+    rw = BuildEasyRequestArgs(win, &es, 0, NULL);             /* Intuition opens it at the top left; move it, then wait as EasyRequest does */
+    if ((ULONG)rw <= 1) return (int)(ULONG)rw;
+    {   struct Screen *s = rw->WScreen;
+        int x = (s->Width - rw->Width) / 2, y = win->TopEdge + BAR_H + 6;
+        if (y + rw->Height > s->Height) y = s->Height - rw->Height;
+        if (x < 0) x = 0;
+        if (y < 0) y = 0;
+        MoveWindow(rw, x - rw->LeftEdge, y - rw->TopEdge);
+        for (int i = 0; i < 50 && (rw->LeftEdge != x || rw->TopEdge != y); i++) Delay(1);   /* Intuition moves it a moment later */
+        {   char b[120]; sprintf(b, "requester %dx%d at %d,%d (screen %dx%d, status bar from y %d)", rw->Width, rw->Height, rw->LeftEdge, rw->TopEdge, s->Width, s->Height, win->TopEdge); logmsg(b); }
+        repaint_now(win); }                                    /* where the requester first opened */
+    while ((r = SysReqHandler(rw, NULL, TRUE)) == -2) ;
+    FreeSysRequest(rw);
+    repaint_now(win);                                          /* where it stood: the next requester (file, scenario) may open at once */
+    return (int)r;
 }
 
 static int ask_quit(struct Window *win)                 /* 1 = quit now, 0 = stay */
@@ -1791,7 +1830,7 @@ static int pick_scenario(struct Window *win)             /* 1..8, 0 = back */
     }
 }
 
-static void start_choice(struct Window *win)             /* what to start with */
+static void start_choice_ask(struct Window *win)
 {
     char path[256];
     for (;;) {
@@ -1809,6 +1848,14 @@ static void start_choice(struct Window *win)             /* what to start with *
         else if (r == 3) { int sc = pick_scenario(win); if (sc) { do_command(CMD_SCEN + sc, win, NULL); return; } }
         else return;                                       /* Current city (the default one) */
     }
+}
+
+static void start_choice(struct Window *win)             /* what to start with */
+{
+    logmsg_t("start menu");
+    easy_centered = 1;                                     /* the start menu and the requesters it leads to */
+    start_choice_ask(win);
+    easy_centered = 0;
 }
 
 static void clamp_view(void)
@@ -2027,8 +2074,10 @@ static int real_main(int argc, char **argv)
     if (argc > 1 && strcasecmp(argv[1], "debug") && strncasecmp(argv[1], "depth=", 6) && strncasecmp(argv[1], "size=", 5) && strcasecmp(argv[1], "ask") && strncasecmp(argv[1], "lang=", 5)
         && strncasecmp(argv[1], "blit=", 5) && strncasecmp(argv[1], "merge=", 6)) {
         city = argv[1];                                  /* given on the command line: relative to the current directory */
+        city_given = 1;
     } else {                                             /* default / CITY tooltype: relative to the program's drawer */
         const char *c = tt_city[0] ? tt_city : "cities/haight.cty";
+        city_given = tt_city[0] != 0;
         if (strchr(c, ':')) strncpy(city_buf, c, sizeof city_buf - 1);
         else sprintf(city_buf, "PROGDIR:%.180s", c);
         city = city_buf;
@@ -2211,6 +2260,7 @@ static int real_main(int argc, char **argv)
     for (int ai = 1; ai < argc; ai++) if (!strncmp(argv[ai], "quit=", 5)) dbg_quit_loops = atoi(argv[ai] + 5) * 50;
     for (int ai = 1; ai < argc; ai++) if (!strncmp(argv[ai], "load=", 5) && strchr(argv[ai], ',')) {
         dbg_load_loops = atoi(argv[ai] + 5) * 50; strncpy(dbg_load_path, strchr(argv[ai], ',') + 1, sizeof dbg_load_path - 1); }
+    start_pending = start_menu && !city_given && argc <= 2;     /* ask only when no city was given (argument or CITY tooltype), never in test runs */
     for (int di = 3; di < argc; di++) {                          /* debug options, any number, any order (arguments 3 and up) */
         const char *a = argv[di];
         if (!strncmp(a, "scroll=", 7)) { dbg_scroll = atoi(a + 7); setSpeed(0); }   /* debug: scroll test */
@@ -2253,7 +2303,6 @@ static int real_main(int argc, char **argv)
             if (!strcmp(a, "chalkerase")) { editor.tool_state = eraserState; ToolDown(&editor, bx + 100, by + 40); ToolUp(&editor, bx + 100, by + 40); }
             editor.tool_state = queryState;
         }   /* debug */
-        start_pending = start_menu && argc <= 2;                  /* not for test runs (debug arguments) */
         if (!strncmp(a, "show=", 5)) debug_show = 1;
         if (!strcmp(a, "show=about")) { show_about(); dbg_about = 1; }
         if (!strcmp(a, "newcity")) do_command(CMD_NEW, win, NULL);
@@ -2535,6 +2584,7 @@ out:
     if (P96Base) { CloseLibrary(P96Base); P96Base = NULL; }
     if (fb) FreeVec(fb);
     if (scratch) FreeVec(scratch);
+    free_assets();                                                /* up to 0.8.18 these about 475 KB stayed allocated after quitting */
     if (CyberGfxBase) CloseLibrary(CyberGfxBase);
     if (GadToolsBase) CloseLibrary(GadToolsBase);
     if (AslBase) CloseLibrary(AslBase);

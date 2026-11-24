@@ -9,6 +9,7 @@ extern int map_mode;                               /* index into map_modes[] */
 extern const char *const map_names[];
 #define MAP_MODES 14
 int  map_load(void);                               /* res/tilessm.bin */
+void map_free(void);                               /* at exit */
 void map_refresh(void);                            /* redraw the map bitmap from the simulation */
 void map_blit(UBYTE *fb, int stride, int x0, int y0, int view_x, int view_y, int cols, int rows);
 int  map_hit(int x, int y, int x0, int y0, int *tx, int *ty);   /* pixel -> tile if inside the map */

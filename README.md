@@ -36,7 +36,7 @@ Work:Micropolis/Micropolis                 ; opens cities/haight.cty
 Work:Micropolis/Micropolis my.cty          ; opens a city file (path relative to the current directory)
 ```
 
-ToolTypes (icon information; remove the parentheses to switch one on): `CITY=cities/bruce.cty` city to open at start,
+ToolTypes (icon information; remove the parentheses to switch one on): `CITY=cities/bruce.cty` city to open at start (directly, without the start menu),
 `SIZE=800x600` screen size (640x480 up to 800x600; the tile view fills the screen, so more of the city is visible),
 `DEBUG` write `micropolis.log`.
 Command line: `Micropolis [city] [SIZE=WxH] [ASK] [DEBUG]`.
@@ -82,7 +82,7 @@ question on again. `SIZE=` (ToolType or argument) skips the question and uses th
 | Overview map | M or Windows > Map opens/closes the overview map, Map > Next overlay cycles power, traffic, pollution, crime, land value, ...; click or drag in it to scroll |
 | Scenarios | menu Scenarios: Dullsville 1900, San Francisco 1906, Hamburg 1944, Bern 1965, Tokyo 1957, Detroit 1972, Boston 2010, Rio de Janeiro 2047 (each with its story and goal) |
 | Tool keys | as in the original: `b` bulldozer, `r` road, `p` park, `t` wire, `x` rail, `z` zone query; typed cheat words (e.g. `fund`) work too |
-| Start | at launch a requester asks: New city, Load city, Scenario or the current (default) city; Options > Start menu at launch turns it off |
+| Start | at launch a requester asks: New city, Load city, Scenario or the current (default) city; not when a city is given (`CITY` tooltype or on the command line); Options > Start menu at launch turns it off |
 | Tool icons | uniform 32x32 icons by default; Options > Classic tool icons switches to the original pictures |
 | Level | menu Level: Easy / Medium / Hard (start funds of a new city; saved in the preferences) |
 | Ambient sounds | quiet loops that follow the visible part of the map: sea where it shows mostly water, traffic hum over a city, birds and wind over open land (Options > Sound options; CC0 recordings, see `tools/ambient/SOURCES.md`) |

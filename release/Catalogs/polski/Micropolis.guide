@@ -145,7 +145,8 @@
   ponownie.
 
   Ustawienia sa w ENVARC:Micropolis.prefs. ToolTypes ikony:
-  SIZE=800x600 (staly rozmiar, bez pytania), CITY=<plik>,
+  SIZE=800x600 (staly rozmiar, bez pytania), CITY=<plik> (otwiera go od razu,
+  bez menu startowego),
   LANGUAGE=polski (albo english, deutsch; w wierszu polecen lang=polski).
 @endnode
 

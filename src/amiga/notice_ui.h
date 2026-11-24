@@ -7,6 +7,7 @@ extern int notice_visible;
 #define NOTICE_W 444
 #define NOTICE_H 300
 int  notice_load(void);                      /* res/notices.txt */
+void notice_free(void);                      /* at exit */
 void notice_show(int id);                    /* "UIShowPicture id" and the win/lose notices; ignores unknown ids */
 void notice_draw(UBYTE *fb, int stride);     /* panel graphics into the frame buffer */
 void notice_text(void);                      /* panel text into the frame buffer (gfx_target must be set), after notice_draw */
