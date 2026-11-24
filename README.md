@@ -1,6 +1,6 @@
 # Micropolis for AmigaOS 3
 
-<img width="1139" height="1111" alt="2026-11-15_Micropolis" src="https://github.com/user-attachments/assets/cbd4db64-3e17-4dd5-a1f7-da38cf63c2f6" />
+<img width="1505" height="1106" alt="2026-11-24 16_51_27- A3000 uae  - WinUAE" src="https://github.com/user-attachments/assets/e38daafa-0c7a-4b54-9db0-5bc0767557a4" />
 
 Micropolis (the open-source version of the original SimCity) for the Amiga with a native
 Intuition front end and **RTG** graphics (Picasso96 / CyberGraphX) or the **AGA / ECS chipset** (no graphics card needed). The simulation is the original
