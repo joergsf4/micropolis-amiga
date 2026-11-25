@@ -73,7 +73,10 @@ static Object *load(const char *name)
     o = NewDTObject((CONST_STRPTR)path, DTA_SourceType, DTST_FILE, DTA_GroupID, GID_SOUND,
                     SDTA_Volume, 64, SDTA_Cycles, 1, TAG_DONE);
     if (!o) return NULL;
-    strncpy(cache[ncache].name, name, 31); cache[ncache].name[31] = 0;
+    {   size_t l = strlen(name);                       /* the cache key: the name, cut to the field */
+        if (l > sizeof cache[ncache].name - 1) l = sizeof cache[ncache].name - 1;
+        memcpy(cache[ncache].name, name, l); cache[ncache].name[l] = 0;
+    }
     cache[ncache].obj = o;
     ncache++;
     return o;

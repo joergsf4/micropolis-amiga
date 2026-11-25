@@ -29,6 +29,8 @@ static const struct notice *cur;
 static char lines[MAX_LINES][LINE_CHARS + 2];
 static int nlines;
 
+static char *notice_buf;                     /* res/notices.txt; the notices point into it */
+
 int notice_load(void)
 {
     BPTR f = Open((CONST_STRPTR)"PROGDIR:res/notices.txt", MODE_OLDFILE);
@@ -38,9 +40,10 @@ int notice_load(void)
     Seek(f, 0, OFFSET_END);
     len = Seek(f, 0, OFFSET_BEGINNING);
     buf = AllocVec(len + 1, MEMF_ANY);
-    if (!buf || Read(f, buf, len) != len) { Close(f); return 0; }
+    if (!buf || Read(f, buf, len) != len) { Close(f); if (buf) FreeVec(buf); return 0; }
     Close(f);
     buf[len] = 0;
+    notice_buf = buf;
     for (p = buf; *p && nnotices < MAX_NOTICES; ) {
         char *eol = strchr(p, '\n'), *t, *b;
         if (!eol) eol = p + strlen(p);
@@ -57,6 +60,13 @@ int notice_load(void)
         p = eol + 1;
     }
     return 1;
+}
+
+void notice_free(void)
+{
+    if (notice_buf) { FreeVec(notice_buf); notice_buf = NULL; }
+    nnotices = 0;
+    cur = NULL;
 }
 
 /* word-wrap the body (with "\n" escape sequences for line breaks) into lines[] */

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """The simulation core of the Amiga build must behave like the same code built natively on the Mac (a wrong -O2 build once left out the traffic,
-counted too few residents and froze the demand valves). Runs a few cities for 12 months in both and compares the results with tolerances
-(the random numbers are seeded from the clock at load time, so the runs are not identical, only equal in the statistics).
+counted too few residents and froze the demand valves). Runs a few cities for 12 months in both and compares the results with tolerances (these runs are seeded from the clock),
+then a reproducible "hash" run of HASH_STEPS steps (fixed clock and seed, see tools/native/statehash.h) in both, which must
+give identical state hashes after every step; the first difference names the step and the tables that differ.
 
 usage: core_parity.py [city ...]      (default senri wetcity; needs Docker for the Amiga run, a C compiler for the native one)
 """
@@ -12,6 +13,7 @@ import sys
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
 MONTHS = 12
+HASH_STEPS = 96          # CityTime steps (16 sim_loop calls each, about a week of game time): two game years
 
 
 def parse(text):
@@ -35,6 +37,41 @@ def native(city):
     out = subprocess.run(['../headless_native', os.path.join(ROOT, 'upstream', 'cities', city + '.cty'), str(MONTHS), str(MONTHS)],
                          cwd=os.path.join(ROOT, 'out', 'native', 'run'), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True).stdout
     return parse(out)
+
+
+def hashes(text):
+    """state hash lines of a hash run: {step: {table: hash}}"""
+    r = {}
+    for line in text.splitlines():
+        m = re.match(r'S(\d+) (.*)', line.strip())
+        if m:
+            r[int(m.group(1))] = dict(kv.split('=', 1) for kv in m.group(2).split())
+    return r
+
+
+def native_hash(city):
+    out = subprocess.run(['../headless_native', os.path.join(ROOT, 'upstream', 'cities', city + '.cty'), str(HASH_STEPS), 'hash'],
+                         cwd=os.path.join(ROOT, 'out', 'native', 'run'), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True).stdout
+    return hashes(out)
+
+
+def amiga_hash(city):
+    cmd = 'CD Work:Micropolis\nheadless cities/%s.cty %d hash' % (city, HASH_STEPS)
+    out = subprocess.run([os.path.join(ROOT, 'tools', 'emusys.sh'), cmd, '300'], cwd=ROOT, stdout=subprocess.PIPE, text=True).stdout
+    return hashes(out)
+
+
+def compare_hashes(a, n):
+    """None if equal, else a description of the first difference"""
+    if not a or not n:
+        return 'no hash result (amiga %d steps, native %d steps)' % (len(a), len(n))
+    for step in sorted(set(a) | set(n)):
+        if step not in a or step not in n:
+            return 'step %d missing in the %s run' % (step, 'amiga' if step not in a else 'native')
+        diff = [k for k in n[step] if a[step].get(k) != n[step][k]]
+        if diff:
+            return 'hashes differ from step %d on (%s)' % (step, ', '.join(diff))
+    return None
 
 
 def amiga(city):
@@ -64,6 +101,9 @@ def main():
                 for i, name in enumerate(('residential', 'commercial', 'industrial')):
                     if abs(a['valves'][i] - n['valves'][i]) > 900:
                         problems.append('%s demand %d vs %d' % (name, a['valves'][i], n['valves'][i]))
+        h = compare_hashes(amiga_hash(city), native_hash(city))
+        if h:
+            problems.append(h)
         print('%-10s %s   (amiga %s | native %s)' % (city, 'ok' if not problems else 'FAIL: ' + '; '.join(problems), a, n))
         failed += bool(problems)
     print('%d of %d cities differ' % (failed, len(cities)) if failed else 'all %d cities agree' % len(cities))

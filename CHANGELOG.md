@@ -2,6 +2,107 @@
 
 Older versions: see the release notes on GitHub (v0.1 to v0.8.1).
 
+## 0.8.19 (24 November 2026)
+
+Why a new release: two more faults of the original simulation are fixed (a loaded city was counted twice, traffic on busy
+roads ran over), the start menu works again, and Micropolis no longer leaves memory behind after quitting.
+
+### Fixed
+- **A loaded city was counted twice** (`DoSimInit()` in `s_sim.c`, a fault of the original code; MicropolisCore does not have it).
+  Right after *Load City* the title bar showed the right population, a few seconds later twice as much, until the next yearly
+  evaluation. The census was not the only thing counted twice: police and fire stations worked double, and crime, fire and
+  pollution were all recalculated at once with these doubled values, so crime was far too low for the first months and the
+  city grew artificially. At the next evaluation the population seemed to halve, and the score dropped sharply (Kobe 700 to
+  480). Now the first evaluation sees the city as loaded. In test runs (14 cities, 64 seeds, 10 years) the score after the
+  first year is about 150 points higher, residents are about 5 % fewer in the first 2 years (the artificial growth is gone)
+  and the same after 10 years, funds are unchanged.
+- **Traffic on busy roads**: the traffic density of a road is a byte and ran over when it passed 255 (240 + 50 = 290 was
+  stored as 34), so the busiest roads kept dropping back to almost no traffic, the heavy traffic animation flickered and the
+  city saw less traffic than there was. It is now always limited to 240, as in MicropolisCore.
+  **This makes the game harder:** busy roads now really count. Pollution is up to 4 points higher, and cities with much traffic
+  grow less: in test runs (14 cities, 64 seeds) residents are about 7 % fewer after 5 years and 6 % after 10 years (Wetcity
+  -19 %, Haight -13 %), funds a few percent lower. Better road networks and rail help.
+- Both fixes change how the simulation runs on, so the test hashes differ from 0.8.18. Saved cities stay valid.
+- **The start menu never appeared** (Options > *Start menu at launch* had no effect since October 2026): the line that
+  switches it on had slipped into the loop over the test arguments, which only runs in test runs. Now the menu (*New city,
+  Load city, Scenario, Current city*) comes again at launch, but only when no city is given: a `CITY=` tooltype or a city on
+  the command line opens that city directly. The program icon therefore has `(CITY=cities/haight.cty)` in brackets now, like
+  the other examples; whoever keeps an old icon with `CITY=` switched on gets no start menu. The menu opens centred just
+  below the status bar, and the game picture behind it is drawn again at once when it moves or closes (before, a black
+  box stayed where it had been while the file requester was open).
+- **About 475 KB of memory stayed allocated after quitting**, every time (at least since 0.8.17): the tile and sprite
+  graphics, the tool icons, the small map tiles and the notice texts were loaded at start and never freed. Starting and
+  quitting Micropolis several times made the free fast RAM shrink further each time. Now all of it is freed; in the emulator
+  five runs in a row leave the free memory unchanged after the first one (the first start leaves system libraries and
+  devices in memory, as every program does).
+- German: the traffic report says "Helikopter Eins meldet starken Verkehr!" instead of "Himmelsbeobachter Eins".
+
+## 0.8.18 (20 November 2026)
+
+Why a new release: a fault of the original code in the citizens' vote is fixed, and Micropolis is now built with a new
+compiler version, GCC 16 instead of GCC 6.5.
+
+### Fixed
+- **The citizens' vote on the city's problems read past the end of its table** (`VoteProblems()` in `s_eval.c`, a fault of
+  the original code that is also in MicropolisCore). Every eleventh try of the vote looked at the memory behind the table, so
+  the result depended on what the linker placed there. Now all tries go to the seven real problems: the problem percentages
+  in the evaluation are about 7 % higher, their order stays the same. The simulation itself is almost always unchanged (11 of
+  12 test runs over 5 game years were bit-identical; one differed after about 3 years by under 1 % population).
+
+### Changed
+- **New compiler version: built with GCC 16** (new Docker image of the cross compiler `sacredbanana/amiga-compiler`, up to
+  0.8.17 it was GCC 6.5). Apart from the vote fix above, the simulation computes bit-identically to 0.8.17, and it matches
+  the PC build exactly (4 cities, 2 seeds, 5 game years). Four new compiler warnings in the front end are fixed (`sound.c`, `eval_ui.c`, `main.c`: string lengths, no effect
+  in practice).
+- **The core is built with `-O2` instead of `-O1`** (without the `peephole2` pass, which miscompiled two of its files in GCC
+  6.5). The simulation is 2-4 % faster on a cycle-exact emulated 68030.
+- For developers: `headless <city> <steps> hash <seed> quiet` measures the time of a run; hash runs also print the problem
+  votes of the evaluation.
+
+## 0.8.17 (19 November 2026)
+
+Why a new release: Micropolis now opens the cities of the original SimCity (Amiga and Atari ST), and a loaded city shows its
+name and numbers at once.
+
+### Added
+- **Import of cities from the original SimCity** for the Amiga and the Atari ST: *Load City* (also in the start question and with `CITY=` or a
+  file name on the command line) now also loads the city files of the original SimCity, such as the scenarios on its disk
+  ("San Francisco", "Tokyo" ...). They are the Mac format of SimCity: a 128 byte MacBinary header (city name, type `CITY`,
+  creator `MCRP`) and then exactly the data of a Micropolis `.cty` file. Micropolis takes the data part and the city name from
+  the header. The load requester also shows files without a name extension. An imported city has no `.cty` name yet: *Save City*
+  asks for one (it suggests `<city name>.cty`) and never overwrites the original file. The simulation core is not changed.
+- **Test option `load=SECONDS,FILE`** (for developers): loads a city after that many seconds, as *Load City* does but without
+  the file requester. With `DEBUG` the log now also shows each change of the status line and the screen title bar, with the
+  time.
+
+### Fixed
+- **The name of a newly loaded city appeared late in the status line**, up to a minute after *Load City* (about 13 s on an
+  A3000): the window was drawn again while the file requester closed, and that drawing only reaches the part the requester had
+  covered, so the new status line was not shown until its text changed again (the clock). After such a refresh the status
+  line, the tool palette and the demand display are now drawn once more in full.
+- **The screen title bar shows a loaded city at once:** date and funds came only with the next simulation step (never while
+  paused) and the population only with the first evaluation (about 16 s later on "slow"). Until that evaluation the title bar
+  shows the population counted at loading.
+
+## 0.8.16 (17 November 2026)
+
+Why a new release: 0.8.15 made drawing faster on fast Amigas with a slow bus, but slower on a 68020/68030; 0.8.16 measures
+which way is faster on each machine.
+
+### Changed
+- **RTG drawing chooses itself** (`BLIT=auto`, the new default): for the first seconds after the start Micropolis sends the
+  picture once with the tile set in the graphics card's memory (0.8.15) and once with WritePixelArray, and keeps the faster
+  way. The tile set wins with a fast CPU and a slow bus (68060 with a ZZ9000 in a Zorro II slot: 8-10 ms per frame instead of
+  13-15 ms), but on a 68030 every single blit costs about 0.5 ms of CPU time, and there WritePixelArray is two to four times
+  faster (A3000 with a Picasso IV in FS-UAE at real speed: 15-18 ms instead of 36-69 ms). `BLIT=atlas` and `BLIT=wpa` still
+  choose by hand.
+
+### Added
+- **"Micropolis" public name license** (`MicropolisPublicNameLicense.md`) in the repository.
+- **Reproducible test runs** (for developers): `headless <city> <steps> hash [seed]` and `headless_native` give the same state
+  hashes every time, and the Amiga build and the native build give identical hashes; `tools/test/core_parity.py` compares
+  them exactly (see PORTING.md). Before, the clock-seeded random numbers made every run different.
+
 ## 0.8.15 (14 November 2026)
 
 ### Changed
@@ -12,7 +113,6 @@ Older versions: see the release notes on GitHub (v0.1 to v0.8.1).
 - **Fewer blits per frame**: runs of changed tiles with the same columns in rows one below the other go to the screen as one
   rectangle. Unchanged tiles are not sent along by default: on that machine a pixel costs about 0.55 µs on the bus and a blit
   about 70 µs, so an extra tile costs more than the saved blit.
-
 - **Dark status line** (#49): it no longer repeats the screen title bar. The name of the city (from the file name) is on the left,
   the time of day (HH:MM, from the system clock, redrawn when the minute changes) on the right, and the last message in between.
   Date, funds, population and speed stay in the grey screen title bar.

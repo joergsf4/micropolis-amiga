@@ -39,13 +39,15 @@ started from anywhere, also from a shell:
     Work:Micropolis/Micropolis my.cty          ; a city file (relative to the current directory)
 
 ToolTypes of the icon (Information; remove the parentheses to switch one on):
-  CITY=cities/bruce.cty   opens that city at start
+  CITY=cities/bruce.cty   opens that city at start (directly, without the start menu)
   SIZE=800x600            screen size, 640x480 up to 800x600 (the view fills the screen: more city visible)
   DEBUG                   writes micropolis.log
 Command line: Micropolis [city] [SIZE=WxH] [ASK] [DEBUG]
-For testing on RTG cards (perf lines of micropolis.log). By default the tile set stays in the
-graphics card's memory and the card copies changed tiles itself (less traffic on the bus).
-  BLIT=wpa                WritePixelArray for everything instead (as up to 0.8.14);
+RTG drawing: for the first seconds Micropolis measures two ways and keeps the faster one: the
+tile set in the graphics card's memory (faster with a fast CPU and a slow bus) or WritePixelArray
+(faster on a 68020/68030). To choose by hand (perf lines of micropolis.log show the times):
+  BLIT=atlas              tile set in the card's memory
+  BLIT=wpa                WritePixelArray for everything (as up to 0.8.14);
                           BLIT=p96 and BLIT=chunky: other functions, 8 bit screens only
   MERGE=0                 a rectangle may include this many unchanged tiles to save a blit (-1 = off)
 
@@ -83,7 +85,8 @@ Evaluation     menu Windows/Evaluation (opinion, problems, score)
 Graphs         menu Windows/Graphs (6 histories, 10 or 120 years)
 Overview map   menu Windows/Map opens the map window, Map/Next overlay cycles (14 overlays); click/drag in it to scroll
 Tool keys      b bulldozer, r road, p park, t wire, x rail, z query (as in the original); cheat words work too
-Start          at launch you choose: New city, Load city, Scenario or the default city (Options/Start menu at launch)
+Start          at launch you choose: New city, Load city, Scenario or the default city (Options/Start menu at launch;
+               not when a city is given with CITY= or on the command line)
 Tool icons     uniform 32x32 set by default; Options/Classic tool icons switches to the original pictures
 Level          menu Level: Easy/Medium/Hard (start funds of a new city, saved in the preferences)
 Ambient sounds quiet sea / city / nature loops that follow the visible part of the map (Options > Sound options)
@@ -106,6 +109,9 @@ STATUS
 ------
 Works: simulation, building tools, animated map, overview map with overlays, budget, evaluation, graphs, sound effects, scenarios, zone query box, earthquake shake,
 load/save/new random city, menus, disasters, event messages.
+Load City also imports cities of the original SimCity for the Amiga and the Atari ST (files without an extension,
+e.g. "San Francisco");
+they are saved as a new .cty file, the original file is not overwritten.
 Missing: looping sounds (bulldozer), terrain options for new cities.
 An early crash on quitting seems fixed in 0.2 - if you still see it, please report the error number.
 

@@ -355,6 +355,15 @@ Kernschmelze
 S_4766D2E4
 Stadt laden
 ; Load City
+S_260DD269
+%s aus dem Original-SimCity importiert
+; Imported %s from the original SimCity
+S_6EB4B2A4
+%s geladen
+; Loaded %s
+S_2CF5B95B
+%s konnte nicht geladen werden
+; Could not load %s
 S_2DC0A276
 Ton: ausgeschaltet (Menü Optionen)
 ; Sound: switched off (Options menu)
@@ -439,12 +448,6 @@ Wiederholt: %d Felder
 S_7E6206A1
 Neue Stadt erzeugt.
 ; New city generated.
-S_6EB4B2A4
-%s geladen
-; Loaded %s
-S_2CF5B95B
-%s konnte nicht geladen werden
-; Could not load %s
 S_2BCF1D35
 Der Bildschirmmodus wird beim nächsten Start gefragt.
 ; The screen mode will be asked at the next start.
@@ -980,7 +983,7 @@ S_1579E3E8
 STARKER VERKEHR!
 ; HEAVY TRAFFIC!
 S_565252E4
-Himmelsbeobachter Eins\\nmeldet starken Verkehr!
+Helikopter Eins\\nmeldet starken Verkehr!
 ; Sky Watch One\\nreporting heavy traffic!
 S_1BC9A543
 ÜBERSCHWEMMUNG GEMELDET!

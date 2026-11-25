@@ -32,10 +32,16 @@ int map_load(void)
     smalltiles = AllocVec(TILE_COUNT * 12, MEMF_ANY);
     if (!smalltiles || Read(f, smalltiles, TILE_COUNT * 12) != TILE_COUNT * 12) {
         Close(f);
+        map_free();
         return 0;
     }
     Close(f);
     return 1;
+}
+
+void map_free(void)
+{
+    if (smalltiles) { FreeVec(smalltiles); smalltiles = NULL; }
 }
 
 /* value classes of upstream g_map.c GetCI(): none/low/medium/high/very high */

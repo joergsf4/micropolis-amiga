@@ -214,7 +214,7 @@ VoteProblems(void)
       z++;
     }
     x++;
-    if (x > PROBNUM) x = 0;
+    if (x >= PROBNUM) x = 0;		/* Amiga port: was "> PROBNUM", which read ProblemTable[PROBNUM] and wrote ProblemVotes[PROBNUM], one past the end */
     count++;
   }
 }

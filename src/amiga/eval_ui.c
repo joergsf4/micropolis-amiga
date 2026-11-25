@@ -50,7 +50,7 @@ void eval_draw(UBYTE *fb, int stride)
     gfx_colors(PEN_TEXT, PEN_BAR);
     y = EVAL_Y + 48;
     gfx_print(x, y, T("Public opinion: is the mayor doing a good job?"));           y += 16;
-    sprintf(b, "   %s %-5s  %s %-5s", T("Yes"), f[15], T("No"), f[16]);                         gfx_print(x, y, b);   y += 24;
+    snprintf(b, sizeof b, "   %s %-5.12s  %s %-5.12s", T("Yes"), f[15], T("No"), f[16]);   /* "45%": at most a few characters */                       gfx_print(x, y, b);   y += 24;
     gfx_print(x, y, T("The worst problems:"));                                      y += 16;
     for (int i = 0; i < 4; i++) {
         gfx_print(x + 24, y, T(f[2 + i])); gfx_print_r(x + 24 + 24 * 8, y, f[6 + i]); y += 14;

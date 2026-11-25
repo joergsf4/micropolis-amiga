@@ -206,7 +206,10 @@ Simulate(int mod16)
 /* comefrom: Simulate */
 DoSimInit(void)
 {
-  Fcycle = 0;
+  Fcycle = 1023;	/* Amiga port: was 0. SimFrame increments Fcycle before Simulate(), so the first step after a load was
+			   phase 1: phases 1-8 counted the city a second time on top of the full census above, and the initial
+			   evaluation in phase 0 showed twice the population. Now the next ++Fcycle wraps to 0 and phase 0 comes
+			   first, as in MicropolisCore (simulate() increments phaseCycle at the end) */
   Scycle = 0;
 
   if (InitSimLoad == 2) 			/* if new city    */
